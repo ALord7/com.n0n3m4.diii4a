@@ -216,6 +216,24 @@ void GL_Uniform4fv(GLint location, const GLfloat *value)
 
 /*
 ====================
+GL_Uniform3fv
+====================
+*/
+void GL_Uniform3fv(GLint location, const GLfloat *value)
+{
+	if (!backEnd.glState.currentProgram) {
+		common->Printf("GL_Uniform4fv: no current program object\n");
+		__builtin_trap();
+		return;
+	}
+
+	glUniform3fv(*(GLint *)((char *)backEnd.glState.currentProgram + location), 1, value);
+
+	GL_CheckErrors();
+}
+
+/*
+====================
 GL_UniformMatrix4fv
 ====================
 */
@@ -228,6 +246,24 @@ void GL_UniformMatrix4fv(GLint location, const GLfloat *value)
 	}
 
 	glUniformMatrix4fv(*(GLint *)((char *)backEnd.glState.currentProgram + location), 1, GL_FALSE, value);
+
+	GL_CheckErrors();
+}
+
+/*
+====================
+GL_Uniform1f
+====================
+*/
+void GL_Uniform1f(GLint location, GLfloat value)
+{
+	if (!backEnd.glState.currentProgram) {
+		common->Printf("GL_Uniform1f: no current program object\n");
+		__builtin_trap();
+		return;
+	}
+
+	glUniform1f(*(GLint *)((char *)backEnd.glState.currentProgram + location), value);
 
 	GL_CheckErrors();
 }
@@ -254,6 +290,7 @@ void GL_EnableVertexAttribArray(GLuint index)
 		return;
 	}
 
+	//RB_LogComment("glEnableVertexAttribArray( %i );\n", index);
 	glEnableVertexAttribArray(*(GLint *)((char *)backEnd.glState.currentProgram + index));
 
 	GL_CheckErrors();
@@ -307,6 +344,7 @@ void GL_VertexAttribPointer(GLuint index, GLint size, GLenum type,
 		return;
 	}
 
+	// RB_LogComment("glVertexAttribPointer( %i, %i, %i, %i, %i, %p );\n", index, size, type, normalized, stride, pointer);
 	glVertexAttribPointer(*(GLint *)((char *)backEnd.glState.currentProgram + index),
 	                      size, type, normalized, stride, pointer);
 

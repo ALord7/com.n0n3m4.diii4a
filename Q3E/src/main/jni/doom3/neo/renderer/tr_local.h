@@ -29,6 +29,35 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __TR_LOCAL_H__
 #define __TR_LOCAL_H__
 
+//#define _SHADOW_MAPPING
+#ifdef _SHADOW_MAPPING
+#define MAX_SHADOWMAP_RESOLUTIONS 5
+#include "Framebuffer.h"
+
+// RB: added multiple subfrustums for cascaded shadow mapping
+enum frustumPlanes_t
+{
+	FRUSTUM_PLANE_LEFT,
+	FRUSTUM_PLANE_RIGHT,
+	FRUSTUM_PLANE_BOTTOM,
+	FRUSTUM_PLANE_TOP,
+	FRUSTUM_PLANE_NEAR,
+	FRUSTUM_PLANE_FAR,
+	FRUSTUM_PLANES = 6,
+	FRUSTUM_CLIPALL = 1 | 2 | 4 | 8 | 16 | 32
+};
+
+enum
+{
+	FRUSTUM_PRIMARY,
+	FRUSTUM_CASCADE1,
+	FRUSTUM_CASCADE2,
+	FRUSTUM_CASCADE3,
+	FRUSTUM_CASCADE4,
+	FRUSTUM_CASCADE5,
+	MAX_FRUSTUMS,
+};
+#endif
 #include "Image.h"
 
 #include "MegaTexture.h"
@@ -241,6 +270,10 @@ class idRenderLightLocal : public idRenderLight
 		idInteraction 			*lastInteraction;
 
 		struct doublePortal_s 	*foggedPortals;
+#ifdef _SHADOW_MAPPING
+	float			baseLightProject[16];		// global xyz1 to projected light strq
+    float			inverseBaseLightProject[16];// transforms the zero-to-one cube to exactly cover the light in world space
+#endif
 };
 
 
@@ -343,6 +376,14 @@ typedef struct viewLight_s {
 	const struct drawSurf_s	*localShadows;				// don't shadow local Surfaces
 	const struct drawSurf_s	*globalInteractions;		// get shadows from everything
 	const struct drawSurf_s	*translucentInteractions;	// get shadows from everything
+
+#ifdef _SHADOW_MAPPING
+    bool					pointLight;					// otherwise a projection light (should probably invert the sense of this, because points are way more common)
+    bool					parallel;					// lightCenter gives the direction to the light at infinity
+    idVec3					lightCenter;				// offset the lighting direction for shading and
+    int						shadowLOD;					// level of detail for shadowmap selection
+    float			baseLightProject[16];			// global xyz1 to projected light strq
+#endif
 } viewLight_t;
 
 
@@ -370,8 +411,10 @@ typedef struct viewEntity_s {
 
 	float				modelMatrix[16];		// local coords to global coords
 	float				modelViewMatrix[16];	// local coords to eye coords
+#ifdef _SHADOW_MAPPING
+	float mvp[16];
+#endif
 } viewEntity_t;
-
 
 const int	MAX_CLIP_PLANES	= 1;				// we may expand this to six for some subview issues
 
@@ -619,6 +662,9 @@ typedef struct {
 	bool		forceGlState;		// the next GL_State will ignore glStateBits and set everything
 
 	shaderProgram_s	*currentProgram;
+#ifdef _SHADOW_MAPPING
+	Framebuffer*		currentFramebuffer;
+#endif
 } glstate_t;
 
 
@@ -678,6 +724,10 @@ typedef struct {
 #ifdef _HUMANHEAD //k: scope view support: in multithread
 	bool scopeView;
 	bool shuttleView;
+#endif
+#ifdef _SHADOW_MAPPING
+    float		shadowV[16][6];				// shadow depth view matrix
+    float		shadowP[16][6];				// shadow depth projection matrix
 #endif
 } backEndState_t;
 
@@ -1047,8 +1097,10 @@ GL wrapper/helper functions
 void	GL_SelectTexture(int unit);
 void	GL_UseProgram(shaderProgram_s *program);
 void	GL_Uniform1fv(GLint location, const GLfloat *value);
+void	GL_Uniform3fv(GLint location, const GLfloat *value);
 void	GL_Uniform4fv(GLint location, const GLfloat *value);
 void	GL_UniformMatrix4fv(GLint location, const GLfloat *value);
+void	GL_Uniform1f(GLint location, GLfloat value);
 void	GL_EnableVertexAttribArray(GLuint index);
 void	GL_DisableVertexAttribArray(GLuint index);
 void	GL_VertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer);
@@ -1057,6 +1109,7 @@ void	GL_ClearStateDelta(void);
 void	GL_State(int stateVector);
 void	GL_TexEnv(int env);
 void	GL_Cull(int cullType);
+void GL_CheckErrors(const char *name);
 
 const int GLS_SRCBLEND_ZERO						= 0x00000001;
 const int GLS_SRCBLEND_ONE						= 0x0;
@@ -1349,6 +1402,8 @@ void RB_StencilShadowPass(const drawSurf_t *drawSurfs);
 void RB_STD_DrawView(void);
 void RB_STD_FogAllLights(void);
 void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float textureMatrix[16] );
+void RB_PrepareStageTexturing(const shaderStage_t *pStage,  const drawSurf_t *surf, idDrawVert *ac);
+void RB_FinishStageTexturing(const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac);
 
 /*
 ============================================================
@@ -1501,6 +1556,15 @@ typedef struct shaderProgram_s {
 	GLint		texgenT;
 	GLint		texgenQ;
 
+	GLint		alpha;
+#ifdef _SHADOW_MAPPING
+	GLint		u_shadowMVPMatrix;
+	GLint		u_globalLightOrigin;
+    GLint		u_bias;
+    GLint		u_sampleSize;
+	GLint		u_near;
+	GLint		u_far;
+#endif
 #ifdef _HARM_SHADER_NAME //k: restore shader name
 	char name[32];
 #endif
@@ -1514,7 +1578,7 @@ void RB_GLSL_DrawInteractions(void);
 void RB_GLSL_CreateDrawInteractions(const drawSurf_t *surf);
 void RB_GLSL_DrawInteraction(const drawInteraction_t *din);
 
-void R_CheckGLSLCvars(void);
+void R_CheckBackEndCvars(void);
 
 extern shaderProgram_t shadowShader;
 extern shaderProgram_t interactionShader;
@@ -1528,6 +1592,18 @@ extern shaderProgram_t blendLightShader; //k: blend light shader
 extern shaderProgram_t interactionBlinnPhongShader; //k: BLINN-PHONG lighting model interaction shader
 extern shaderProgram_t diffuseCubemapShader; //k: diffuse cubemap shader
 extern shaderProgram_t texgenShader; //k: texgen shader
+#ifdef _SHADOW_MAPPING
+extern shaderProgram_t depthShader_pointLight; //k: depth shader(point light)
+extern shaderProgram_t	interactionShadowMappingShader_pointLight; //k: interaction with shadow mapping(point light)
+extern shaderProgram_t depthShader_spotLight; //k: depth shader
+extern shaderProgram_t	interactionShadowMappingShader_spotLight; //k: interaction with shadow mapping
+extern shaderProgram_t depthShader_parallelLight; //k: depth shader(parallel)
+extern shaderProgram_t	interactionShadowMappingShader_parallelLight; //k: interaction with shadow(parallel)
+
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_pointLight; //k: interaction with shadow mapping(point light)
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_spotLight; //k: interaction with shadow mapping
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_parallelLight; //k: interaction with shadow mapping(parallel)
+#endif
 
 
 /*
@@ -1843,43 +1919,75 @@ extern idCVar harm_r_maxAllocStackMemory; // declare in tr_trisurf.cpp
 	#define HARM_MAX_STACK_ALLOC_SIZE (1024 * 512)
 #endif
 
+struct idAllocAutoHeap {
+	public:
+
+		idAllocAutoHeap() 
+			: data(NULL)
+		{ }
+
+		~idAllocAutoHeap() {
+			Free();
+		}
+
+		void * Alloc(size_t size) {
+			Free();
+			data = calloc(size, 1);
+			common->Printf("[Harmattan]: %p alloca on heap memory %p(%d bytes)\n", this, data, size);
+			return data;
+		}
+
+		void * Alloc16(size_t size) {
+			Free();
+			data = calloc(size + 15, 1);
+			void *ptr = ((void *)(((intptr_t)data + 15) & ~15));
+			common->Printf("[Harmattan]: %p alloca16 on heap memory %p(%d bytes) <- %p(%d bytes)\n", this, ptr, size, data, size + 15);
+			return ptr;
+		}
+
+		bool IsAlloc(void) const {
+			return data != NULL;
+		}
+
+	private:
+		void *data;
+
+		void Free(void) {
+			if(data) {
+				common->Printf("[Harmattan]: %p free alloca16 heap memory %p\n", this, data);
+				free(data);
+				data = NULL;
+			}
+		}
+		void * operator new(size_t size);
+		void * operator new[](size_t size);
+		void operator delete(void *ptr);
+		void operator delete[](void *ptr);
+		idAllocAutoHeap(const idAllocAutoHeap &other);
+		idAllocAutoHeap & operator=(const idAllocAutoHeap &other);
+};
+
 // alloc in heap memory
 #define _alloca16_heap( x )					((void *)((((intptr_t)calloc( (x)+15 ,1 )) + 15) & ~15))
 
 	// Using heap memory. Also reset RLIMIT_STACK by call `setrlimit`.
 #define _DROID_ALLOC16_DEF(T, alloc_size, varname, x) \
-	const int _HARM_MAX_STACK_ALLOC_SIZE##x = harm_r_maxAllocStackMemory.GetInteger(); \
-	bool useHeapMem##x; \
-	if(_HARM_MAX_STACK_ALLOC_SIZE##x > 0) \
-		useHeapMem##x = (alloc_size) >= _HARM_MAX_STACK_ALLOC_SIZE##x;	 \
-	else if(_HARM_MAX_STACK_ALLOC_SIZE##x == 0) \
-		useHeapMem##x = true; \
-	else \
-		useHeapMem##x = false; \
-	T *varname = (T *) (useHeapMem##x ? _alloca16_heap(alloc_size) : _alloca16(alloc_size)); \
-	if(useHeapMem##x) \
-		common->Printf("[Harmattan]: Alloca on heap memory %p(%d bytes)\n", varname, alloc_size);
+	idAllocAutoHeap _allocAutoHeap##x; \
+	T *varname = (T *) (HARM_MAX_STACK_ALLOC_SIZE == 0 || (HARM_MAX_STACK_ALLOC_SIZE > 0 && (alloc_size) >= HARM_MAX_STACK_ALLOC_SIZE) ? _allocAutoHeap##x.Alloc16(alloc_size) : _alloca16(alloc_size)); \
+	if(_allocAutoHeap##x.IsAlloc()) \
+		common->Printf("[Harmattan]: Alloca on heap memory %s %p(%d bytes)\n", #varname, varname, alloc_size);
 
 #define _DROID_ALLOC16(T, alloc_size, varname, x) \
-	const int _HARM_MAX_STACK_ALLOC_SIZE##x = harm_r_maxAllocStackMemory.GetInteger(); \
-	bool useHeapMem##x; \
-	if(_HARM_MAX_STACK_ALLOC_SIZE##x > 0) \
-		useHeapMem##x = (alloc_size) >= _HARM_MAX_STACK_ALLOC_SIZE##x;	 \
-	else if(_HARM_MAX_STACK_ALLOC_SIZE##x == 0) \
-		useHeapMem##x = true; \
-	else \
-		useHeapMem##x = false; \
-	varname = (T *) (useHeapMem##x ? _alloca16_heap(alloc_size) : _alloca16(alloc_size)); \
-	if(useHeapMem##x) \
-		common->Printf("[Harmattan]: Alloca on heap memory %p(%d bytes)\n", varname, alloc_size);
+	idAllocAutoHeap _allocAutoHeap##x; \
+	varname = (T *) (HARM_MAX_STACK_ALLOC_SIZE == 0 || (HARM_MAX_STACK_ALLOC_SIZE > 0 && (alloc_size) >= HARM_MAX_STACK_ALLOC_SIZE) ? _allocAutoHeap##x.Alloc16(alloc_size) : _alloca16(alloc_size)); \
+	if(_allocAutoHeap##x.IsAlloc()) \
+		common->Printf("[Harmattan]: Alloca on heap memory %s %p(%d bytes)\n", #varname, varname, alloc_size);
 
 	// free memory when not call alloca()
-#define _DROID_FREE(varname, x) \
-	if(useHeapMem##x) \
+#define _DROID_FREE(varname, x)/* \
 	{ \
 		common->Printf("[Harmattan]: Free alloca heap memory %p\n", varname); \
-		free(varname); \
-	}
+	}*/
 
 #endif
 
@@ -1900,5 +2008,46 @@ extern void CheckEGLInitialized(void); // sys/android/main
 //extern volatile bool has_gl_context;
 extern unsigned int lastRenderTime;
 extern int r_maxFps;
+
+#ifdef _SHADOW_MAPPING
+#include "GLMatrix.h"
+#include "RenderMatrix.h"
+
+extern idCVar r_useShadowMapping;			// use shadow mapping instead of stencil shadows
+extern idCVar r_useHalfLambertLighting;		// use Half-Lambert lighting instead of classic Lambert
+
+extern idCVar r_showShadowMaps;
+extern idCVar r_showShadowMapLODs;
+
+extern idCVar r_shadowMapFrustumFOV;
+extern idCVar r_shadowMapSingleSide;
+extern idCVar r_shadowMapImageSize;
+extern idCVar r_shadowMapJitterScale;
+extern idCVar r_shadowMapBiasScale;
+extern idCVar r_shadowMapRandomizeJitter;
+extern idCVar r_shadowMapSamples;
+extern idCVar r_shadowMapSplits;
+extern idCVar r_shadowMapSplitWeight;
+extern idCVar r_shadowMapLodScale;
+extern idCVar r_shadowMapLodBias;
+extern idCVar r_shadowMapPolygonFactor;
+extern idCVar r_shadowMapPolygonOffset;
+extern idCVar r_shadowMapOccluderFacing;
+
+extern idCVar harm_r_shadowMapLod;
+extern idCVar harm_r_shadowMapBias;
+extern idCVar harm_r_shadowMapAlpha;
+extern idCVar harm_r_shadowMapSampleSize;
+extern idCVar harm_r_shadowMapFrustumNear;
+extern idCVar harm_r_shadowMapFrustumFar;
+
+extern idBounds bounds_zeroOneCube;
+extern idBounds bounds_unitCube;
+
+float R_ComputePointLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+float R_ComputeSpotLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+float R_ComputeParallelLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+
+#endif
 
 #endif /* !__TR_LOCAL_H__ */

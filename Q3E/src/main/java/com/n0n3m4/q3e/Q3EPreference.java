@@ -37,6 +37,8 @@ public final class Q3EPreference
     public static final String pref_harm_q4_fs_game = "q3e_harm_q4_fs_game"; //k
     public static final String pref_harm_q4_game_lib = "q3e_harm_q4_game_lib"; //k
     public static final String pref_harm_user_mod = "q3e_harm_user_mod"; //k
+    public static final String pref_harm_q4_user_mod = "q3e_harm_q4_user_mod"; //k
+    public static final String pref_harm_prey_user_mod = "q3e_harm_prey_user_mod"; //k
     public static final String pref_harm_view_motion_control_gyro = "q3e_harm_mouse_move_control_gyro"; //k
     public static final String pref_harm_view_motion_gyro_x_axis_sens = "q3e_harm_view_motion_gyro_x_axis_sens"; //k
     public static final String pref_harm_view_motion_gyro_y_axis_sens = "q3e_harm_view_motion_gyro_y_axis_sens"; //k
@@ -53,6 +55,9 @@ public final class Q3EPreference
     public static final String pref_harm_using_mouse = "harm_using_mouse"; //k
     public static final String pref_harm_find_dll = "harm_find_dll"; //k
     public static final String pref_harm_r_maxFps = "q3e_harm_r_maxFps"; //k
+    public static final String pref_harm_skip_intro = "q3e_harm_skip_intro"; //k
+    public static final String pref_harm_scale_by_screen_area = "q3e_harm_scale_by_screen_area";
+    public static final String pref_harm_r_useShadowMapping = "q3e_harm_r_useShadowMapping"; //k
 
     public static final String RUN_BACKGROUND = "harm_run_background";
     public static final String RENDER_MEM_STATUS = "harm_render_mem_status";
@@ -68,6 +73,7 @@ public final class Q3EPreference
     public static final String LANG = "harm_lang";
     public static final String MAP_BACK = "harm_map_back";
     public static final String ONSCREEN_BUTTON = "harm_onscreen_button";
+    public static final String REOPEN_LAUNCHER = "harm_reopen_launcher";
 
     public static float GetFloatFromString(Context context, String name, float defVal)
     {

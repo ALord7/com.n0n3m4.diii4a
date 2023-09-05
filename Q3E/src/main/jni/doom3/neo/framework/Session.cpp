@@ -2041,7 +2041,7 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 	if (!idAsyncNetwork::IsActive() && !loadingSaveGame) {
 		// spawn players
 		for (i = 0; i < numClients; i++) {
-			game->SpawnPlayer(i); // not bot
+			game->SpawnPlayer(i);
 		}
 	}
 
@@ -2976,7 +2976,7 @@ void idSessionLocal::Draw()
 		console->Draw(false);
 	}
 
-#if defined(__ANDROID__)
+#ifdef __ANDROID__
 	Sys_SyncState();
 #endif
 }
