@@ -383,6 +383,7 @@ typedef struct viewLight_s {
     idVec3					lightCenter;				// offset the lighting direction for shading and
     int						shadowLOD;					// level of detail for shadowmap selection
     float			baseLightProject[16];			// global xyz1 to projected light strq
+	float			inverseBaseLightProject[16];// transforms the zero-to-one cube to exactly cover the light in world space
 #endif
 } viewLight_t;
 
@@ -726,8 +727,8 @@ typedef struct {
 	bool shuttleView;
 #endif
 #ifdef _SHADOW_MAPPING
-    float		shadowV[16][6];				// shadow depth view matrix
-    float		shadowP[16][6];				// shadow depth projection matrix
+    float		shadowV[6][16];				// shadow depth view matrix
+    float		shadowP[6][16];				// shadow depth projection matrix
 #endif
 } backEndState_t;
 
@@ -1100,6 +1101,7 @@ void	GL_Uniform1fv(GLint location, const GLfloat *value);
 void	GL_Uniform3fv(GLint location, const GLfloat *value);
 void	GL_Uniform4fv(GLint location, const GLfloat *value);
 void	GL_UniformMatrix4fv(GLint location, const GLfloat *value);
+void 	GL_UniformMatrix4fv(GLint location, const GLsizei n, const GLfloat *value);
 void	GL_Uniform1f(GLint location, GLfloat value);
 void	GL_EnableVertexAttribArray(GLuint index);
 void	GL_DisableVertexAttribArray(GLuint index);
@@ -1555,15 +1557,12 @@ typedef struct shaderProgram_s {
 	GLint		texgenS;
 	GLint		texgenT;
 	GLint		texgenQ;
+	GLint		u_uniformParm[MAX_VERTEX_PARMS];
 
-	GLint		alpha;
 #ifdef _SHADOW_MAPPING
-	GLint		u_shadowMVPMatrix;
-	GLint		u_globalLightOrigin;
-    GLint		u_bias;
-    GLint		u_sampleSize;
-	GLint		u_near;
-	GLint		u_far;
+	GLint		shadowMVPMatrix;
+	GLint		globalLightOrigin;
+    GLint		bias;
 #endif
 #ifdef _HARM_SHADER_NAME //k: restore shader name
 	char name[32];
@@ -2040,6 +2039,7 @@ extern idCVar harm_r_shadowMapAlpha;
 extern idCVar harm_r_shadowMapSampleSize;
 extern idCVar harm_r_shadowMapFrustumNear;
 extern idCVar harm_r_shadowMapFrustumFar;
+extern idCVar harm_r_useLightScissors;
 
 extern idBounds bounds_zeroOneCube;
 extern idBounds bounds_unitCube;
@@ -2047,6 +2047,9 @@ extern idBounds bounds_unitCube;
 float R_ComputePointLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
 float R_ComputeSpotLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
 float R_ComputeParallelLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+void R_SetupShadowMappingLOD(const idRenderLightLocal *light, viewLight_t *vLight);
+void R_SetupShadowMappingProjectionMatrix(idRenderLightLocal *light);
+void R_SetupFrontEndViewDefMVP(void);
 
 #endif
 
