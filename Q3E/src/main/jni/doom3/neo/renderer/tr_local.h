@@ -29,6 +29,10 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __TR_LOCAL_H__
 #define __TR_LOCAL_H__
 
+#include "qgl.h"
+
+extern bool USING_GLES3;
+
 //#define _SHADOW_MAPPING
 #ifdef _SHADOW_MAPPING
 #define MAX_SHADOWMAP_RESOLUTIONS 5
@@ -384,6 +388,7 @@ typedef struct viewLight_s {
     int						shadowLOD;					// level of detail for shadowmap selection
     float			baseLightProject[16];			// global xyz1 to projected light strq
 	float			inverseBaseLightProject[16];// transforms the zero-to-one cube to exactly cover the light in world space
+    idVec3					lightRadius;		// xyz radius for point lights
 #endif
 } viewLight_t;
 
@@ -651,6 +656,9 @@ typedef struct {
 	int		currentCubeMap;
 	int		texEnv;
 	textureType_t	textureType;
+#ifdef GL_ES_VERSION_3_0
+	int		current2DArrayMap;
+#endif
 } tmu_t;
 
 const int MAX_MULTITEXTURE_UNITS =	8;
@@ -820,6 +828,9 @@ class idRenderSystemLocal : public idRenderSystem
 
 	bool scopeView;
 	bool shuttleView;
+#endif
+#ifdef _MULTITHREAD
+	virtual void EndFrame(byte *data, int *frontEndMsec, int *backEndMsec);
 #endif
 
 	public:
@@ -1139,7 +1150,7 @@ const int GLS_DSTBLEND_ONE_MINUS_DST_ALPHA		= 0x00000080;
 const int GLS_DSTBLEND_BITS						= 0x000000f0;
 
 
-// these masks are the inverse, meaning when set the glColorMask value will be 0,
+// these masks are the inverse, meaning when set the qglColorMask value will be 0,
 // preventing that channel from being written
 const int GLS_DEPTHMASK							= 0x00000100;
 const int GLS_REDMASK							= 0x00000200;
@@ -1496,6 +1507,7 @@ DRAW_GLSL
 ============================================================
 */
 
+#define MAX_UNIFORM_PARMS 8
 //#define _HARM_SHADER_NAME
 typedef struct shaderProgram_s {
 	GLuint		program;
@@ -1557,7 +1569,7 @@ typedef struct shaderProgram_s {
 	GLint		texgenS;
 	GLint		texgenT;
 	GLint		texgenQ;
-	GLint		u_uniformParm[MAX_VERTEX_PARMS];
+	GLint		u_uniformParm[MAX_UNIFORM_PARMS];
 
 #ifdef _SHADOW_MAPPING
 	GLint		shadowMVPMatrix;
@@ -1594,14 +1606,24 @@ extern shaderProgram_t texgenShader; //k: texgen shader
 #ifdef _SHADOW_MAPPING
 extern shaderProgram_t depthShader_pointLight; //k: depth shader(point light)
 extern shaderProgram_t	interactionShadowMappingShader_pointLight; //k: interaction with shadow mapping(point light)
-extern shaderProgram_t depthShader_spotLight; //k: depth shader
-extern shaderProgram_t	interactionShadowMappingShader_spotLight; //k: interaction with shadow mapping
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_pointLight; //k: interaction with shadow mapping(point light)
+// for GLES2.0
+// distance / frustum-far
+extern shaderProgram_t depthShader_pointLight_far; //k: depth shader(point light)
+extern shaderProgram_t	interactionShadowMappingShader_pointLight_far; //k: interaction with shadow mapping(point light)
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_pointLight_far; //k: interaction with shadow mapping(point light)
+// emulate Z transform
+extern shaderProgram_t depthShader_pointLight_z; //k: depth shader(point light)
+extern shaderProgram_t	interactionShadowMappingShader_pointLight_z; //k: interaction with shadow mapping(point light)
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_pointLight_z; //k: interaction with shadow mapping(point light)
+
 extern shaderProgram_t depthShader_parallelLight; //k: depth shader(parallel)
 extern shaderProgram_t	interactionShadowMappingShader_parallelLight; //k: interaction with shadow(parallel)
-
-extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_pointLight; //k: interaction with shadow mapping(point light)
-extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_spotLight; //k: interaction with shadow mapping
 extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_parallelLight; //k: interaction with shadow mapping(parallel)
+
+extern shaderProgram_t depthShader_spotLight; //k: depth shader
+extern shaderProgram_t	interactionShadowMappingShader_spotLight; //k: interaction with shadow mapping
+extern shaderProgram_t	interactionShadowMappingBlinnPhongShader_spotLight; //k: interaction with shadow mapping
 #endif
 
 
@@ -2009,6 +2031,9 @@ extern unsigned int lastRenderTime;
 extern int r_maxFps;
 
 #ifdef _SHADOW_MAPPING
+
+#define SHADOW_MAPPING_DEBUG
+
 #include "GLMatrix.h"
 #include "RenderMatrix.h"
 
@@ -2036,10 +2061,11 @@ extern idCVar r_shadowMapOccluderFacing;
 extern idCVar harm_r_shadowMapLod;
 extern idCVar harm_r_shadowMapBias;
 extern idCVar harm_r_shadowMapAlpha;
-extern idCVar harm_r_shadowMapSampleSize;
+extern idCVar harm_r_shadowMapSampleFactor;
 extern idCVar harm_r_shadowMapFrustumNear;
 extern idCVar harm_r_shadowMapFrustumFar;
 extern idCVar harm_r_useLightScissors;
+extern idCVar harm_r_shadowMapPointLight;
 
 extern idBounds bounds_zeroOneCube;
 extern idBounds bounds_unitCube;

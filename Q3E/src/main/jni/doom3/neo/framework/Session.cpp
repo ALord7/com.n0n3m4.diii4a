@@ -958,22 +958,6 @@ static void Session_ExitMenu_f(const idCmdArgs &args)
 }
 #endif
 
-#ifdef _MULTITHREAD
-static void Session_Multithreading_f(const idCmdArgs &args)
-{
-	extern intptr_t Sys_GetMainThread(void);
-	extern const xthreadInfo * Sys_GetRenderThread(void);
-
-	common->Printf("[Harmattan]: Multi-Thread current is %s.\n", multithreadActive ? "enabled" : "disabled");
-	common->Printf("             - Main thread handle is %lu.\n", Sys_GetMainThread());
-	//if(multithreadActive)
-	{
-		const xthreadInfo *thread = Sys_GetRenderThread();
-		common->Printf("             - Render thread(%s) handle is %lu.\n", thread ? thread->name : "<NULL>", thread ? thread->threadHandle : 0);
-	}
-}
-#endif
-
 /*
 ================
 idSessionLocal::StartRecordingRenderDemo
@@ -3502,9 +3486,6 @@ void idSessionLocal::Init()
 #ifdef _HUMANHEAD //k: for sound in new game
 	cmdSystem->AddCommand("exitMenu", Session_ExitMenu_f, CMD_FL_SYSTEM, "exit menu");
 #endif
-#ifdef _MULTITHREAD
-	cmdSystem->AddCommand("r_multithead", Session_Multithreading_f, CMD_FL_SYSTEM, "test multi-threading state");
-#endif
 
 	// the same idRenderWorld will be used for all games
 	// and demos, insuring that level specific models
@@ -4017,5 +3998,52 @@ const char * idSessionLocal::GetDeathwalkMapName(const char *mapName) const
 	if(!idStr::Icmp(dwMap, "none"))
 		return "";
 	return dwMap;
+}
+#endif
+
+#ifdef _MULTITHREAD
+void idSessionLocal::UpdateScreen(byte *data, bool outOfSequence)
+{
+	if(!data)
+	{
+		UpdateScreen(outOfSequence);
+		return;
+	}
+
+#ifdef _WIN32
+
+	if (com_editors) {
+		if (!Sys_IsWindowVisible()) {
+			return;
+		}
+	}
+
+#endif
+
+	if (insideUpdateScreen) {
+		return;
+//		common->FatalError( "idSessionLocal::UpdateScreen: recursively called" );
+	}
+
+	insideUpdateScreen = true;
+
+	// if this is a long-operation update and we are in windowed mode,
+	// release the mouse capture back to the desktop
+	if (outOfSequence) {
+		Sys_GrabMouseCursor(false);
+	}
+
+	renderSystem->BeginFrame(renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight());
+
+	// draw everything
+	Draw();
+
+	if (com_speeds.GetBool()) {
+		renderSystem->EndFrame(&time_frontend, &time_backend);
+	} else {
+		renderSystem->EndFrame(data, NULL, NULL);
+	}
+
+	insideUpdateScreen = false;
 }
 #endif

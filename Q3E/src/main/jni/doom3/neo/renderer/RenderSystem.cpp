@@ -1066,8 +1066,8 @@ void idRenderSystemLocal::CaptureRenderToFile(const char *fileName, bool fixAlph
 	// Android: GL_RGBA && GL_UNSIGNED_BYTE
 	/*
 	   GLint eReadFormat, eReadType;
-	   glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE, &eReadType); 
-	   glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT, &eReadFormat); 
+	   qglGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE, &eReadType); 
+	   qglGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT, &eReadFormat); 
 	   common->Printf("glReadPixels ava READ_FORMAT: 0x%x, READ_TYPE: %x\n", eReadFormat, eReadType);
 	   */
 	int	c = (rc->width + 4) * rc->height;
@@ -1081,7 +1081,7 @@ void idRenderSystemLocal::CaptureRenderToFile(const char *fileName, bool fixAlph
 	}
 	else
 #endif
-	glReadPixels(rc->x, rc->y, rc->width, rc->height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	qglReadPixels(rc->x, rc->y, rc->width, rc->height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
 	byte *data2 = (byte *)R_StaticAlloc(c * 4);
 
@@ -1179,7 +1179,7 @@ void BackendThreadTask(void) // BackendThread ->
 	// Take screen shot
 	if(pixels) // if block backend rendering, do not exit backend render function, because it will be swap buffers in GLSurfaceView
 	{
-		glReadPixels( pixelsCrop->x, pixelsCrop->y, pixelsCrop->width, pixelsCrop->height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)pixels );
+		qglReadPixels( pixelsCrop->x, pixelsCrop->y, pixelsCrop->width, pixelsCrop->height, GL_RGBA, GL_UNSIGNED_BYTE, (void*)pixels );
 		pixels = NULL;
 		pixelsCrop = NULL;
 	}
@@ -1198,5 +1198,81 @@ void BackendThreadWait(void)
         Sys_WaitForEvent(TRIGGER_EVENT_BACKEND_FINISHED);
         //usleep(500);
     }
+}
+
+void idRenderSystemLocal::EndFrame(byte *data, int *frontEndMsec, int *backEndMsec)
+{
+	if(!data)
+	{
+		tr.EndFrame(frontEndMsec, backEndMsec);
+		return;
+	}
+	renderCrop_t *rc = &renderCrops[currentRenderCrop];
+
+	emptyCommand_t *cmd;
+
+	if (!glConfig.isInitialized) {
+		return;
+	}
+
+	// close any gui drawing
+	guiModel->EmitFullScreen();
+	guiModel->Clear();
+
+	// save out timing information
+	if (frontEndMsec) {
+		*frontEndMsec = pc.frontEndMsec;
+	}
+
+	if (backEndMsec) {
+		*backEndMsec = backEnd.pc.msec;
+	}
+
+	// print any other statistics and clear all of them
+	R_PerformanceCounters();
+
+	// check for dynamic changes that require some initialization
+	R_CheckCvars();
+
+	// check for errors
+	GL_CheckErrors();
+
+	// add the swapbuffers command
+	cmd = (emptyCommand_t *)R_GetCommandBuffer(sizeof(*cmd));
+	cmd->commandId = RC_SWAP_BUFFERS;
+
+	FPS_LIMIT();
+
+	if(multithreadActive)
+	{
+		RenderCommands(rc, data);
+	}
+	else
+	{
+		CheckEGLInitialized(); // check/wait EGL context
+		R_CheckBackEndCvars(); // check backend cvars state
+
+		// start the back end up again with the new command list
+		R_IssueRenderCommands();
+
+		// use the other buffers next frame, because another CPU
+		// may still be rendering into the current buffers
+		R_ToggleSmpFrame();
+
+		// we can now release the vertexes used this frame
+		vertexCache.EndFrame();
+
+		qglReadPixels(rc->x, rc->y, rc->width, rc->height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	}
+
+	if (session->writeDemo) {
+		session->writeDemo->WriteInt(DS_RENDER);
+		session->writeDemo->WriteInt(DC_END_FRAME);
+
+		if (r_showDemo.GetBool()) {
+			common->Printf("write DC_END_FRAME\n");
+		}
+	}
+
 }
 #endif

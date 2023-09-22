@@ -62,18 +62,18 @@ GL_SelectTextureNoClient
 ID_INLINE static void GL_SelectTextureNoClient(int unit)
 {
 	backEnd.glState.currenttmu = unit;
-	glActiveTexture(GL_TEXTURE0 + unit);
-	RB_LogComment("glActiveTexture( %i )\n", unit);
+	qglActiveTexture(GL_TEXTURE0 + unit);
+	RB_LogComment("qglActiveTexture( %i )\n", unit);
 }
 
 ID_INLINE void			GL_Scissor( int x /* left*/, int y /* bottom */, int w, int h )
 {
-	glScissor( x, y, w, h );
+	qglScissor( x, y, w, h );
 }
 
 ID_INLINE void			GL_Viewport( int x /* left */, int y /* bottom */, int w, int h )
 {
-	glViewport( x, y, w, h );
+	qglViewport( x, y, w, h );
 }
 
 ID_INLINE void	GL_Scissor( const idScreenRect& rect )
@@ -114,11 +114,11 @@ ID_INLINE void GL_PolygonOffset( bool enabled, float scale = 0.0f, float bias = 
 {
 	if(enabled)
 	{
-		glPolygonOffset( scale, bias );
-		glEnable(GL_POLYGON_OFFSET_FILL);
+		qglPolygonOffset( scale, bias );
+		qglEnable(GL_POLYGON_OFFSET_FILL);
 	}
 	else
-		glDisable(GL_POLYGON_OFFSET_FILL);
+		qglDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 /*
@@ -263,27 +263,27 @@ void	RB_GLSL_DrawInteraction(const drawInteraction_t *din)
         }
         else if( backEnd.vLight->pointLight )
         {
-			float ms[6][16];
+			float ms[6 * 16];
             for( int i = 0; i < 6; i++ )
             {
 				lightViewRenderMatrix << backEnd.shadowV[i];
 				lightProjectionRenderMatrix << backEnd.shadowP[i];
 
-            idRenderMatrix modelRenderMatrix;
-            idRenderMatrix::Transpose( *( idRenderMatrix* )din->surf->space->modelMatrix, modelRenderMatrix );
+				idRenderMatrix modelRenderMatrix;
+				idRenderMatrix::Transpose( *( idRenderMatrix* )din->surf->space->modelMatrix, modelRenderMatrix );
 
-            idRenderMatrix modelToLightRenderMatrix;
-            idRenderMatrix::Multiply( lightViewRenderMatrix, modelRenderMatrix, modelToLightRenderMatrix );
+				idRenderMatrix modelToLightRenderMatrix;
+				idRenderMatrix::Multiply( lightViewRenderMatrix, modelRenderMatrix, modelToLightRenderMatrix );
 
-            idRenderMatrix clipMVP;
-            idRenderMatrix::Multiply( lightProjectionRenderMatrix, modelToLightRenderMatrix, clipMVP );
+				idRenderMatrix clipMVP;
+				idRenderMatrix::Multiply( lightProjectionRenderMatrix, modelToLightRenderMatrix, clipMVP );
 
                 idRenderMatrix MVP;
                 idRenderMatrix::Multiply(renderMatrix_clipSpaceToWindowSpace, clipMVP, MVP);
 
-				MVP >> ms[i];
+                MVP >> &ms[i * 16];
             }
-			GL_UniformMatrix4fv(offsetof(shaderProgram_t, shadowMVPMatrix), 6, ms[0]);
+			GL_UniformMatrix4fv(offsetof(shaderProgram_t, shadowMVPMatrix), 6, ms);
         }
         else
         {
@@ -304,12 +304,31 @@ void	RB_GLSL_DrawInteraction(const drawInteraction_t *din)
 			idRenderMatrix MVP;
 			idRenderMatrix::Multiply(renderMatrix_clipSpaceToWindowSpace, clipMVP, MVP);
 			GL_UniformMatrix4fv(offsetof(shaderProgram_t, shadowMVPMatrix), MVP.m);
-
         }
 
 		// texture 6 is the shadow map
 		GL_SelectTextureNoClient(6);
 		float sampleScale = 1.0;
+#ifdef GL_ES_VERSION_3_0
+		if(USING_GLES3)
+		{
+			globalImages->shadowES3Image[backEnd.vLight->shadowLOD]->Bind();
+			if( backEnd.vLight->parallel )
+			{
+				sampleScale = 0.0005;
+			}
+			else if( backEnd.vLight->pointLight )
+			{
+				sampleScale = 0.005;
+			}
+			else
+			{
+				sampleScale = 0.005;
+			}
+		}
+		else
+#endif
+		{
 		if( backEnd.vLight->parallel )
 		{
 			globalImages->shadowImage[backEnd.vLight->shadowLOD]->Bind();
@@ -324,13 +343,13 @@ void	RB_GLSL_DrawInteraction(const drawInteraction_t *din)
 			sampleScale = 0.01;
 			globalImages->shadowImage[backEnd.vLight->shadowLOD]->Bind();
 		}
-        float sampleSize = harm_r_shadowMapSampleSize.GetFloat();
-        if(sampleSize < 0)
+		}
+        float sampleFactor = harm_r_shadowMapSampleFactor.GetFloat();
+        if(sampleFactor < 0)
         {
-            static float SampleSizes[MAX_SHADOWMAP_RESOLUTIONS] = {1.0f, 0.5f, 0.2f, 0.2f, 0.1f};
-            sampleSize = SampleSizes[backEnd.vLight->shadowLOD];
+            sampleFactor = SampleFactors[backEnd.vLight->shadowLOD];
         }
-        GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[2]), sampleSize * sampleScale);
+        GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[2]), sampleFactor * sampleScale);
 	};
 #endif
 
@@ -449,7 +468,7 @@ void RB_GLSL_DrawInteractions(void)
 	const bool shadowMapping = r_shadowMapping && r_shadows.GetBool();
 	GLfloat clearColor[4];
 	if(shadowMapping)
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        qglGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
 #endif
 	//
 	// for each light, perform adding and shadowing
@@ -479,18 +498,18 @@ void RB_GLSL_DrawInteractions(void)
 			backEnd.currentScissor = vLight->scissorRect;
 
 			if (r_useScissor.GetBool()) {
-				glScissor(backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
+				qglScissor(backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
 				          backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
 				          backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
 				          backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1);
 			}
-			glClear(GL_STENCIL_BUFFER_BIT);
+			qglClear(GL_STENCIL_BUFFER_BIT);
 		} else {
 			// no shadows, so no need to read or write the stencil buffer
 			// we might in theory want to use GL_ALWAYS instead of disabling
 			// completely, to satisfy the invarience rules
 			if (r_shadows.GetBool())
-			glStencilFunc(GL_ALWAYS, 128, 255);
+			qglStencilFunc(GL_ALWAYS, 128, 255);
 		}
 
 #ifdef _SHADOW_MAPPING
@@ -525,7 +544,7 @@ void RB_GLSL_DrawInteractions(void)
 
 			if(vLight->globalShadows || vLight->localShadows)
 			{
-                glDisable(GL_STENCIL_TEST);
+                qglDisable(GL_STENCIL_TEST);
 				extern char RB_ShadowMapPass_T;
 
 				RB_ShadowMapPass_T = 'G';
@@ -543,7 +562,7 @@ void RB_GLSL_DrawInteractions(void)
 				RB_GLSL_CreateDrawInteractions_shadowMapping(vLight->localInteractions);
 				RB_GLSL_CreateDrawInteractions_shadowMapping(vLight->globalInteractions);
 
-                glEnable(GL_STENCIL_TEST);
+                qglEnable(GL_STENCIL_TEST);
 			}
 			else
 			{
@@ -567,7 +586,7 @@ void RB_GLSL_DrawInteractions(void)
 			continue;
 		}
 		if (r_shadows.GetBool())
-		glStencilFunc(GL_ALWAYS, 128, 255);
+		qglStencilFunc(GL_ALWAYS, 128, 255);
 
 		backEnd.depthFunc = GLS_DEPTHFUNC_LESS;
 		RB_GLSL_CreateDrawInteractions(vLight->translucentInteractions);
@@ -577,12 +596,12 @@ void RB_GLSL_DrawInteractions(void)
 
 	// disable stencil shadow test
 	if (r_shadows.GetBool())
-	glStencilFunc(GL_ALWAYS, 128, 255);
+	qglStencilFunc(GL_ALWAYS, 128, 255);
 
 	//GL_SelectTexture(0); //k2023
 #ifdef _SHADOW_MAPPING
 	if(shadowMapping)
-        glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        qglClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
 #endif
 }
 
@@ -605,6 +624,7 @@ static void R_InitGLSLCvars(void)
 
 #ifdef _SHADOW_MAPPING
 	r_shadowMapping = r_useShadowMapping.GetBool();
+    r_shadowMapPointLight = harm_r_shadowMapPointLight.GetInteger();
 #endif
 }
 
@@ -632,6 +652,11 @@ void R_CheckBackEndCvars(void)
 		r_shadowMapping = r_useShadowMapping.GetBool();
 		r_useShadowMapping.ClearModified();
 	}
+    if(harm_r_shadowMapPointLight.IsModified())
+    {
+        r_shadowMapPointLight = harm_r_shadowMapPointLight.GetInteger();
+        harm_r_shadowMapPointLight.ClearModified();
+    }
 #endif
 }
 
