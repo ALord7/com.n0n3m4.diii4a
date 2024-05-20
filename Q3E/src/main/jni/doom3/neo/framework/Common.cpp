@@ -35,10 +35,11 @@ If you have questions concerning this license or the applicable additional terms
 #define MAX_WARNING_LIST	256
 
 #ifdef _MULTITHREAD
+extern bool multithreadActive;
+extern bool Sys_InRenderThread(void);
 #ifdef _K_DEV
 #define _HARM_DEBUG_MULTITHREAD
 #endif
-#include <pthread.h>
 #endif
 
 typedef enum {
@@ -78,7 +79,13 @@ idCVar com_asyncSound("com_asyncSound", "1", CVAR_INTEGER|CVAR_SYSTEM, ASYNCSOUN
 #endif
 idCVar com_forceGenericSIMD("com_forceGenericSIMD", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "force generic platform independent SIMD");
 idCVar com_developer("developer", "0", CVAR_BOOL|CVAR_SYSTEM|CVAR_NOCHEAT, "developer mode");
-idCVar com_allowConsole("com_allowConsole", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "allow toggling console with the tilde key");
+idCVar com_allowConsole("com_allowConsole",
+#ifdef __ANDROID__
+		"1"
+#else
+						"0"
+#endif
+						, CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "allow toggling console with the tilde key");
 idCVar com_speeds("com_speeds", "0", CVAR_BOOL|CVAR_SYSTEM|CVAR_NOCHEAT, "show engine timings");
 idCVar com_showFPS("com_showFPS", "0", CVAR_BOOL|CVAR_SYSTEM|CVAR_ARCHIVE|CVAR_NOCHEAT, "show frames rendered per second");
 idCVar com_showMemoryUsage("com_showMemoryUsage", "0", CVAR_BOOL|CVAR_SYSTEM|CVAR_NOCHEAT, "show total and per frame memory usage");
@@ -94,7 +101,7 @@ idCVar com_videoRam("com_videoRam", "64", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCH
 
 idCVar com_product_lang_ext("com_product_lang_ext", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Extension to use when creating language files.");
 
-idCVar harm_com_consoleHistory("harm_com_consoleHistory", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Save/load console history(0: disable; 1: loading in engine initialization, and saving in engine shutdown; 2: loading in engine initialization, and saving in every e executing).");
+idCVar harm_com_consoleHistory("harm_com_consoleHistory", "2", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Save/load console history(0: disable; 1: loading in engine initialization, and saving in engine shutdown; 2: loading in engine initialization, and saving in every e executing).");
 
 // com_speeds times
 int				time_gameFrame;
@@ -107,6 +114,23 @@ int				com_frameNumber;		// variable frame number
 volatile int	com_ticNumber;			// 60 hz tics
 int				com_editors;			// currently opened editor(s)
 bool			com_editorActive;		//  true if an editor has focus
+
+#ifdef _BREAK_60FPS_CAP
+#include "Session_local.h"
+int				com_frameDelta;			// time elapsed since previous frame in milliseconds
+extern idCVar	com_maxFPS;
+extern idCVar harm_g_minorTic;
+extern idCVar harm_g_timestepMs;
+
+#define USERCMD_HZ 60		// 60 frames per second
+#define USERCMD_MSEC (1000 / USERCMD_HZ)
+
+#define DEFAULT_60_TIC() \
+            { \
+				harm_g_timestepMs.SetInteger(USERCMD_MSEC); \
+				harm_g_minorTic.SetBool(false);             \
+			}
+#endif
 
 #ifdef _WIN32
 HWND			com_hwndMsg = NULL;
@@ -223,6 +247,8 @@ class idCommonLocal : public idCommon
 	virtual void				DebuggerCheckBreakpoint ( idInterpreter* interpreter, idProgram* program, int instructionPointer ) { (void)interpreter; (void)program; (void)instructionPointer; }
 	virtual bool				DoingDeclValidation( void ) { return false; }
 	virtual void				LoadToolsDLL( void ) { }
+	virtual int					GetRModeForMachineSpec( int machineSpec ) const { (void)machineSpec; return 0; };
+	virtual void				SetDesiredMachineSpec( int machineSpec ) { (void)machineSpec; };
 #endif
 #ifdef _HUMANHEAD
 	virtual void				FixupKeyTranslations(const char *src, char *dst, int lengthAllocated) { (void) src; (void)dst; (void)lengthAllocated; }
@@ -481,7 +507,7 @@ void idCommonLocal::VPrintf(const char *fmt, va_list args)
 		// update the console if we are in a long-running command, like dmap
 		if (com_refreshOnPrint) {
 #ifdef _MULTITHREAD
-			if(!multithreadActive/* || !IN_RENDER_THREAD()*/)
+			if(!multithreadActive/* || !Sys_InRenderThread()*/)
 #endif
 			session->UpdateScreen();
 		}
@@ -1486,7 +1512,11 @@ static void Com_Crash_f(const idCmdArgs &args)
 		return;
 	}
 
-	*(int *) 0 = 0x12345678;
+#ifdef __GNUC__
+	__builtin_trap();
+#else
+	* ( int * ) 0 = 0x12345678;
+#endif
 }
 
 /*
@@ -2558,7 +2588,7 @@ void idCommonLocal::InitCommands(void)
 	cmdSystem->AddCommand("renderbump", RenderBump_f, CMD_FL_TOOL, "renders a bump map", idCmdSystem::ArgCompletion_ModelName);
 	cmdSystem->AddCommand("renderbumpFlat", RenderBumpFlat_f, CMD_FL_TOOL, "renders a flat bump map", idCmdSystem::ArgCompletion_ModelName);
 #ifdef _RAVEN //k: for generate AAS file of mp game map and bot.
-	cmdSystem->AddCommand("harm_runAAS", RunAAS_f, CMD_FL_GAME, "compiles an AAS file for a map for Quake 4 multiplayer-game", idCmdSystem::ArgCompletion_MapName);
+	cmdSystem->AddCommand("botRunAAS", RunAAS_f, CMD_FL_GAME, "compiles an AAS file for a map for Quake 4 multiplayer-game", idCmdSystem::ArgCompletion_MapName);
 #endif
 	cmdSystem->AddCommand("runAAS", RunAAS_f, CMD_FL_TOOL, "compiles an AAS file for a map", idCmdSystem::ArgCompletion_MapName);
 	cmdSystem->AddCommand("runAASDir", RunAASDir_f, CMD_FL_TOOL, "compiles AAS files for all maps in a folder", idCmdSystem::ArgCompletion_MapName);
@@ -2623,6 +2653,9 @@ void idCommonLocal::InitRenderSystem(void)
 		return;
 	}
 
+#ifdef __ANDROID__ //karin: force setup resolution on Android
+	Sys_ForceResolution();
+#endif
 	renderSystem->InitOpenGL();
 	PrintLoadingMessage(common->GetLanguageDict()->GetString("#str_04343"));
 }
@@ -2686,7 +2719,44 @@ void idCommonLocal::Frame(void)
 
 		eventLoop->RunEventLoop();
 
+#ifdef _BREAK_60FPS_CAP
+		static int64_t com_frameTimeMicro = 0;		//same as com_frameTime, but in microseconds
+		static int64_t lastFrameAstroTime = Sys_Microseconds();
+		if (sessLocal.com_fixedTic.GetBool()) {
+		    DEFAULT_60_TIC();
+
+			//stgatilov #4865: impose artificial FPS limit
+			int64_t minDeltaTime = 1000000 / com_maxFPS.GetInteger();
+			int64_t currFrameAstroTime;
+			while (1) {
+				currFrameAstroTime = Sys_Microseconds();
+				if (currFrameAstroTime - lastFrameAstroTime > minDeltaTime)
+					break;
+				//note: this is busy-wait loop
+				currFrameAstroTime = currFrameAstroTime;	//NOP
+			}
+			//see how much passed in microseconds
+			int deltaTime = currFrameAstroTime - lastFrameAstroTime;
+			lastFrameAstroTime = currFrameAstroTime;
+
+			//update precise time in microseconds, then round it to milliseconds
+			com_frameTimeMicro += deltaTime * com_timescale.GetFloat();
+			int newFrameTime = com_frameTimeMicro / 1000;
+			com_frameDelta = newFrameTime - com_frameTime;
+			com_frameTime = newFrameTime;
+		}
+		else {
+			//synchronize common time to async tic number
+			//(which is synced to astronomical time in idCommonLocal::SingleAsyncTic)
+			com_frameTime = com_ticNumber * USERCMD_MSEC;	//com_frameTime += USERCMD_MSEC;
+			com_frameDelta = USERCMD_MSEC;
+			//these variables are not used now, but they will be needed if we switch to uncapped FPS mode
+			com_frameTimeMicro = com_frameTime * 1000;
+			lastFrameAstroTime = Sys_Microseconds();
+		}
+#else
 		com_frameTime = com_ticNumber * USERCMD_MSEC;
+#endif
 
 		idAsyncNetwork::RunFrame();
 
@@ -2868,8 +2938,6 @@ void idCommonLocal::Async(void)
 idCommonLocal::LoadGameDLL
 =================
 */
-#ifdef __ANDROID__
-
 #ifdef _RAVEN // quake4 game dll
 #define _HARM_BASE_GAME_DLL "q4game"
 #elif defined(_HUMANHEAD) // prey game dll
@@ -2878,19 +2946,32 @@ idCommonLocal::LoadGameDLL
 #define _HARM_BASE_GAME_DLL "game"
 #endif
 
-#ifndef _ANDROID_PACKAGE_NAME
-//#define _ANDROID_PACKAGE_NAME "com.n0n3m4.DIII4A"
-#define _ANDROID_PACKAGE_NAME "com.karin.idTech4Amm"
+#ifdef _WIN32
+#define DLL_SUFFIX ".dll"
+
+#ifdef _MSC_VER
+#define DLL_PREFIX ""
+#else
+#define DLL_PREFIX "lib"
 #endif
 
-#define _ANDROID_DLL_PATH "/data/data/" _ANDROID_PACKAGE_NAME "/lib/"
+#else
+#define DLL_SUFFIX ".so"
+#define DLL_PREFIX "lib"
 #endif
-//k
-#define _ANDROID_NATIVE_LIBRARY_DIR "<Android APK native library directory path>/"
+
+#define DLL_NAME(x) DLL_PREFIX x DLL_SUFFIX
+
+#ifdef __ANDROID__
+#define _DEFAULT_LIBRARY_DIR "<apk native libraries path>"
+#else
+#define _DEFAULT_LIBRARY_DIR "<executable application path>"
+#endif
+
 static idCVar	harm_fs_gameLibPath("harm_fs_gameLibPath", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "[Harmattan]: Special game dynamic library. e.g. "
-		"`" _ANDROID_NATIVE_LIBRARY_DIR "lib" _HARM_BASE_GAME_DLL ".so`, "
+		"`<harm_fs_gameLibPath>/lib" _HARM_BASE_GAME_DLL DLL_SUFFIX "`, "
 		"default is empty will load by cvar `fs_game`."); // This cvar priority is higher than `fs_game`.
-static idCVar	harm_fs_gameLibDir("harm_fs_gameLibDir", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "[Harmattan]: Special game dynamic library directory path(default is empty, means using `" _ANDROID_NATIVE_LIBRARY_DIR "`).");
+static idCVar	harm_fs_gameLibDir("harm_fs_gameLibDir", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "[Harmattan]: Special game dynamic library directory path(default is empty, means using `" _DEFAULT_LIBRARY_DIR "`).");
 void idCommonLocal::LoadGameDLL(void)
 {
 #ifdef __DOOM_DLL__
@@ -2900,11 +2981,10 @@ void idCommonLocal::LoadGameDLL(void)
 	gameExport_t	gameExport;
 	GetGameAPI_t	GetGameAPI;
 
-#ifdef __ANDROID__
+#if 1 //karin: select game dll on Android
 #define LOAD_RESULT(dll) ((dll) ? "done" : "fail")
 
-#define _K_D3_MOD
-#ifdef _K_D3_MOD
+#ifdef __ANDROID__
 	common->Printf("[Harmattan]: fpu = "
 #ifdef __aarch64__
 			"hard"
@@ -2916,6 +2996,7 @@ void idCommonLocal::LoadGameDLL(void)
 	#endif
 #endif
 			"\n");
+#endif
 	// First try to load user special game library.
 	// For other apk.
 	idStr fsgame = cvarSystem->GetCVarString("harm_fs_gameLibPath");
@@ -2938,13 +3019,11 @@ void idCommonLocal::LoadGameDLL(void)
 			common->Printf("[Harmattan]: Find game dynamic library directory in `%s` from cvar `harm_fs_gameLibDir`.\n", dir.c_str());
 		else
 		{
-			const char *dir_str = native_library_dir ? native_library_dir : _ANDROID_DLL_PATH;
+			const char *dir_str = Sys_DLLDefaultPath();
 			common->Printf("[Harmattan]: cvar `harm_fs_gameLibDir` is unset. Find game dynamic library directory in default path `%s`.\n", dir_str);
 			dir = dir_str;
 		}
 
-		if(fsgame.Length())
-		{
 			common->Printf("[Harmattan]: Load game `%s` from cvar `fs_game`.\n", fsgame.c_str());
 
 #ifdef _RAVEN // quake4 base game dll
@@ -2952,7 +3031,7 @@ void idCommonLocal::LoadGameDLL(void)
 			{
 				common->Printf("[Harmattan]: Load Quake4 game......\n");
 				idStr dllFile(dir);
-				dllFile.AppendPath("libq4game.so");
+            dllFile.AppendPath(DLL_NAME("q4game"));
 				gameDLL = sys->DLL_Load(dllFile);
 				common->Printf("[Harmattan]: Load dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
 			}
@@ -2961,7 +3040,7 @@ void idCommonLocal::LoadGameDLL(void)
 			{
 				common->Printf("[Harmattan]: Load Prey2006 game......\n");
 				idStr dllFile(dir);
-				dllFile.AppendPath("libpreygame.so");
+				dllFile.AppendPath(DLL_NAME("preygame"));
 				gameDLL = sys->DLL_Load(dllFile);
 				common->Printf("[Harmattan]: Load dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
 			}
@@ -2970,7 +3049,7 @@ void idCommonLocal::LoadGameDLL(void)
 			{
 				common->Printf("[Harmattan]: Load DOOM3 game......\n");
 				idStr dllFile(dir);
-				dllFile.AppendPath("libgame.so");
+				dllFile.AppendPath(DLL_NAME("game"));
 				gameDLL = sys->DLL_Load(dllFile);
 				common->Printf("[Harmattan]: Load dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
 			}
@@ -2979,7 +3058,7 @@ void idCommonLocal::LoadGameDLL(void)
 			{
 				common->Printf("[Harmattan]: Load `%s` game......\n", fsgame.c_str());
 				idStr dllFile(dir);
-				dllFile.AppendPath(va("lib%s.so", fsgame.c_str()));
+            dllFile.AppendPath(va(DLL_NAME("%s"), fsgame.c_str()));
 				gameDLL = sys->DLL_Load(dllFile);
 				common->Printf("[Harmattan]: Load dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
 			}
@@ -2996,33 +3075,43 @@ void idCommonLocal::LoadGameDLL(void)
 					common->Printf("[Harmattan]: Load found dynamic library %s!\n", LOAD_RESULT(gameDLL));
 				}
 			}
+#if !defined(__ANDROID__)
+        if(!gameDLL) // load <fs_game>/libgame.so
+        {
+            idStr dllFile("./");
+            const char *fs_game = cvarSystem->GetCVarString("fs_game");
+            if(!fs_game || !fs_game[0])
+                fs_game = BASE_GAMEDIR;
+            common->Printf("[Harmattan]: Load game from %s......\n", fs_game);
+            dllFile.AppendPath(fs_game);
+            dllFile.AppendPath(DLL_NAME("game"));
+            gameDLL = sys->DLL_Load(dllFile);
+            common->Printf("[Harmattan]: Load game dynamic library `%s` %p!\n", dllFile.c_str(), gameDLL);
 		}
-#if 0
-		else
-#else
-			// last load base game library if all failed.
-			if(!gameDLL)
 #endif
-#endif
-			{
-				common->Printf("[Harmattan]: Load BASE game......\n");
-				idStr dllFile(dir);
-				dllFile.AppendPath("lib" _HARM_BASE_GAME_DLL ".so");
-				gameDLL = sys->DLL_Load(dllFile);
-				common->Printf("[Harmattan]: Load BASE dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
-			}
+		// last load base game library if all failed.
+		if(!gameDLL)
+		{
+			common->Printf("[Harmattan]: Load BASE game......\n");
+			idStr dllFile(dir);
+			dllFile.AppendPath(DLL_NAME(_HARM_BASE_GAME_DLL));
+			gameDLL = sys->DLL_Load(dllFile);
+			common->Printf("[Harmattan]: Load BASE dynamic library `%s` %s!\n", dllFile.c_str(), LOAD_RESULT(gameDLL));
+		}
 	}
-	//k
 #else
-	fileSystem->FindDLL("game", dllPath, true);
+    if(!gameDLL)
+    {
+        fileSystem->FindDLL("game", dllPath, true);
 
-	if (!dllPath[ 0 ]) {
-		common->FatalError("couldn't find game dynamic library");
-		return;
-	}
+        if (!dllPath[ 0 ]) {
+            common->FatalError("couldn't find game dynamic library");
+            return;
+        }
 
-	common->DPrintf("Loading game DLL: '%s'\n", dllPath);
-	gameDLL = sys->DLL_Load(dllPath);
+        common->DPrintf("Loading game DLL: '%s'\n", dllPath);
+        gameDLL = sys->DLL_Load(dllPath);
+    }
 #endif
 
 	if (!gameDLL) {
@@ -3205,6 +3294,37 @@ void idCommonLocal::Init(int argc, const char **argv, const char *cmdline)
 
 		// override cvars from command line
 		StartupVariable(NULL, false);
+#ifdef _MULTITHREAD
+#if !defined(__ANDROID__) //karin: enable multithreading-rendering from command cvar
+		multithreadActive = cvarSystem->GetCVarBool("harm_r_multithread");
+		if(multithreadActive)
+			Sys_Printf("[Harmattan]: Enable multi-threading rendering\n");
+		else
+			Sys_Printf("[Harmattan]: Disable multi-threading rendering\n");
+#endif
+#endif
+#ifdef _OPENGLES3
+#if !defined(__ANDROID__) //karin: check OpenGL version from command cvar
+		const char *openglVersion = cvarSystem->GetCVarString("harm_sys_openglVersion");
+		if(openglVersion && openglVersion[0])
+		{
+			extern int gl_version;
+		    extern bool USING_GLES3;
+			Sys_Printf("[Harmattan]: harm_sys_openglVersion = %s\n", openglVersion);
+			if(!idStr::Icmp("GLES2", openglVersion))
+			{
+				gl_version = 0x00020000;
+				Sys_Printf("[Harmattan]: Using OpenGLES2\n");
+			}
+			else
+			{
+				gl_version = 0x00030000;
+				Sys_Printf("[Harmattan]: Using OpenGLES3\n");
+			}
+			USING_GLES3 = gl_version != 0x00020000;
+		}
+#endif
+#endif
 
 		if (!idAsyncNetwork::serverDedicated.GetInteger() && Sys_AlreadyRunning()) {
 			Sys_Quit();

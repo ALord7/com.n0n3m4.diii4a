@@ -308,6 +308,9 @@ idRenderModel *idRenderWorldLocal::ParseShadowModel(idLexer *src)
 
 	// we do NOT do a model->FinishSurfaceces, because we don't need sil edges, planes, tangents, etc.
 //	model->FinishSurfaces();
+#ifdef _SHADOW_MAPPING
+	tri->shadowIsPrelight = true;
+#endif
 
 	return model;
 }
@@ -1024,7 +1027,6 @@ bool idRenderWorldLocal::CheckAreaForPortalSky(int areaNum)
 }
 
 #ifdef _RAVEN
-static idCVar r_skipSky("r_skipSky", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Dark sky");
 bool idRenderWorldLocal::HasSkybox(int areaNum)
 {
 	assert(areaNum >= 0 && areaNum < numPortalAreas);

@@ -29,10 +29,11 @@
             android:title="@string/game"
         >
             <ListPreference
+                android:enabled="false"
                 android:title="@string/run_background"
                 android:key="harm_run_background"
                 android:persistent="true"
-                android:defaultValue="1"
+                android:defaultValue="2"
                 android:summary="@string/control_game_state_when_application_in_background"
                 android:entryValues="@array/run_background_values"
                 android:entries="@array/run_background_labels"
@@ -46,6 +47,13 @@
                 android:entries="@array/map_back_labels"
                 android:defaultValue="@array/map_back_values"
             />
+            <CheckBoxPreference
+                android:title="@string/standalone_game_data_directory"
+                android:key="harm_game_standalone_directory"
+                android:persistent="true"
+                android:defaultValue="false"
+                android:summary="@string/game_data_directories_are_standalone"
+                />
             <CheckBoxPreference
                 android:title="@string/redirect_output_to_file"
                 android:key="harm_redirect_output_to_file"

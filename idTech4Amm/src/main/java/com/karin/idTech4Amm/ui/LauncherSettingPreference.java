@@ -1,4 +1,5 @@
 package com.karin.idTech4Amm.ui;
+import android.os.Handler;
 import android.preference.PreferenceFragment;
 import android.os.Bundle;
 import android.preference.PreferenceScreen;
@@ -6,11 +7,9 @@ import android.preference.Preference;
 
 import com.karin.idTech4Amm.R;
 import com.karin.idTech4Amm.lib.ContextUtility;
-import com.karin.idTech4Amm.sys.Constants;
+import com.karin.idTech4Amm.sys.PreferenceKey;
 import com.n0n3m4.q3e.Q3EPreference;
-import com.n0n3m4.q3e.Q3EUtils;
 import java.util.Set;
-import com.n0n3m4.q3e.Q3EJNI;
 
 import android.view.View;
 import android.widget.Toast;
@@ -28,11 +27,12 @@ public class LauncherSettingPreference extends PreferenceFragment implements Pre
 
         addPreferencesFromResource(R.xml.launcher_settings_preference);
 
-        findPreference(Constants.PreferenceKey.LAUNCHER_ORIENTATION).setOnPreferenceChangeListener(this);
+        findPreference(PreferenceKey.LAUNCHER_ORIENTATION).setOnPreferenceChangeListener(this);
         findPreference(Q3EPreference.MAP_BACK).setOnPreferenceChangeListener(this);
-        findPreference(Constants.PreferenceKey.HIDE_AD_BAR).setOnPreferenceChangeListener(this);
+        findPreference(PreferenceKey.HIDE_AD_BAR).setOnPreferenceChangeListener(this);
         findPreference(Q3EPreference.pref_harm_function_key_toolbar_y).setOnPreferenceChangeListener(this);
         findPreference(Q3EPreference.LANG).setOnPreferenceChangeListener(this);
+        findPreference(Q3EPreference.GAME_STANDALONE_DIRECTORY).setOnPreferenceChangeListener(this);
     }
 
     @Override
@@ -47,7 +47,7 @@ public class LauncherSettingPreference extends PreferenceFragment implements Pre
         String key = preference.getKey();
         switch (key)
         {
-            case Constants.PreferenceKey.LAUNCHER_ORIENTATION:
+            case PreferenceKey.LAUNCHER_ORIENTATION:
                 int o = (boolean) newValue ? 0 : 1;
                 ContextUtility.SetScreenOrientation(getActivity(), o);
                 return true;
@@ -62,7 +62,7 @@ public class LauncherSettingPreference extends PreferenceFragment implements Pre
                 preference.getSharedPreferences().edit().putInt(Q3EPreference.pref_harm_mapBack, r).commit();
                 return true;
             }
-            case Constants.PreferenceKey.HIDE_AD_BAR:
+            case PreferenceKey.HIDE_AD_BAR:
                 boolean b = (boolean) newValue;
                 View view = getActivity().findViewById(R.id.main_ad_layout);
                 if (null != view)
@@ -86,6 +86,17 @@ public class LauncherSettingPreference extends PreferenceFragment implements Pre
             case Q3EPreference.LANG:
             {
                 Toast.makeText(ContextUtility.GetContext(this), R.string.be_available_on_reboot_the_next_time, Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            case Q3EPreference.GAME_STANDALONE_DIRECTORY:
+            {
+                Toast.makeText(ContextUtility.GetContext(this), R.string.app_is_rebooting, Toast.LENGTH_SHORT).show();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        ContextUtility.RestartApp(LauncherSettingPreference.this.getActivity());
+                    }
+                }, 1000);
                 return true;
             }
             default:

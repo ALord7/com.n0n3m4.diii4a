@@ -14,7 +14,6 @@
 
 //#define UI_DEBUG	1
 
-
 #ifdef GAME_DLL
 
 idSys *						sys = NULL;
@@ -74,10 +73,16 @@ GetGameAPI
 ============
 */
 
+#if __MWERKS__
+#pragma export on
+#endif
 #if __GNUC__ >= 4
 #pragma GCC visibility push(default)
 #endif
-extern "C" gameExport_t *GetGameAPI( gameImport_t *import ) {
+extern "C" ID_GAME_API gameExport_t *GetGameAPI( gameImport_t *import ) {
+#if __MWERKS__
+#pragma export off
+#endif
 
 	if ( import->version == GAME_API_VERSION ) {
 
@@ -484,19 +489,11 @@ void idGameLocal::Init( void ) {
 	// register game specific decl folders
 // RAVEN BEGIN
 #ifndef RV_SINGLE_DECL_FILE
-#if 0 //k
 	declManager->RegisterDeclFolderWrapper( "def",			".def",			DECL_ENTITYDEF );
-#else
-	declManager->RegisterDeclFolder( "def",			".def",			DECL_ENTITYDEF );
-#endif
 // bdube: not used in quake 4
 //	declManager->RegisterDeclFolder( "fx",					".fx",			DECL_FX );
 //	declManager->RegisterDeclFolder( "particles",			".prt",			DECL_PARTICLE );
-#if 0 //k
 	declManager->RegisterDeclFolderWrapper( "af",			".af",			DECL_AF );
-#else
-	declManager->RegisterDeclFolder( "af",			".af",			DECL_AF );
-#endif
 //	declManager->RegisterDeclFolderWrapper( "newpdas",		".pda",			DECL_PDA );
 #else
 	if(!cvarSystem->GetCVarBool("com_SingleDeclFile"))
@@ -1605,8 +1602,7 @@ void idGameLocal::LocalMapRestart( int instance ) {
 	for (i = 0; i < MAX_CLIENTS; i++) {
 // RAVEN BEGIN
 // jnewquist: Use accessor for static class type 
-		if (entities[i] && entities[i]->IsType(idPlayer::GetClassType()) &&
-			(isClient || instance == -1 || entities[i]->GetInstance() == instance)) {
+		if (entities[i] && entities[i]->IsType(idPlayer::GetClassType()) && (isClient || instance == -1 || entities[i]->GetInstance() == instance)) {
 // RAVEN END
 			static_cast< idPlayer * >( entities[i] )->Restart();
 		}
@@ -2052,7 +2048,7 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 				if(!aasFileExists)
 				{
 					Printf("[Harmattan]: Generate AAS file %s......\n", mapFileName.c_str());
-					cmdSystem->BufferCommandText( CMD_EXEC_NOW, va("harm_runAAS %s", mapFileName.c_str()) );
+					cmdSystem->BufferCommandText( CMD_EXEC_NOW, va("botRunAAS %s", mapFileName.c_str()) );
 					Printf("[Harmattan]: Generate AAS file %s completed. Try reload AAS.\n", mapFileName.c_str());
 					aasLoadSuc = false;
 					for( i = 0; i < aasNames.Num(); i++ ) {

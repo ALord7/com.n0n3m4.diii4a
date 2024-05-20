@@ -19,6 +19,11 @@
 
 package com.n0n3m4.q3e;
 
+import android.app.Activity;
+
+import com.n0n3m4.q3e.karin.KOnceRunnable;
+import com.n0n3m4.q3e.onscreen.Q3EGUI;
+
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
@@ -29,6 +34,8 @@ public class Q3ECallbackObj
     public int state = Q3EGlobals.STATE_NONE;
     private final Object m_audioLock = new Object();
     public static boolean reqThreadrunning = false;
+
+    private Q3EGUI gui;
 
     private final LinkedList<Runnable> m_eventQueue = new LinkedList<>();
     public boolean notinmenu = true;
@@ -97,12 +104,17 @@ public class Q3ECallbackObj
                                            "' */
 
         if (mAudioTrack != null) return;
-        mAudioTrack = Q3EAudioTrack.Instance(size);
+        mAudioTrack = Instance(size);
         reqThreadrunning = true;
     }
 
+    public static Q3EAudioTrack Instance(int size)
+    {
+        return Q3EAudioTrack.Instance(size);
+    }
+
     //k NEW:
-// Now call directly by native of libdante.so, and don't need call requestAudioData in Java.
+// Now call directly by native of libidtech4*.so, and don't need call requestAudioData in Java.
 // if offset >= 0 and length > 0, only write.
 // if offset >= 0 and length < 0, length = -length, then write and flush.
 // If length == 0 and offset < 0, only flush.
@@ -113,7 +125,7 @@ public class Q3ECallbackObj
         return mAudioTrack.writeAudio(audioData, offset, len);
     }
 
-    public int writeAudio_direct(byte[] audioData, int offset, int len)
+    public int writeAudio_array(byte[] audioData, int offset, int len)
     {
         if (null == mAudioTrack || !reqThreadrunning)
             return 0;
@@ -178,7 +190,7 @@ public class Q3ECallbackObj
             @Override
             public void run()
             {
-                Q3EUtils.CopyToClipboard(Q3EMain.mGLSurfaceView.getContext(), text);
+                Q3EUtils.CopyToClipboard(Q3EMain.gameHelper.GetContext(), text);
             }
         };
         //Q3EMain.mGLSurfaceView.post(runnable);
@@ -187,7 +199,88 @@ public class Q3ECallbackObj
 
     public String GetClipboardText()
     {
-        return Q3EUtils.GetClipboardText(Q3EMain.mGLSurfaceView.getContext());
+        return Q3EUtils.GetClipboardText(Q3EMain.gameHelper.GetContext());
+    }
+
+    public void sendAnalog(final boolean down, final float x, final float y)
+    {
+        PushEvent(new KOnceRunnable()
+        {
+            @Override
+            public void Run()
+            {
+                Q3EJNI.sendAnalog(down ? 1 : 0, x, y);
+            }
+        });
+    }
+
+    public void sendKeyEvent(final boolean down, final int keycode, final int charcode)
+    {
+        PushEvent(new KOnceRunnable()
+        {
+            @Override
+            public void Run()
+            {
+                Q3EJNI.sendKeyEvent(down ? 1 : 0, keycode, charcode);
+            }
+        });
+    }
+
+    public void sendMotionEvent(final float deltax, final float deltay)
+    {
+        PushEvent(new KOnceRunnable()
+        {
+            @Override
+            public void Run()
+            {
+                Q3EJNI.sendMotionEvent(deltax, deltay);
+            }
+        });
+    }
+
+    public void InitGUIInterface(Activity context)
+    {
+        gui = new Q3EGUI(context);
+    }
+
+    public void ShowToast(String text)
+    {
+        if(null != gui)
+            gui.Toast(text);
+    }
+
+    public void CloseVKB()
+    {
+        if (null != vw)
+        {
+            vw.post(new Runnable() {
+                @Override
+                public void run() {
+                    Q3EUtils.CloseVKB(vw);
+                }
+            });
+        }
+    }
+
+    public void OpenVKB()
+    {
+        if (null != vw)
+        {
+            vw.post(new Runnable() {
+                @Override
+                public void run() {
+                    Q3EUtils.OpenVKB(vw);
+                }
+            });
+        }
+    }
+
+    public void ToggleToolbar(boolean on)
+    {
+        if (null != vw)
+        {
+            vw.ToggleToolbar(on);
+        }
     }
 }
 

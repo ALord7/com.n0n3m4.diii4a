@@ -563,7 +563,13 @@ protected:				// HUMANHEAD nla - need to be protected for access by hhPlayer
 
 	// if there is a focusGUIent, the attack button will be changed into mouse clicks
 	idEntity *				focusGUIent;
+#ifdef _MOD_FULL_BODY_AWARENESS
+public:
+#endif
 	idUserInterface *		focusUI;				// focusGUIent->renderEntity.gui, gui2, or gui3
+#ifdef _MOD_FULL_BODY_AWARENESS
+protected:
+#endif
 	int						focusTime;
 	idUserInterface *		cursor;
 	
@@ -671,6 +677,14 @@ protected:				// HUMANHEAD nla - need to be protected for access by hhPlayer
 	void					Event_HideTip( void );
 	void					Event_LevelTrigger( void );
 	void					Event_Gibbed( void );
+#ifdef _MOD_FULL_BODY_AWARENESS
+protected:
+	idVec3 fullBodyAwarenessOffset;
+public:
+	virtual bool IsZoomed(void) const { return false; }
+	idVec3 firstPersonViewOrigin_playerViewOrigin; // melee
+	idVec3 firstPersonViewOrigin_viewWeaponOrigin; // launch
+#endif
 };
 
 ID_INLINE bool idPlayer::IsReady( void ) {

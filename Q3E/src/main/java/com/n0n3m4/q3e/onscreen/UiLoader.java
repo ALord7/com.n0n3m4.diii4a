@@ -5,6 +5,7 @@ import android.preference.PreferenceManager;
 import android.view.View;
 
 import com.n0n3m4.q3e.Q3EGlobals;
+import com.n0n3m4.q3e.Q3EKeyCodes;
 import com.n0n3m4.q3e.Q3EPreference;
 import com.n0n3m4.q3e.Q3EUtils;
 
@@ -43,33 +44,36 @@ public class UiLoader
 
     private Object LoadUiElement(int id, int cx, int cy, int size, int alpha, boolean editMode)
     {
-        int bh = size;
-        if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == 0)
-            bh = size;
-        if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == 1)
-            bh = size;
-        if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == 2)
-            bh = size / 2;
-
-        int sh = size;
-        if (Q3EUtils.q3ei.arg_table[id * 4 + 3] == 0)
-            sh = size / 2;
-        if (Q3EUtils.q3ei.arg_table[id * 4 + 3] == 1)
-            sh = size;
-
-
+        int key, key2, key3;
         switch (Q3EUtils.q3ei.type_table[id])
         {
             case Q3EGlobals.TYPE_BUTTON:
-                return new Button(ctx, gl, cx, cy, size, bh, Q3EUtils.q3ei.texture_table[id], Q3EUtils.q3ei.arg_table[id * 4], Q3EUtils.q3ei.arg_table[id * 4 + 2], Q3EUtils.q3ei.arg_table[id * 4 + 1] == 1, (float) alpha / 100);
+                int bh = size;
+                if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == Q3EGlobals.ONSCREEN_BUTTON_TYPE_FULL)
+                    bh = size;
+                else if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == Q3EGlobals.ONSCREEN_BUTTON_TYPE_RIGHT_BOTTOM)
+                    bh = size;
+                else if (Q3EUtils.q3ei.arg_table[id * 4 + 2] == Q3EGlobals.ONSCREEN_BUTTON_TYPE_CENTER)
+                    bh = size / 2;
+                key = Q3EKeyCodes.GetRealKeyCode(Q3EUtils.q3ei.arg_table[id * 4]);
+                return new Button(ctx, gl, cx, cy, size, bh, Q3EUtils.q3ei.texture_table[id], key, Q3EUtils.q3ei.arg_table[id * 4 + 2], Q3EUtils.q3ei.arg_table[id * 4 + 1] == 1, (float) alpha / 100);
             case Q3EGlobals.TYPE_JOYSTICK: {
-                return new Joystick(ctx, gl, size, (float) alpha / 100, cx, cy, Q3EUtils.q3ei.joystick_release_range, Q3EUtils.q3ei.joystick_inner_dead_zone, Q3EUtils.q3ei.joystick_unfixed, editMode, Q3EUtils.q3ei.texture_table[id]);
+                int visibleMode = PreferenceManager.getDefaultSharedPreferences(ctx.getContext()).getInt(Q3EPreference.pref_harm_joystick_visible, Q3EGlobals.ONSCRREN_JOYSTICK_VISIBLE_ALWAYS);
+                return new Joystick(ctx, gl, size, (float) alpha / 100, cx, cy, Q3EUtils.q3ei.joystick_release_range, Q3EUtils.q3ei.joystick_inner_dead_zone, Q3EUtils.q3ei.joystick_unfixed, editMode, visibleMode, Q3EUtils.q3ei.texture_table[id]);
             }
             case Q3EGlobals.TYPE_SLIDER:
-                return new Slider(ctx, gl, cx, cy, size, sh, Q3EUtils.q3ei.texture_table[id], Q3EUtils.q3ei.arg_table[id * 4], Q3EUtils.q3ei.arg_table[id * 4 + 1], Q3EUtils.q3ei.arg_table[id * 4 + 2], Q3EUtils.q3ei.arg_table[id * 4 + 3], (float) alpha / 100);
+                key = Q3EKeyCodes.GetRealKeyCode(Q3EUtils.q3ei.arg_table[id * 4]);
+                key2 = Q3EKeyCodes.GetRealKeyCode(Q3EUtils.q3ei.arg_table[id * 4 + 1]);
+                key3 = Q3EKeyCodes.GetRealKeyCode(Q3EUtils.q3ei.arg_table[id * 4 + 2]);
+                int sh = size;
+                if (Q3EUtils.q3ei.arg_table[id * 4 + 3] == Q3EGlobals.ONSCRREN_SLIDER_STYLE_LEFT_RIGHT || Q3EUtils.q3ei.arg_table[id * 4 + 3] == Q3EGlobals.ONSCRREN_SLIDER_STYLE_LEFT_RIGHT_SPLIT_CLICK)
+                    sh = size / 2;
+                /*else if (Q3EUtils.q3ei.arg_table[id * 4 + 3] == Q3EGlobals.ONSCRREN_SLIDER_STYLE_DOWN_RIGHT)
+                    sh = size;*/
+                return new Slider(ctx, gl, cx, cy, size, sh, Q3EUtils.q3ei.texture_table[id], key, key2, key3, Q3EUtils.q3ei.arg_table[id * 4 + 3], (float) alpha / 100);
             case Q3EGlobals.TYPE_DISC:
             {
-                String keysStr = PreferenceManager.getDefaultSharedPreferences(ctx.getContext()).getString(Q3EPreference.WEAPON_PANEL_KEYS, "1,2,3,4,5,6,7,8,9,q,0");
+                String keysStr = PreferenceManager.getDefaultSharedPreferences(ctx.getContext()).getString(Q3EPreference.WEAPON_PANEL_KEYS, Q3EKeyCodes.K_WEAPONS_STR);
                 char[] keys = null;
                 if (null != keysStr && !keysStr.isEmpty())
                 {

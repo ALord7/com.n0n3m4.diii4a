@@ -65,7 +65,9 @@ idCVar r_useInfiniteFarZ("r_useInfiniteFarZ", "1", CVAR_RENDERER | CVAR_BOOL, "u
 
 idCVar r_znear("r_znear", "3", CVAR_RENDERER | CVAR_FLOAT, "near Z clip plane distance", 0.001f, 200.0f);
 
-idCVar r_noLight("r_noLight", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "lighting disable hack");
+#ifdef _NO_LIGHT
+idCVar r_noLight("r_noLight", "0", CVAR_RENDERER | CVAR_INTEGER/*CVAR_BOOL | CVAR_ARCHIVE*/, "lighting disable hack: 0 - using interaction lighting; 1 - disable lighting(not allow switch); 2 - disable lighting(allow switch with 0)");
+#endif
 idCVar r_useETC1("r_useETC1", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "use ETC1 compression");
 idCVar r_useETC1Cache("r_useETC1cache", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "use ETC1 compression");
 idCVar r_useDXT("r_useDXT", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "use DXT compression if possible");
@@ -75,7 +77,13 @@ idCVar r_finish("r_finish", "0", CVAR_RENDERER | CVAR_BOOL, "force a call to glF
 idCVar r_swapInterval("r_swapInterval", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "changes swap interval");
 
 idCVar r_gamma("r_gamma", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f, 3.0f);
-idCVar r_brightness("r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f, 2.0f);
+idCVar r_brightness("r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f,
+#ifdef _NO_GAMMA //karin: r_brightness when unsupport gamma
+		3.0f
+#else
+		2.0f
+#endif
+);
 
 idCVar r_renderer("r_renderer", "glsl", CVAR_RENDERER | CVAR_ARCHIVE, "hardware specific renderer path to use");
 
@@ -197,7 +205,11 @@ idCVar r_showOverDraw("r_showOverDraw", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = 
 idCVar r_lockSurfaces("r_lockSurfaces", "0", CVAR_RENDERER | CVAR_BOOL, "allow moving the view point without changing the composition of the scene, including culling");
 idCVar r_useEntityCallbacks("r_useEntityCallbacks", "1", CVAR_RENDERER | CVAR_BOOL, "if 0, issue the callback immediately at update time, rather than defering");
 
+#ifdef _RAVEN //k: r_showSkel diff with renderer
+idCVar r_showSkel( "r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "draw the skeleton when model animates, 1 = draw model with skeleton, 2 = draw skeleton only, 3 = draw joints only", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
+#else
 idCVar r_showSkel("r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "draw the skeleton when model animates, 1 = draw model with skeleton, 2 = draw skeleton only", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2>);
+#endif
 idCVar r_jointNameScale("r_jointNameScale", "0.02", CVAR_RENDERER | CVAR_FLOAT, "size of joint names when r_showskel is set to 1");
 idCVar r_jointNameOffset("r_jointNameOffset", "0.5", CVAR_RENDERER | CVAR_FLOAT, "offset of joint names when r_showskel is set to 1");
 
@@ -211,6 +223,23 @@ idCVar r_materialOverride("r_materialOverride", "", CVAR_RENDERER, "overrides al
 idCVar r_debugRenderToTexture("r_debugRenderToTexture", "0", CVAR_RENDERER | CVAR_INTEGER, "");
 
 idCVar harm_r_maxFps( "harm_r_maxFps", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "Limit maximum FPS. 0 = unlimited" );
+idCVar harm_r_shadowCarmackInverse("harm_r_shadowCarmackInverse", "0", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "[Harmattan]: Stencil shadow using Carmack-Inverse.");
+idCVar r_scaleMenusTo43( "r_scaleMenusTo43", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Scale menus, fullscreen videos and PDA to 4:3 aspect ratio" );
+//k: temp memory allocate in stack / heap control on Android
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
+// #warning "For fix `DOOM3: The lost mission` mod, when load `game/le_hell` map(loading resource `models/mapobjects/hell/hellintro.lwo` model, a larger scene, alloca() stack out of memory)."
+/*static */idCVar harm_r_maxAllocStackMemory("harm_r_maxAllocStackMemory", "524288", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "[Harmattan]: Control allocate temporary memory when load model data on Android, default value is `524288` bytes(Because stack memory is limited on Android, exam `game/le_hell` map's `models/mapobjects/hell/hellintro.lwo` in `DOOM3: The lost mission` mod). If less than this `byte` value, call `alloca` in stack memory, else call `malloc`/`calloc` in heap memory(0 - Always heap, Negative - Always stack, Positive - Max stack memory limit).");
+#endif
+
+#ifdef _USING_STB
+idCVar r_screenshotFormat("r_screenshotFormat", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Screenshot format. 0 = TGA (default), 1 = BMP, 2 = PNG, 3 = JPG, 4 = DDS", 0, 4, idCmdSystem::ArgCompletion_Integer<0, 4>);
+idCVar r_screenshotJpgQuality("r_screenshotJpgQuality", "75", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Screenshot quality for JPG images (0-100)", 0, 100, idCmdSystem::ArgCompletion_Integer<0, 100>);
+idCVar r_screenshotPngCompression("r_screenshotPngCompression", "3", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Compression level when using PNG screenshots (0-9)", 0, 9, idCmdSystem::ArgCompletion_Integer<0, 9>);
+#endif
+
+#ifdef _RAVEN
+idCVar r_skipSky("r_skipSky", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Dark sky");
+#endif
 
 /*
 =================
@@ -403,6 +432,23 @@ static void R_CheckPortableExtensions(void)
 	{
 		common->Printf( "X..%s not found\n", "GL_EXT_framebuffer_object" );
 	}
+
+#ifdef GL_ES_VERSION_3_0
+	if(USING_GLES3)
+	{
+		glConfig.depthTextureAvailable = true;
+		glConfig.depthTextureCubeMapAvailable = true;
+		glConfig.depth24Available = true;
+		glConfig.gl_FragDepthAvailable = true;
+	}
+	else
+#endif
+	{
+		glConfig.depthTextureAvailable = R_CheckExtension("GL_OES_depth_texture");
+		glConfig.depthTextureCubeMapAvailable = R_CheckExtension("GL_OES_depth_texture_cube_map");
+		glConfig.depth24Available = R_CheckExtension("GL_OES_depth24");
+		glConfig.gl_FragDepthAvailable = R_CheckExtension("GL_EXT_frag_depth");
+	}
 }
 
 
@@ -487,30 +533,6 @@ all renderSystem functions will still operate properly, notably the material
 and model information functions.
 ==================
 */
-#ifdef __ANDROID__
-static void AndroidSetResolution(int32_t width, int32_t height)
-{
-	cvarSystem->SetCVarBool("r_fullscreen",  true);
-	cvarSystem->SetCVarInteger("r_mode", -1);
-
-	cvarSystem->SetCVarInteger("r_customWidth", width);
-	cvarSystem->SetCVarInteger("r_customHeight", height);
-
-	float r = (float) width / (float) height;
-
-	if (r > 1.7f) {
-		cvarSystem->SetCVarInteger("r_aspectRatio", 1);    // 16:9
-	} else if (r > 1.55f) {
-		cvarSystem->SetCVarInteger("r_aspectRatio", 2);    // 16:10
-	} else {
-		cvarSystem->SetCVarInteger("r_aspectRatio", 0);    // 4:3
-	}
-
-	Sys_Printf("r_mode(%i), r_customWidth(%i), r_customHeight(%i)",
-	           -1, width, height);
-}
-#endif
-
 void R_InitOpenGL(void)
 {
 	GLint			temp;
@@ -530,9 +552,6 @@ void R_InitOpenGL(void)
 	//
 	// initialize OS specific portions of the renderSystem
 	//
-#ifdef __ANDROID__
-	AndroidSetResolution(screen_width, screen_height);
-#endif
 	for (i = 0 ; i < 2 ; i++) {
 		// set the parameters we are trying
 		R_GetModeInfo(&glConfig.vidWidth, &glConfig.vidHeight, r_mode.GetInteger());
@@ -1061,8 +1080,7 @@ void R_Benchmark_f(const idCmdArgs &args)
 	r_skipRenderContext.SetBool(false);
 }
 
-#ifdef GL_ES_VERSION_3_0
-void R_OpenGL_f(const idCmdArgs &args)
+void R_ShowglConfig_f(const idCmdArgs &args)
 {
 	if(!glConfig.isInitialized)
 	{
@@ -1070,9 +1088,11 @@ void R_OpenGL_f(const idCmdArgs &args)
 		return;
 	}
 
+#ifdef GL_ES_VERSION_3_0
 	if(USING_GLES3)
 		common->Printf("OpenGLES 3.0\n");
 	else
+#endif
 		common->Printf("OpenGLES 2.0\n");
 
 	common->Printf("Renderer: %s\n", glConfig.renderer_string);
@@ -1123,24 +1143,37 @@ void R_OpenGL_f(const idCmdArgs &args)
 	common->Printf("maxRenderbufferSize: %d\n", glConfig.maxRenderbufferSize);
 	common->Printf("maxColorAttachments: %d\n", glConfig.maxColorAttachments);
 
+	common->Printf("depthTextureAvailable: %d\n", glConfig.depthTextureAvailable);
+	common->Printf("depthTextureCubeMapAvailable: %d\n", glConfig.depthTextureCubeMapAvailable);
+	common->Printf("depth24Available: %d\n", glConfig.depth24Available);
+	common->Printf("gl_FragDepthAvailable: %d\n", glConfig.gl_FragDepthAvailable);
+#ifdef _SHADOW_MAPPING
+	extern bool r_useDepthTexture;
+	extern bool r_useCubeDepthTexture;
+	extern bool r_usePackColorAsDepth;
+	common->Printf("r_useDepthTexture: %d\n", r_useDepthTexture);
+	common->Printf("r_useCubeDepthTexture: %d\n", r_useCubeDepthTexture);
+	common->Printf("r_usePackColorAsDepth: %d\n", r_usePackColorAsDepth);
+#endif
+
+#ifdef GL_ES_VERSION_3_0
 	if(USING_GLES3)
 		common->Printf("OpenGLES 3.0\n");
 	else
+#endif
 		common->Printf("OpenGLES 2.0\n");
 }
-#endif
 
 #ifdef _MULTITHREAD
 static void R_Multithreading_f(const idCmdArgs &args)
 {
 	extern intptr_t Sys_GetMainThread(void);
-	extern const xthreadInfo * Sys_GetRenderThread(void);
 
 	common->Printf("[Harmattan]: Multi-Thread current is %s.\n", multithreadActive ? "enabled" : "disabled");
 	common->Printf("             - Main thread handle is %lu.\n", Sys_GetMainThread());
 	//if(multithreadActive)
 	{
-		const xthreadInfo *thread = Sys_GetRenderThread();
+		const xthreadInfo *thread = &renderThread->render_thread;
 		common->Printf("             - Render thread(%s) handle is %lu.\n", thread ? thread->name : "<NULL>", thread ? thread->threadHandle : 0);
 	}
 }
@@ -1306,6 +1339,41 @@ void idRenderSystemLocal::TakeScreenshot(int width, int height, const char *file
 		r_jitter.SetBool(false);
 	}
 
+#ifdef _USING_STB
+	switch(r_screenshotFormat.GetInteger())
+	{
+		case 1: {// bmp
+			idStr fn(fileName);
+			fn.SetFileExtension("bmp");
+			const char *basePath = strstr(fileName, "viewnote") ? "fs_cdpath" : NULL;
+			R_WriteBMP(fn.c_str(), buffer + 18, width, height, 4, true, basePath);
+		}
+			break;
+		case 2: {// png
+			idStr fn(fileName);
+			fn.SetFileExtension("png");
+			const char *basePath = strstr(fileName, "viewnote") ? "fs_cdpath" : NULL;
+			R_WritePNG(fn.c_str(), buffer + 18, width, height, 4, true, idMath::ClampInt(0, 9, r_screenshotPngCompression.GetInteger()), basePath);
+		}
+			break;
+		case 3: {// jpg
+			idStr fn(fileName);
+			fn.SetFileExtension("jpg");
+			const char *basePath = strstr(fileName, "viewnote") ? "fs_cdpath" : NULL;
+			R_WriteJPG(fn.c_str(), buffer + 18, width, height, 4, true, idMath::ClampInt(0, 9, idMath::ClampInt(1, 100, r_screenshotJpgQuality.GetInteger())), basePath);
+		}
+			break;
+		case 4: {// dds
+			idStr fn(fileName);
+			fn.SetFileExtension("dds");
+			const char *basePath = strstr(fileName, "viewnote") ? "fs_cdpath" : NULL;
+			R_WriteDDS(fn.c_str(), buffer + 18, width, height, 4, true, basePath);
+		}
+			break;
+		case 0: // tga
+		default:
+#endif
+
 	// fill in the header (this is vertically flipped, which glReadPixels emits)
 	buffer[2] = 2;		// uncompressed type
 	buffer[12] = width & 255;
@@ -1329,6 +1397,10 @@ void idRenderSystemLocal::TakeScreenshot(int width, int height, const char *file
 	} else {
 		fileSystem->WriteFile(fileName, buffer, c);
 	}
+#ifdef _USING_STB
+			break;
+	}
+#endif
 
 	R_StaticFree(buffer);
 
@@ -1563,29 +1635,35 @@ void R_EnvShot_f(const idCmdArgs &args)
 	primary = *tr.primaryView;
 
 	memset(&axis, 0, sizeof(axis));
-	axis[0][0][0] = 1;
-	axis[0][1][2] = 1;
-	axis[0][2][1] = 1;
+    // forward = east (positive x-axis in DR)
+    axis[0][0][0] = 1;
+    axis[0][1][1] = 1;
+    axis[0][2][2] = 1;
 
-	axis[1][0][0] = -1;
-	axis[1][1][2] = -1;
-	axis[1][2][1] = 1;
+    // left = north
+    axis[1][0][1] = 1;
+    axis[1][1][0] = -1;
+    axis[1][2][2] = 1;
 
-	axis[2][0][1] = 1;
-	axis[2][1][0] = -1;
-	axis[2][2][2] = -1;
+    // right = south
+    axis[2][0][1] = -1;
+    axis[2][1][0] = 1;
+    axis[2][2][2] = 1;
 
-	axis[3][0][1] = -1;
-	axis[3][1][0] = -1;
-	axis[3][2][2] = 1;
+    // back = west
+    axis[3][0][0] = -1;
+    axis[3][1][1] = -1;
+    axis[3][2][2] = 1;
 
-	axis[4][0][2] = 1;
-	axis[4][1][0] = -1;
-	axis[4][2][1] = 1;
+    // down, while facing forward
+    axis[4][0][2] = -1;
+    axis[4][1][1] = 1;
+    axis[4][2][0] = 1;
 
-	axis[5][0][2] = -1;
-	axis[5][1][0] = 1;
-	axis[5][2][1] = 1;
+    // up, while facing forward
+    axis[5][0][2] = 1;
+    axis[5][1][1] = 1;
+    axis[5][2][0] = -1;
 
 	for (i = 0 ; i < 6 ; i++) {
 		ref = primary.renderView;
@@ -1826,6 +1904,7 @@ R_SetColorMappings
 */
 void R_SetColorMappings(void)
 {
+#if !defined(_NO_GAMMA) //karin: r_brightness when unsupport gamma
 	int		i, j;
 	float	g, b;
 	int		inf;
@@ -1858,6 +1937,11 @@ void R_SetColorMappings(void)
 	}
 
 	GLimp_SetGamma(tr.gammaTable, tr.gammaTable, tr.gammaTable);
+#else
+	RB_overbright = (r_brightness.GetFloat() * 2) - 1;
+	if( RB_overbright < 1 )
+		RB_overbright = 1;
+#endif
 }
 
 
@@ -1946,7 +2030,7 @@ void R_VidRestart_f(const idCmdArgs &args)
 #ifdef _MULTITHREAD
 	if(multithreadActive)
 	{
-		BackendThreadShutdown();
+		renderThread->BackendThreadShutdown();
 		common->SetRefreshOnPrint( false ); // without a renderer there's nothing to refresh
 	}
 #endif
@@ -2139,11 +2223,25 @@ void R_InitCommands(void)
 	cmdSystem->AddCommand("listRenderLightDefs", R_ListRenderLightDefs_f, CMD_FL_RENDERER, "lists the light defs");
 	cmdSystem->AddCommand("listModes", R_ListModes_f, CMD_FL_RENDERER, "lists all video modes");
 	cmdSystem->AddCommand("reloadSurface", R_ReloadSurface_f, CMD_FL_RENDERER, "reloads the decl and images for selected surface");
-#ifdef GL_ES_VERSION_3_0
-	cmdSystem->AddCommand("glVersion", R_OpenGL_f, CMD_FL_RENDERER, "print OpenGL version");
-#endif
+	cmdSystem->AddCommand("glConfig", R_ShowglConfig_f, CMD_FL_RENDERER, "print OpenGL config");
 #ifdef _MULTITHREAD
 	cmdSystem->AddCommand("r_multithread", R_Multithreading_f, CMD_FL_SYSTEM, "print multi-threading state");
+#endif
+#ifdef _SHADOW_MAPPING
+	extern void R_DumpShadowMap_f(const idCmdArgs &args);
+	cmdSystem->AddCommand("harm_dumpShadowMap", R_DumpShadowMap_f, CMD_FL_RENDERER, "dump shadow map to file in next frame");
+#endif
+#ifdef _USING_STB
+	extern void R_ConvertImage_f(const idCmdArgs &args);
+	cmdSystem->AddCommand("convertImage", R_ConvertImage_f, CMD_FL_RENDERER, "convert image format", idCmdSystem::ArgCompletion_ImageName);
+#endif
+	extern void R_ExportGLSLShaderSource_f(const idCmdArgs &args);
+	extern void R_PrintGLSLShaderSource_f(const idCmdArgs &args);
+	cmdSystem->AddCommand("exportGLSLShaderSource", R_ExportGLSLShaderSource_f, CMD_FL_RENDERER, "export internal GLSL shader source to game data directory\nUsage: COMMAND [name1 name2 ...] [save_path]");
+	cmdSystem->AddCommand("printGLSLShaderSource", R_PrintGLSLShaderSource_f, CMD_FL_RENDERER, "print internal GLSL shader source\nUsage: COMMAND [name1 name2 ...]");
+#ifdef _EXTRAS_TOOLS
+	MD5Anim_AddCommand();
+	ModelTest_AddCommand();
 #endif
 }
 
@@ -2191,6 +2289,7 @@ void idRenderSystemLocal::Clear(void)
 #ifdef _HUMANHEAD
 	scopeView = false;
 	shuttleView = false;
+	lastRenderSkybox = -1;
 #endif
 }
 
@@ -2264,7 +2363,7 @@ void idRenderSystemLocal::Shutdown(void)
 #ifdef _MULTITHREAD
 	if(multithreadActive)
 	{
-		BackendThreadShutdown();
+		renderThread->BackendThreadShutdown();
 		common->SetRefreshOnPrint( false ); // without a renderer there's nothing to refresh
 	}
 #endif
@@ -2471,22 +2570,29 @@ idCVar r_shadowMapSplits( "r_shadowMapSplits", "3", CVAR_RENDERER | CVAR_INTEGER
 idCVar r_shadowMapSplitWeight( "r_shadowMapSplitWeight", "0.9", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "" );
 idCVar r_shadowMapLodScale( "r_shadowMapLodScale", "1.4", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "" );
 idCVar r_shadowMapLodBias( "r_shadowMapLodBias", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "" );
-idCVar r_shadowMapPolygonFactor( "r_shadowMapPolygonFactor", "2", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "polygonOffset factor for drawing shadow buffer" );
-idCVar r_shadowMapPolygonOffset( "r_shadowMapPolygonOffset", "3000", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "polygonOffset units for drawing shadow buffer" );
+idCVar r_shadowMapPolygonFactor( "r_shadowMapPolygonFactor", "0" /*"2"*/, CVAR_RENDERER | CVAR_FLOAT, "polygonOffset factor for drawing shadow buffer" );
+idCVar r_shadowMapPolygonOffset( "r_shadowMapPolygonOffset", "0" /*"3000"*/, CVAR_RENDERER | CVAR_FLOAT, "polygonOffset units for drawing shadow buffer" );
 idCVar r_shadowMapOccluderFacing( "r_shadowMapOccluderFacing", "2", CVAR_RENDERER | CVAR_INTEGER, "0 = front faces, 1 = back faces, 2 = twosided" );
+idCVar r_forceShadowMapsOnAlphaTestedSurfaces( "r_forceShadowMapsOnAlphaTestedSurfaces", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "0 = same shadowing as with stencil shadows, 1 = ignore noshadows for alpha tested materials" );
 // RB end
 
-idCVar harm_r_shadowMapLod( "harm_r_shadowMapLod", "-1", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "force using shadow map LOD(0 - 4)" );
-idCVar harm_r_shadowMapBias( "harm_r_shadowMapBias", "0.05", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map bias" );
-idCVar harm_r_shadowMapAlpha( "harm_r_shadowMapAlpha", "0.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map alpha" );
-idCVar harm_r_shadowMapSampleFactor( "harm_r_shadowMapSampleFactor", "-1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map sample factor" );
-idCVar harm_r_shadowMapFrustumNear( "harm_r_shadowMapFrustumNear", "4.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map frustum near" );
-idCVar harm_r_shadowMapFrustumFar( "harm_r_shadowMapFrustumFar", "-2.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map frustum far" );
+idCVar harm_r_shadowMapLod( "harm_r_shadowMapLod", "-1", CVAR_RENDERER | CVAR_INTEGER, "force using shadow map LOD(0 - 4, -1: auto)" );
+idCVar harm_r_shadowMapBias( "harm_r_shadowMapBias", "0.001", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow's depth compare BIAS in shadow mapping" );
+idCVar harm_r_shadowMapAlpha( "harm_r_shadowMapAlpha", "0.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow's alpha in shadow mapping" );
+idCVar harm_r_shadowMapSampleFactor( "harm_r_shadowMapSampleFactor", "-1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "soft shadow's sample factor in shadow mapping(0: disable, -1: auto, > 0: multiple)" );
+idCVar harm_r_shadowMapFrustumNear( "harm_r_shadowMapFrustumNear", "4.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map render frustum near" );
+idCVar harm_r_shadowMapFrustumFar( "harm_r_shadowMapFrustumFar", "-2.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map render frustum far(0: 2.5 x light's radius, < 0: light's radius x multiple, > 0: using fixed value)" );
 idCVar harm_r_useLightScissors("harm_r_useLightScissors", "3", CVAR_RENDERER | CVAR_INTEGER, "0 = no scissor, 1 = non-clipped scissor, 2 = near-clipped scissor, 3 = fully-clipped scissor", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
-idCVar harm_r_shadowMapPointLight("harm_r_shadowMapPointLight", "1", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "Point light render method in OpenGLES2.0: 0 = using window space z value as depth value[(gl_Position.z / gl_Position.w + 1.0) * 0.5], 1 = using light position to vertex position distance divide frustum far value as depth value[(VertexPositionInLightSpace - LightGlobalPosition) / LightRadiusLengthAsFrustumFar], 2 = emulate z transform as depth value", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
+idCVar harm_r_shadowMapDepthBuffer( "harm_r_shadowMapDepthBuffer", "0", CVAR_RENDERER | CVAR_INIT | CVAR_INTEGER, "0 = Auto; 1 = depth texture; 2 = color texture's red; 3 = color texture's rgba", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
+idCVar harm_r_shadowMapNonParallelLightUltra( "harm_r_shadowMapNonParallelLightUltra", "0", CVAR_RENDERER | CVAR_BOOL/*//k next version open: | CVAR_ARCHIVE*/, "non parallel light allow ultra quality shadow map texture" );
 
-#include "Framebuffer.cpp"
-#include "tr_shadowmapping.cpp"
-#include "RenderMatrix.cpp"
-#include "GLMatrix.cpp"
+#include "rb/Framebuffer.cpp"
+#include "tr/tr_shadowmapping.cpp"
+#include "matrix/RenderMatrix.cpp"
+#include "matrix/GLMatrix.cpp"
+#endif
+
+#ifdef _TRANSLUCENT_STENCIL_SHADOW
+idCVar harm_r_stencilShadowTranslucent( "harm_r_stencilShadowTranslucent", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable translucent shadow in stencil shadow" );
+idCVar harm_r_stencilShadowAlpha( "harm_r_stencilShadowAlpha", "0.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "translucent shadow's alpha in stencil shadow" );
 #endif

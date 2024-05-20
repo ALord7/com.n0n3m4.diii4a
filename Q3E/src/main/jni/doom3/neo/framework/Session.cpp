@@ -31,8 +31,22 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Session_local.h"
 
-#ifdef _RAVEN //k: for play credits in mainmenu
+#ifdef _MULTITHREAD
+extern bool multithreadActive;
+extern bool Sys_InRenderThread(void);
+#endif
+
+#if defined(_RAVEN) || defined(_HUMANHEAD)
 #include "../ui/Window.h"
+#endif
+#ifdef _HUMANHEAD
+#include "../ui/UserInterfaceLocal.h"
+#endif
+
+#ifdef _RAVEN
+//karin: pause when finished loading
+idCVar com_skipLevelLoadPause("com_skipLevelLoadPause", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "");
+
 const char * Com_LocalizeGametype( const char *gameType ) { // from MultiplayerGame.cpp
 	const char *localisedGametype = gameType;
 
@@ -96,6 +110,51 @@ idCVar	idSessionLocal::com_aviDemoHeight("com_aviDemoHeight", "256", CVAR_SYSTEM
 idCVar	idSessionLocal::com_aviDemoTics("com_aviDemoTics", "2", CVAR_SYSTEM | CVAR_INTEGER, "", 1, 60);
 idCVar	idSessionLocal::com_wipeSeconds("com_wipeSeconds", "1", CVAR_SYSTEM, "");
 idCVar	idSessionLocal::com_guid("com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "");
+
+#ifdef _HUMANHEAD //k: play level music when map loading
+static idCVar g_levelloadmusic("g_levelloadmusic", "1", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "play music during level loads");
+
+#include "../sound/snd_local.h"
+#endif
+
+#ifdef _BREAK_60FPS_CAP
+
+#define USERCMD_HZ 60		// 60 frames per second
+#define USERCMD_MSEC (1000 / USERCMD_HZ)
+
+#define DEFAULT_60_TIC() \
+            { \
+				harm_g_timestepMs.SetInteger(USERCMD_MSEC); \
+				harm_g_minorTic.SetBool(false);             \
+			}
+#define SETUP_TIC(timestepMs, minorTic) \
+            { \
+				harm_g_timestepMs.SetInteger(timestepMs); \
+				harm_g_minorTic.SetBool(minorTic);             \
+			}
+
+//Karin: These 2 cvar using transfer variants for keeping game code compation.
+idCVar harm_g_minorTic("harm_g_minorTic", "0", CVAR_BOOL | CVAR_SYSTEM, "bool minorTic;");
+idCVar harm_g_timestepMs("harm_g_timestepMs", va("%d", USERCMD_MSEC), CVAR_INTEGER | CVAR_SYSTEM, "int timestepMs;");
+
+idCVar g_timeModifier(				"g_timeModifier",			"1",			CVAR_GAME | CVAR_FLOAT, "Use this to stretch the hardcoded 16 msec each frame takes. This can be used to let the game run ultra-slow." );
+idCVar	com_useMinorTics("com_useMinorTics", "1", CVAR_SYSTEM | CVAR_BOOL,
+						   "If several game tics are modelled in one frame, all tics except the first one are declared \"minor\". "
+						   "Minor tics can enable various optimizations, f.i. alive AIs don't think in minor tics.",
+						   1, 1000);
+idCVar	com_maxFPS( "com_maxFPS", "300", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "define the maximum FPS cap", 2, 1000 );
+idCVar	com_maxTicTimestep("com_maxTicTimestep", "17", CVAR_SYSTEM | CVAR_INTEGER,
+							 "Timestep of a game tic must not exceed this number of milliseconds. "
+							 "If frame takes more time, then its duration is split into several game tics.\n"
+							 "Note: takes effect only when FPS is uncapped.",
+							 1, 1000);
+idCVar	com_maxTicsPerFrame("com_maxTicsPerFrame", "10", CVAR_SYSTEM | CVAR_INTEGER,
+							  "Never do more than this number of game tics per one frame. "
+							  "When frames take too much time, allow game time to run slower than astronomical time.",
+							  1, 1000);
+
+extern int				com_frameDelta;			// time elapsed since previous frame in milliseconds
+#endif
 
 idSessionLocal		sessLocal;
 idSession			*session = &sessLocal;
@@ -440,6 +499,9 @@ void idSessionLocal::Clear()
 	authWaitBox = false;
 
 	authMsg.Clear();
+#ifdef _RAVEN
+	finishedLoading = false;
+#endif
 }
 
 /*
@@ -455,6 +517,12 @@ idSessionLocal::idSessionLocal()
 
 	menuSoundWorld = NULL;
 
+#ifdef _HUMANHEAD
+	guiSubtitles = NULL;
+	subtitleTextScaleInited = false;
+	for(int m = 0; m < sizeof(subtitlesTextScale) / sizeof(subtitlesTextScale[0]); m++)
+		subtitlesTextScale[m] = 0.0f;
+#endif
 	Clear();
 }
 
@@ -493,6 +561,9 @@ void idSessionLocal::Stop()
 
 	insideUpdateScreen = false;
 	insideExecuteMapChange = false;
+#ifdef _RAVEN
+	finishedLoading = false;
+#endif
 
 	// drop all guis
 	SetGUI(NULL, NULL);
@@ -1472,12 +1543,21 @@ void idSessionLocal::MoveToNewMap(const char *mapName)
 
 	ExecuteMapChange();
 
-	if (!mapSpawnData.serverInfo.GetBool("devmap")) {
-		// Autosave at the beginning of the level
-		SaveGame(GetAutoSaveName(mapName), true);
-	}
+#ifdef _RAVEN //karin: pause when finished loading
+    if(!com_skipLevelLoadPause.GetBool())
+		SetGUI(guiLoading, NULL);
+	else
+    {
+#endif
+    if (!mapSpawnData.serverInfo.GetBool("devmap")) {
+        // Autosave at the beginning of the level
+        SaveGame(GetAutoSaveName(mapName), true);
+    }
 
-	SetGUI(NULL, NULL);
+    SetGUI(NULL, NULL);
+#ifdef _RAVEN
+    }
+#endif
 }
 
 /*
@@ -1621,6 +1701,9 @@ void idSessionLocal::StartPlayingCmdDemo(const char *demoName)
 	LoadCmdDemoFromFile(cmdDemoFile);
 
 	// run one frame to get the view angles correct
+#ifdef _BREAK_60FPS_CAP
+	DEFAULT_60_TIC();
+#endif
 	RunGameTic();
 }
 
@@ -1644,6 +1727,9 @@ void idSessionLocal::TimeCmdDemo(const char *demoName)
 	minuteStart = startTime;
 
 	while (cmdDemoFile) {
+#ifdef _BREAK_60FPS_CAP
+		DEFAULT_60_TIC();
+#endif
 		RunGameTic();
 		count++;
 
@@ -1919,16 +2005,20 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 		soundSystem->BeginLevelLoad();
 	}
 #ifdef _HUMANHEAD //k: play level music when map loading
-	soundSystem->SetMute(false);
-	soundSystem->SetPlayingSoundWorld(menuSoundWorld);
-	const idDecl *mapDecl = declManager->FindType(DECL_MAPDEF, mapString.c_str(), false);
-	if(mapDecl)
+	if(g_levelloadmusic.GetBool())
 	{
-		const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>(mapDecl);
-		const char *loadMusic = mapDef->dict.GetString("snd_loadmusic");
-		if(loadMusic && loadMusic[0])
-			menuSoundWorld->PlayShaderDirectly(loadMusic, 2);
+		soundSystem->SetMute(false);
+		soundSystem->SetPlayingSoundWorld(menuSoundWorld);
+		const idDecl *mapDecl = declManager->FindType(DECL_MAPDEF, mapString.c_str(), false);
+		if(mapDecl)
+		{
+			const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>(mapDecl);
+			const char *loadMusic = mapDef->dict.GetString("snd_loadmusic");
+			if(loadMusic && loadMusic[0])
+				menuSoundWorld->PlayShaderDirectly(loadMusic, 2);
+		}
 	}
+	subtitleTextScaleInited = false; // reload subtitles's text scale
 #endif
 
 	uiManager->BeginLevelLoad();
@@ -1940,6 +2030,9 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 	// cause prints to force screen updates as a pacifier,
 	// and draw the loading gui instead of game draws
 	insideExecuteMapChange = true;
+#ifdef _RAVEN
+	finishedLoading = false;
+#endif
 
 	// if this works out we will probably want all the sizes in a def file although this solution will
 	// work for new maps etc. after the first load. we can also drop the sizes into the default.cfg
@@ -2042,6 +2135,9 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 	if (!idAsyncNetwork::IsActive() && !loadingSaveGame) {
 		// run a few frames to allow everything to settle
 		for (i = 0; i < 10; i++) {
+#ifdef _BREAK_60FPS_CAP
+			DEFAULT_60_TIC();
+#endif
 #ifdef _RAVEN
 			game->RunFrame(mapSpawnData.mapSpawnUsercmd, 0, false, 0); // serverGameFrame isn't used
 #else
@@ -2079,6 +2175,15 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 	// capture the current screen and start a wipe
 	StartWipe("wipe2Material");
 
+#ifdef _RAVEN //karin: pause when finished loading
+	if(!com_skipLevelLoadPause.GetBool() && !(loadingSaveGame && savegameFile) && !IsMultiplayer())
+	{
+		guiLoading->HandleNamedEvent("FinishedLoading");
+		finishedLoading = true;
+		return;
+	}
+	finishedLoading = true;
+#endif
 	usercmdGen->Clear();
 
 	// start saving commands for possible writeCmdDemo usage
@@ -2109,9 +2214,6 @@ void idSessionLocal::ExecuteMapChange(bool noFadeWipe)
 	// restart entity sound playback
 	soundSystem->SetMute(false);
 
-#ifdef _RAVENxxx //karin: TODO: why has noise sound when enable effects???
-	sw->StopAllSounds();
-#endif
 	// we are valid for game draws now
 	mapSpawned = true;
 	Sys_ClearEvents();
@@ -2824,7 +2926,7 @@ void idSessionLocal::PacifierUpdate()
 	}
 
 #ifdef _MULTITHREAD
-	if(multithreadActive && IN_RENDER_THREAD()) // render thread do not continue in multithreading, e.g. call this from idCommon::Printf
+	if(multithreadActive && Sys_InRenderThread()) // render thread do not continue in multithreading, e.g. call this from idCommon::Printf
 		return;
 #endif
 	int	time = eventLoop->Milliseconds();
@@ -2885,6 +2987,10 @@ void idSessionLocal::Draw()
 		// draw the menus full screen
 		if (guiActive == guiTakeNotes && !com_skipGameDraw.GetBool()) {
 			game->Draw(GetLocalClientNum());
+#ifdef _HUMANHEAD
+			if(guiSubtitles)
+				guiSubtitles->Redraw(com_frameTime);
+#endif
 		}
 
 		guiActive->Redraw(com_frameTime);
@@ -2899,6 +3005,10 @@ void idSessionLocal::Draw()
 			// draw the game view
 			int	start = Sys_Milliseconds();
 			gameDraw = game->Draw(GetLocalClientNum());
+#ifdef _HUMANHEAD
+			if(guiSubtitles)
+				guiSubtitles->Redraw(com_frameTime);
+#endif
 			int end = Sys_Milliseconds();
 			time_gameDraw += (end - start);	// note time used for com_speeds
 		}
@@ -2960,7 +3070,7 @@ void idSessionLocal::Draw()
 		console->Draw(false);
 	}
 
-#ifdef __ANDROID__
+#ifdef __ANDROID__ //karin: sync session state to Q3E
 	Sys_SyncState();
 #endif
 }
@@ -3069,7 +3179,20 @@ void idSessionLocal::Frame()
 	}
 
 	// se how many tics we should have before continuing
+#ifdef _BREAK_60FPS_CAP
+	int	minTic;
+	if ( com_fixedTic.GetInteger() ) {
+		// stgatilov: don't wait for async tics, just model & render as fast as we can
+		minTic = latchedTicNumber;
+	}
+	else {
+		// stgatilov: don't do anything until at least one async tic has passed
+		// that's because we tie game ticks to async tics
+		minTic = latchedTicNumber + 1;
+	}
+#else
 	int	minTic = latchedTicNumber + 1;
+#endif
 
 	if (com_minTics.GetInteger() > 1) {
 		minTic = lastGameTic + com_minTics.GetInteger();
@@ -3090,6 +3213,12 @@ void idSessionLocal::Frame()
 	// fixedTic lets us run a forced number of usercmd each frame without timing
 	if (com_fixedTic.GetInteger()) {
 		minTic = latchedTicNumber;
+#ifdef _BREAK_60FPS_CAP
+		if (com_minTics.GetInteger() > 1) {
+			// stgatilov: looks like some rarely used debug setting
+			minTic = lastGameTic + com_minTics.GetInteger();
+		}
+#endif
 	}
 
 	// FIXME: deserves a cleanup and abstraction
@@ -3206,9 +3335,23 @@ void idSessionLocal::Frame()
 	}
 
 	// don't get too far behind after a hitch
+#ifdef _BREAK_60FPS_CAP
+	if(com_fixedTic.GetInteger())
+	{
+		if (numCmdsToRun > com_maxTicsPerFrame.GetInteger()) {
+			lastGameTic = latchedTicNumber - com_maxTicsPerFrame.GetInteger();
+		}
+	}
+	else
+	{
+#else
 	if (numCmdsToRun > 10) {
 		lastGameTic = latchedTicNumber - 10;
 	}
+#endif
+#ifdef _BREAK_60FPS_CAP
+	}
+#endif
 
 	// never use more than USERCMD_PER_DEMO_FRAME,
 	// which makes it go into slow motion when recording
@@ -3238,16 +3381,61 @@ void idSessionLocal::Frame()
 		syncNextGameFrame = false;
 	}
 
+#ifdef _BREAK_60FPS_CAP
+	int					gameTicsToRun;			// how many game ticks to run this frame
+	int					gameTimestepTotal;		// total timestep for all game tics to be run this frame (in milliseconds)
+
+    if (com_fixedTic.GetInteger() > 0) {
+        gameTimestepTotal = com_frameDelta;
+        //stgatilov #4924: if too much time passed since last frame,
+        //then split this game tic into many short tics
+        //long tics easily make physics unstable, so game tic duration should be under control
+        gameTicsToRun = (gameTimestepTotal - 1) / com_maxTicTimestep.GetInteger() + 1;	//divide by 17 ms, rounding up
+        if (gameTicsToRun > com_maxTicsPerFrame.GetInteger()) {
+            //if everything is too bad, slow game down instead of modeling insane number of ticks per frame
+			gameTicsToRun = com_maxTicsPerFrame.GetInteger();
+            gameTimestepTotal = USERCMD_MSEC * gameTicsToRun;
+        }
+        lastGameTic = latchedTicNumber - gameTicsToRun;
+    }
+    else {
+		gameTicsToRun = latchedTicNumber - lastGameTic;
+        gameTimestepTotal = USERCMD_MSEC * gameTicsToRun;
+    }
+#endif
+
 	// create client commands, which will be sent directly
 	// to the game
 	if (com_showTics.GetBool()) {
 		common->Printf("%i ", latchedTicNumber - lastGameTic);
 	}
 
+#if !defined( _BREAK_60FPS_CAP)
 	int	gameTicsToRun = latchedTicNumber - lastGameTic;
+#endif
 	int i;
 
+#ifdef _HUMANHEAD
+    soundSystemLocal.SF_ShowSubtitle();
+#endif
 	for (i = 0 ; i < gameTicsToRun ; i++) {
+#ifdef _BREAK_60FPS_CAP
+		bool minorTic;
+		int deltaMs;
+		if (com_fixedTic.GetBool())
+		{
+			deltaMs = gameTimestepTotal * (i+1) / gameTicsToRun - gameTimestepTotal * i / gameTicsToRun;
+
+			// stgatilov #5992: optimize all tics except for the first one
+			minorTic = com_useMinorTics.GetBool() && (i > 0);
+		}
+		else
+		{
+			deltaMs = USERCMD_MSEC;
+			minorTic = false;
+		}
+		SETUP_TIC(deltaMs, minorTic);
+#endif
 		RunGameTic();
 
 		if (!mapSpawned) {
@@ -3507,6 +3695,30 @@ void idSessionLocal::Init()
 	guiRestartMenu = uiManager->FindGui("guis/restart.gui", true, false, true);
 #if !defined(_HUMANHEAD)
 	guiGameOver = uiManager->FindGui("guis/gameover.gui", true, false, true);
+#endif
+#ifdef _HUMANHEAD
+	guiSubtitles = uiManager->FindGui("guis/subtitles.gui", true, false, true);
+	if(guiSubtitles)
+	{
+		idWindow *desktop = ((idUserInterfaceLocal *)guiSubtitles)->GetDesktop();
+		if(desktop)
+		{
+#define SUBTITLE_GET_TEXT_SCALE(name, index) \
+            {                              \
+				drawWin_t *dw = desktop->FindChildByName(name); \
+				if(dw && dw->win) \
+				{ \
+					idWinVar *winvar = dw->win->GetWinVarByName("textScale"); \
+					if(winvar) \
+						subtitlesTextScale[index] = winvar->x(); \
+				} \
+			}
+			SUBTITLE_GET_TEXT_SCALE("subtitles1", 0)
+			SUBTITLE_GET_TEXT_SCALE("subtitles2", 1)
+			SUBTITLE_GET_TEXT_SCALE("subtitles3", 2)
+#undef SUBTITLE_GET_TEXT_SCALE
+		}
+	}
 #endif
 	guiMsg = uiManager->FindGui("guis/msg.gui", true, false, true);
 	guiTakeNotes = uiManager->FindGui("guis/takeNotes.gui", true, false, true);
@@ -3998,6 +4210,73 @@ const char * idSessionLocal::GetDeathwalkMapName(const char *mapName) const
 	if(!idStr::Icmp(dwMap, "none"))
 		return "";
 	return dwMap;
+}
+
+static idCVar harm_ui_subtitlesTextScale( "harm_ui_subtitlesTextScale", "0.32", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE, "[Harmattan]: Subtitles's text scale(<= 0: unset)." ); //karin: setup subtitles's text scale
+void idSessionLocal::ShowSubtitle(const idStrList &strList)
+{
+	int num;
+	int i;
+	int index;
+	char text[32];
+
+	if(!guiSubtitles)
+		return;
+
+	// setup subtitles's text scale
+	if(!subtitleTextScaleInited || harm_ui_subtitlesTextScale.IsModified())
+	{
+		idWindow *desktop = ((idUserInterfaceLocal *)guiSubtitles)->GetDesktop();
+		if(desktop)
+		{
+			float textScale = harm_ui_subtitlesTextScale.GetFloat(); // !!less than 32 characters!!
+#define SUBTITLE_SET_TEXT_SCALE(name, index) \
+            {                              \
+				float f = textScale > 0.0f ? textScale : subtitlesTextScale[index]; \
+				if(f > 0.0f) \
+				{ \
+					sprintf(text, /*sizeof(text), */"%f", f); \
+					desktop->SetChildWinVarVal(name, "textScale", text); \
+				} \
+			}
+			SUBTITLE_SET_TEXT_SCALE("subtitles1", 0)
+			SUBTITLE_SET_TEXT_SCALE("subtitles2", 1)
+			SUBTITLE_SET_TEXT_SCALE("subtitles3", 2)
+#undef SUBTITLE_SET_TEXT_SCALE
+		}
+		subtitleTextScaleInited = true;
+		harm_ui_subtitlesTextScale.ClearModified();
+	}
+
+	num = strList.Num();
+	for(i = 0; i < 3; i++)
+	{
+		index = num - 1 - i;
+		if(index >= 0)
+		{
+			sprintf(text, /*sizeof(text), */"subtitleText%d", 3 - i);
+			guiSubtitles->SetStateString(text, strList[index].c_str());
+			sprintf(text, /*sizeof(text), */"subtitleAlpha%d", 3 - i);
+			guiSubtitles->SetStateFloat(text, 1);
+		}
+		else
+		{
+			sprintf(text, /*sizeof(text), */"subtitleAlpha%d", 3 - i);
+			guiSubtitles->SetStateFloat(text, 0);
+		}
+	}
+	guiSubtitles->StateChanged(game->GetTimeGroupTime(TIME_GROUP1));
+}
+
+void idSessionLocal::HideSubtitle(void) const
+{
+	if(!guiSubtitles)
+		return;
+	guiSubtitles->SetStateFloat("subtitleAlpha1", 0);
+	guiSubtitles->SetStateFloat("subtitleAlpha2", 0);
+	guiSubtitles->SetStateFloat("subtitleAlpha3", 0);
+	/*guiSubtitles->SetStateFloat("subtitleAlpha4", 0);
+	guiSubtitles->SetStateFloat("subtitleAlpha5", 0);*/
 }
 #endif
 

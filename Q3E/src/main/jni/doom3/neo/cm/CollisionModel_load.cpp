@@ -3608,9 +3608,6 @@ cm_model_t *idCollisionModelManagerLocal::LoadRenderModel(const char *fileName)
 #ifdef _MODEL_DAE
 		&& (extension.Icmp("dae") != 0)
 #endif
-#ifdef _RAVEN
-		 && ( extension.Icmp( "mdr" ) != 0 ) && (extension.Icmp("obj") != 0) && (extension.Icmp("dae") != 0)
-#endif
 	)
 	{
 		return NULL;
@@ -4078,9 +4075,12 @@ void idCollisionModelManagerLocal::BuildModels(const idMapFile *mapFile)
             }
         }
         WriteCollisionModelsToFile( mapFile->GetName(), firstModel, numModels, mapFile->GetGeometryCRC() );
-#endif
-#endif
+#else
 		WriteCollisionModelsToFile(mapFile->GetName(), 0, numModels, mapFile->GetGeometryCRC());
+#endif
+#else
+		WriteCollisionModelsToFile(mapFile->GetName(), 0, numModels, mapFile->GetGeometryCRC());
+#endif
 	}
 
 	timer.Stop();

@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "snd_local.h"
+#include "sound.h"
 
 #ifdef ID_DEDICATED
 idCVar idSoundSystemLocal::s_noSound("s_noSound", "1", CVAR_SOUND | CVAR_BOOL | CVAR_ROM, "");
@@ -71,7 +72,11 @@ idCVar idSoundSystemLocal::s_skipHelltimeFX("s_skipHelltimeFX", "0", CVAR_SOUND 
 
 #if ID_OPENAL
 // off by default. OpenAL DLL gets loaded on-demand
+#ifdef _WIN32
 idCVar idSoundSystemLocal::s_libOpenAL("s_libOpenAL", "openal32.dll", CVAR_SOUND | CVAR_ARCHIVE, "OpenAL DLL name/path");
+#else
+idCVar idSoundSystemLocal::s_libOpenAL("s_libOpenAL", "./libopenal.so", CVAR_SOUND | CVAR_ARCHIVE, "OpenAL DLL name/path");
+#endif
 idCVar idSoundSystemLocal::s_useOpenAL("s_useOpenAL", "0", CVAR_SOUND | CVAR_BOOL | CVAR_ARCHIVE, "use OpenAL");
 idCVar idSoundSystemLocal::s_useEAXReverb("s_useEAXReverb", "0", CVAR_SOUND | CVAR_BOOL | CVAR_ARCHIVE, "use EAX reverb");
 idCVar idSoundSystemLocal::s_muteEAXReverb("s_muteEAXReverb", "0", CVAR_SOUND | CVAR_BOOL, "mute eax reverb");
@@ -82,6 +87,9 @@ idCVar idSoundSystemLocal::s_useOpenAL("s_useOpenAL", "0", CVAR_SOUND | CVAR_BOO
 idCVar idSoundSystemLocal::s_useEAXReverb("s_useEAXReverb", "0", CVAR_SOUND | CVAR_BOOL | CVAR_ROM, "EAX not available in this build");
 idCVar idSoundSystemLocal::s_muteEAXReverb("s_muteEAXReverb", "0", CVAR_SOUND | CVAR_BOOL | CVAR_ROM, "mute eax reverb");
 idCVar idSoundSystemLocal::s_decompressionLimit("s_decompressionLimit", "6", CVAR_SOUND | CVAR_INTEGER | CVAR_ROM, "specifies maximum uncompressed sample length in seconds");
+#endif
+#ifdef _OPENAL_EFX
+idCVar idSoundSystemLocal::s_alReverbGain( "s_alReverbGain", "0.5", CVAR_SOUND | CVAR_FLOAT | CVAR_ARCHIVE, "reduce reverb strength (0.0 to 1.0)", 0.0f, 1.0f );
 #endif
 
 bool idSoundSystemLocal::useOpenAL = false;
@@ -310,6 +318,50 @@ void SoundSystemRestart_f(const idCmdArgs &args)
 	soundSystem->SetMute(false);
 }
 
+#ifdef _HUMANHEAD
+/*
+===============
+ListSubtitles_f
+
+Optional parameter to only list sounds containing that string
+===============
+*/
+void ListSubtitles_f(const idCmdArgs &args)
+{
+	int i, j;
+	const char	*snd = args.Argv(1);
+
+	if (!soundSystemLocal.soundSubtitleList.Num()) {
+		common->Printf("No subtitle yet.\n");
+		return;
+	}
+
+	int	totalSounds = 0;
+	int totalSubtitles = 0;
+
+	for (i = 0; i < soundSystemLocal.soundSubtitleList.Num(); i++) {
+		const soundSubtitleList_s &list = soundSystemLocal.soundSubtitleList[i];
+
+		if(snd && snd[0])
+		{
+			if(idStr::Icmp(snd, list.soundName))
+				continue;
+		}
+		common->Printf("%5d: %s\n", i + 1, list.soundName.c_str());
+
+		for (j = 0; j < list.subList.Num(); j++) {
+			const soundSubtitle_s &sub = list.subList[j];
+			common->Printf("\t%3d: %3d %4.3f %s\n", j + 1, sub.subChannel, sub.subTime, sub.subText.c_str());
+			totalSubtitles++;
+		}
+		totalSounds++;
+	}
+
+	common->Printf("%5d current total sounds with subtitle\n", totalSounds);
+	common->Printf("%5d current total subtitles\n", totalSubtitles);
+}
+#endif
+
 /*
 ===============
 idSoundSystemLocal::Init
@@ -354,13 +406,23 @@ void idSoundSystemLocal::Init()
 	}
 
 	// set up openal device and context
-	common->StartupVariable("s_useOpenAL", false);
-	common->StartupVariable("s_useEAXReverb", false);
+#if !defined(_OPENAL_SOFT)
+	common->StartupVariable("s_useOpenAL", true);
+	common->StartupVariable("s_useEAXReverb", true);
+#endif
 
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (idSoundSystemLocal::s_useOpenAL.GetBool() || idSoundSystemLocal::s_useEAXReverb.GetBool()) {
+		// default all true
+#ifdef _OPENAL_SOFT
+		idSoundSystemLocal::s_useOpenAL.SetBool(true);
+#endif
 		if (!Sys_LoadOpenAL()) {
 			idSoundSystemLocal::s_useOpenAL.SetBool(false);
+            idSoundSystemLocal::s_useEAXReverb.SetBool(false);
+#ifdef _OPENAL_SOFT
+			EAXAvailable = 0;
+#endif
 		} else {
 			common->Printf("Setup OpenAL device and context... ");
 			openalDevice = alcOpenDevice(NULL);
@@ -368,6 +430,64 @@ void idSoundSystemLocal::Init()
 			alcMakeContextCurrent(openalContext);
 			common->Printf("Done.\n");
 
+			// log openal info
+			common->Printf( "OpenAL vendor: %s\n", alGetString(AL_VENDOR) );
+			common->Printf( "OpenAL renderer: %s\n", alGetString(AL_RENDERER) );
+			common->Printf( "OpenAL version: %s\n", alGetString(AL_VERSION) );
+
+#ifdef _OPENAL_EFX
+			// try to obtain EFX extensions
+			if(idSoundSystemLocal::s_useEAXReverb.GetBool())
+			{
+				if (alcIsExtensionPresent(openalDevice, "ALC_EXT_EFX")) {
+					common->Printf( "OpenAL: found EFX extension\n" );
+					EAXAvailable = 1;
+					idSoundSystemLocal::s_useEAXReverb.SetBool( true );
+
+					alGenEffects = (LPALGENEFFECTS)alGetProcAddress(ID_ALCHAR "alGenEffects");
+					alDeleteEffects = (LPALDELETEEFFECTS)alGetProcAddress(ID_ALCHAR "alDeleteEffects");
+					alIsEffect = (LPALISEFFECT)alGetProcAddress(ID_ALCHAR "alIsEffect");
+					alEffecti = (LPALEFFECTI)alGetProcAddress(ID_ALCHAR "alEffecti");
+					alEffectf = (LPALEFFECTF)alGetProcAddress(ID_ALCHAR "alEffectf");
+					alEffectfv = (LPALEFFECTFV)alGetProcAddress(ID_ALCHAR "alEffectfv");
+					alGenFilters = (LPALGENFILTERS)alGetProcAddress(ID_ALCHAR "alGenFilters");
+					alDeleteFilters = (LPALDELETEFILTERS)alGetProcAddress(ID_ALCHAR "alDeleteFilters");
+					alIsFilter = (LPALISFILTER)alGetProcAddress(ID_ALCHAR "alIsFilter");
+					alFilteri = (LPALFILTERI)alGetProcAddress(ID_ALCHAR "alFilteri");
+					alFilterf = (LPALFILTERF)alGetProcAddress(ID_ALCHAR "alFilterf");
+					alGenAuxiliaryEffectSlots = (LPALGENAUXILIARYEFFECTSLOTS)alGetProcAddress(ID_ALCHAR "alGenAuxiliaryEffectSlots");
+					alDeleteAuxiliaryEffectSlots = (LPALDELETEAUXILIARYEFFECTSLOTS)alGetProcAddress(ID_ALCHAR "alDeleteAuxiliaryEffectSlots");
+					alIsAuxiliaryEffectSlot = (LPALISAUXILIARYEFFECTSLOT)alGetProcAddress(ID_ALCHAR "alIsAuxiliaryEffectSlot");;
+					alAuxiliaryEffectSloti = (LPALAUXILIARYEFFECTSLOTI)alGetProcAddress(ID_ALCHAR "alAuxiliaryEffectSloti");
+					alAuxiliaryEffectSlotf = (LPALAUXILIARYEFFECTSLOTF)alGetProcAddress(ID_ALCHAR "alAuxiliaryEffectSlotf");
+				} else {
+					common->Printf( "OpenAL: EFX extension not found\n" );
+					EAXAvailable = 0;
+					idSoundSystemLocal::s_useEAXReverb.SetBool( false );
+
+					alGenEffects = NULL;
+					alDeleteEffects = NULL;
+					alIsEffect = NULL;
+					alEffecti = NULL;
+					alEffectf = NULL;
+					alEffectfv = NULL;
+					alGenFilters = NULL;
+					alDeleteFilters = NULL;
+					alIsFilter = NULL;
+					alFilteri = NULL;
+					alFilterf = NULL;
+					alGenAuxiliaryEffectSlots = NULL;
+					alDeleteAuxiliaryEffectSlots = NULL;
+					alIsAuxiliaryEffectSlot = NULL;
+					alAuxiliaryEffectSloti = NULL;
+					alAuxiliaryEffectSlotf = NULL;
+				}
+			}
+			else
+			{
+				EAXAvailable = 0;
+			}
+#else
 			// try to obtain EAX extensions
 			if (idSoundSystemLocal::s_useEAXReverb.GetBool() && alIsExtensionPresent(ID_ALCHAR "EAX4.0")) {
 				idSoundSystemLocal::s_useOpenAL.SetBool(true);	// EAX presence causes AL enable
@@ -391,6 +511,7 @@ void idSoundSystemLocal::Init()
 				alEAXGetBufferMode = (EAXGetBufferMode)NULL;
 				common->Printf("OpenAL: no EAX-RAM extension\n");
 			}
+#endif
 
 			if (!idSoundSystemLocal::s_useOpenAL.GetBool()) {
 				common->Printf("OpenAL: disabling ( no EAX ). Using legacy mixer.\n");
@@ -435,6 +556,9 @@ void idSoundSystemLocal::Init()
 				// adjust source count to allow for at least eight stereo sounds to play
 				openalSourceCount -= 8;
 
+#ifdef _OPENAL_SOFT
+				if(idSoundSystemLocal::s_useEAXReverb.GetBool())
+#endif
 				EAXAvailable = 1;
 			}
 		}
@@ -450,6 +574,14 @@ void idSoundSystemLocal::Init()
 	cmdSystem->AddCommand("testSound", TestSound_f, CMD_FL_SOUND | CMD_FL_CHEAT, "tests a sound", idCmdSystem::ArgCompletion_SoundName);
 	cmdSystem->AddCommand("s_restart", SoundSystemRestart_f, CMD_FL_SOUND, "restarts the sound system");
 
+#ifdef _HUMANHEAD
+	sb_subtitleQueue.Clear();
+    sf_subtitleQueue.Clear();
+
+    sfb_subtitleChanged = false;
+	cmdSystem->AddCommand("listSubtitles", ListSubtitles_f, CMD_FL_SOUND, "lists all subtitles of sounds");
+#endif
+
 	common->Printf("sound system initialized.\n");
 	common->Printf("--------------------------------------\n");
 }
@@ -463,9 +595,12 @@ void idSoundSystemLocal::Shutdown()
 {
 	ShutdownHW();
 
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	// EAX or not, the list needs to be cleared
 	EFXDatabase.Clear();
+#ifdef _RAVEN
+	reverb.Clear();
+#endif
 
 	// destroy openal sources
 	if (useOpenAL) {
@@ -498,7 +633,7 @@ void idSoundSystemLocal::Shutdown()
 	delete soundCache;
 	soundCache = NULL;
 
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	// destroy openal device and context
 	if (useOpenAL) {
 		alcMakeContextCurrent(NULL);
@@ -665,10 +800,13 @@ int idSoundSystemLocal::AsyncUpdate(int inTime)
 	if (!isInitialized || shutdown || !snd_audio_hw) {
 		return 0;
 	}
+#ifdef _HUMANHEAD
+	SB_HideSubtitle();
+#endif
 
 	ulong dwCurrentWritePos;
 	dword dwCurrentBlock;
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	// If not using openal, get actual playback position from sound hardware
 	if (useOpenAL) {
 		// here we do it in samples ( overflows in 27 hours or so )
@@ -739,7 +877,7 @@ int idSoundSystemLocal::AsyncUpdate(int inTime)
 	if ((newSoundTime - CurrentSoundTime) > (int)MIXBUFFER_SAMPLES) {
 		soundStats.missedWindow++;
 	}
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (useOpenAL) {
 		// enable audio hardware caching
 		alcSuspendContext(openalContext);
@@ -754,7 +892,7 @@ int idSoundSystemLocal::AsyncUpdate(int inTime)
 	if (!muted && currentSoundWorld && !currentSoundWorld->fpa[0]) {
 		currentSoundWorld->MixLoop(newSoundTime, numSpeakers, finalMixBuffer);
 	}
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (useOpenAL) {
 		// disable audio hardware caching (this updates ALL settings since last alcSuspendContext)
 		alcProcessContext(openalContext);
@@ -781,6 +919,9 @@ int idSoundSystemLocal::AsyncUpdate(int inTime)
 	CurrentSoundTime = newSoundTime;
 
 	soundStats.timeinprocess = Sys_Milliseconds() - inTime;
+#ifdef _HUMANHEAD
+	SB_SetupSubtitle();
+#endif
 
 	return soundStats.timeinprocess;
 }
@@ -798,6 +939,9 @@ int idSoundSystemLocal::AsyncUpdateWrite(int inTime)
 	if (!isInitialized || shutdown || !snd_audio_hw) {
 		return 0;
 	}
+#ifdef _HUMANHEAD
+	SB_HideSubtitle();
+#endif
 
 	if (!useOpenAL) {
 		snd_audio_hw->Flush();
@@ -819,7 +963,7 @@ int idSoundSystemLocal::AsyncUpdateWrite(int inTime)
 
 	int sampleTime = dwCurrentBlock * MIXBUFFER_SAMPLES;
 	int numSpeakers = snd_audio_hw->GetNumberOfSpeakers();
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (useOpenAL) {
 		// enable audio hardware caching
 		alcSuspendContext(openalContext);
@@ -834,7 +978,7 @@ int idSoundSystemLocal::AsyncUpdateWrite(int inTime)
 	if (!muted && currentSoundWorld && !currentSoundWorld->fpa[0]) {
 		currentSoundWorld->MixLoop(sampleTime, numSpeakers, finalMixBuffer);
 	}
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (useOpenAL) {
 		// disable audio hardware caching (this updates ALL settings since last alcSuspendContext)
 		alcProcessContext(openalContext);
@@ -863,6 +1007,9 @@ int idSoundSystemLocal::AsyncUpdateWrite(int inTime)
 	// only move to the next block if the write was successful
 	nextWriteBlock = dwCurrentBlock + 1;
 	CurrentSoundTime = sampleTime;
+#ifdef _HUMANHEAD
+	SB_SetupSubtitle();
+#endif
 
 	return Sys_Milliseconds() - inTime;
 }
@@ -1212,11 +1359,14 @@ void idSoundSystemLocal::BeginLevelLoad()
 
 	soundCache->BeginLevelLoad();
 
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	if (efxloaded) {
 		EFXDatabase.UnloadFile();
 		efxloaded = false;
 	}
+#endif
+#ifdef _RAVEN
+	reverb.UnloadFile();
 #endif
 }
 
@@ -1233,7 +1383,11 @@ void idSoundSystemLocal::EndLevelLoad(const char *mapstring)
 
 	soundCache->EndLevelLoad();
 
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
+#ifdef _OPENAL_EFX
+	if (!useEAXReverb)
+		return;
+#endif
 
 	idStr efxname("efxs/");
 	idStr mapname(mapstring);
@@ -1247,8 +1401,27 @@ void idSoundSystemLocal::EndLevelLoad(const char *mapstring)
 	if (efxloaded) {
 		common->Printf("sound: found %s\n", efxname.c_str());
 	} else {
+#ifdef _RAVEN //karin: Quake4 has efxs/default.efx
+		efxloaded = EFXDatabase.LoadFile("efxs/default.efx");
+		if (efxloaded) {
+			common->Printf("sound: found %s\n", efxname.c_str());
+		} else {
+			common->Printf("sound: missing %s\n", efxname.c_str());
+		}
+#else
 		common->Printf("sound: missing %s\n", efxname.c_str());
+#endif
 	}
+#ifdef _RAVEN //karin: load Quake4 <map>.reverb
+	if(efxloaded)
+	{
+		int num = reverb.LoadMap(mapstring);
+		if(num >= 0)
+			common->Printf("Loaded reverb file '%s', total %d\n", (const char *)rvMapReverb::GetMapFileName(mapstring), num);
+		else
+			common->Warning("Unable load reverb file '%s'!", (const char *)rvMapReverb::GetMapFileName(mapstring));
+	}
+#endif
 #endif
 }
 
@@ -1259,7 +1432,7 @@ idSoundSystemLocal::AllocOpenALSource
 */
 ALuint idSoundSystemLocal::AllocOpenALSource(idSoundChannel *chan, bool looping, bool stereo)
 {
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	int timeOldestZeroVolSingleShot = Sys_Milliseconds();
 	int timeOldestZeroVolLooping = Sys_Milliseconds();
 	int timeOldestSingle = Sys_Milliseconds();
@@ -1347,7 +1520,7 @@ idSoundSystemLocal::FreeOpenALSource
 */
 void idSoundSystemLocal::FreeOpenALSource(ALuint handle)
 {
-#if !defined(__ANDROID__)
+#ifdef _OPENAL
 	ALsizei i;
 
 	for (i = 0; i < openalSourceCount; i++) {
@@ -1357,13 +1530,13 @@ void idSoundSystemLocal::FreeOpenALSource(ALuint handle)
 			}
 
 #if ID_OPENAL
-
+#if !defined(_OPENAL_EFX)
 			// Reset source EAX ROOM level when freeing stereo source
 			if (openalSources[i].stereo && alEAXSet) {
 				long Room = EAXSOURCE_DEFAULTROOM;
 				alEAXSet(&EAXPROPERTYID_EAX_Source, EAXSOURCE_ROOM, openalSources[i].handle, &Room, sizeof(Room));
 			}
-
+#endif
 #endif
 			// Initialize structure
 			openalSources[i].startTime = 0;
@@ -1555,6 +1728,9 @@ int idSoundSystemLocal::IsEAXAvailable(void)
 #if !ID_OPENAL
 	return -1;
 #else
+#ifdef _OPENAL_EFX
+	return EAXAvailable;
+#else
 	ALCdevice	*device;
 	ALCcontext	*context;
 
@@ -1586,9 +1762,205 @@ int idSoundSystemLocal::IsEAXAvailable(void)
 	EAXAvailable = 0;
 	return 0;
 #endif
+#endif
 }
 
 #ifdef _RAVEN
+rvMapReverb::rvMapReverb(void)
+{
+}
+
+rvMapReverb::~rvMapReverb(void)
+{
+}
+
+void rvMapReverb::Init(void)
+{
+	Clear();
+}
+
+// { 0 Hangar }
+bool rvMapReverb::ParseItem(idLexer &src, rvReverbItem_t &item) const
+{
+	if(!src.ExpectTokenString("{"))
+		return false;
+	item.areaNum = src.ParseInt();
+	idToken name;
+	src.ReadToken(&name);
+	item.efxName = name;
+	if(!src.ExpectTokenString("}"))
+		return false;
+	return true;
+}
+
+bool rvMapReverb::LoadFile(const char *filename, bool OSPath )
+{
+	Init();
+	idLexer	src;
+	src.LoadFile( filename, OSPath );
+	if ( !src.IsLoaded() ) {
+		return false;
+	}
+	fileName = filename;
+	src.SetFlags(DECL_LEXER_FLAGS);
+
+	return ParseReverb(src);
+}
+
+bool rvMapReverb::ParseReverb(idLexer &src)
+{
+	idToken token;
+	src.SkipUntilString("{");
+
+	while (!src.EndOfFile()) {
+		if (!src.ReadToken(&token)) {
+			break;
+		}
+
+		if (!token.Icmp("}")) {
+			break;
+		}
+
+		if (token.Icmp("{")) {
+			items.Clear();
+			return false;
+		}
+
+		src.UnreadToken(&token);
+		rvReverbItem_t item;
+		if(!ParseItem(src, item))
+		{
+			items.Clear();
+			return false;
+		}
+		EFXprintf("Quake4 map EFX: read area %d -> %s\n", item.areaNum, item.efxName.c_str());
+		items.Append(item);
+	}
+	EFXprintf("Quake4 map EFX: load areas %d\n", items.Num());
+
+	return true;
+}
+
+bool rvMapReverb::Append(int area, const char *name, bool over)
+{
+	int index;
+
+	index = GetAreaIndex(area);
+	if(index >= 0)
+	{
+		rvReverbItem_t &item = items[index];
+		if(!over)
+		{
+			common->Warning("Area %d has exists with efx name %s", area, item.efxName.c_str());
+			return false;
+		}
+		else
+		{
+			item.efxName = name;
+			return true;
+		}
+	}
+	else
+	{
+		rvReverbItem_t item;
+		item.areaNum = area;
+		item.efxName = name;
+		items.Append(item);
+		return true;
+	}
+}
+
+int rvMapReverb::LoadMap(const char *mapName, const char *filterName)
+{
+	idStr filename = GetMapFileName(mapName, filterName);
+	EFXprintf("Quake4 map EFX: load reverb file %s -> %s\n", mapName, filename.c_str());
+	if(LoadFile(filename))
+		return items.Num();
+	else
+		return -1;
+}
+
+idStr rvMapReverb::GetMapFileName(const char *mapName, const char *filterName)
+{
+	(void)filterName;
+	idStr name;
+
+	// maps/game/air2.reverb
+	name += "maps";
+	name.AppendPath(mapName);
+	name.SetFileExtension(".reverb");
+
+	return name;
+}
+
+int rvMapReverb::GetAreaIndex(int area) const
+{
+	for(int i = 0; i < items.Num(); i++)
+	{
+		if(items[i].areaNum == area)
+			return i;
+	}
+	return -1;
+}
+
+void rvMapReverb::Clear(void)
+{
+	fileName = "";
+	items.Clear();
+}
+
+
+
+/*
+===============
+idSoundSystemLocal::GetReverbName
+ Get reverb efx name by index
+===============
+*/
+const char * idSoundSystemLocal::GetReverbName( int reverb )
+{
+	return reverb >= 0 && reverb < this->reverb.Num() ? this->reverb[reverb].efxName.c_str() : "";
+}
+
+/*
+===============
+idSoundSystemLocal::GetNumAreas
+ Get num of areas
+===============
+*/
+int idSoundSystemLocal::GetNumAreas( void )
+{
+	return this->reverb.Num();
+}
+
+/*
+===============
+idSoundSystemLocal::GetReverb
+ Get index of area
+===============
+*/
+int idSoundSystemLocal::GetReverb( int area )
+{
+	return this->reverb.GetAreaIndex(area);
+}
+
+/*
+===============
+idSoundSystemLocal::SetReverb
+===============
+*/
+bool idSoundSystemLocal::SetReverb( int area, const char *reverbName, const char *fileName )
+{
+	if(idStr::Icmp(this->reverb.GetName(), fileName))
+		return false;
+	return this->reverb.Append(area, reverbName);
+}
+
+/*
+===============
+idSoundSystemLocal::GetSoundWorldFromId
+===============
+*/
 idSoundWorld* idSoundSystemLocal::GetSoundWorldFromId(int worldId) {
 	switch (worldId)
 	{
@@ -1601,5 +1973,415 @@ idSoundWorld* idSoundSystemLocal::GetSoundWorldFromId(int worldId) {
 	default:
 		return session->sw;
 	}
+}
+#endif
+
+#ifdef _HUMANHEAD
+//#define _DEBUG_SUBTITLE
+#ifdef _DEBUG_SUBTITLE
+#if !defined(_MSC_VER)
+#define SUBTITLE_DEBUG(fmt, args...) common->Printf(fmt, ##args)
+#else
+#define SUBTITLE_DEBUG(fmt, s...) common->Printf(fmt,__VA_ARGS__)
+#endif
+#else
+#if !defined(_MSC_VER)
+#define SUBTITLE_DEBUG(fmt, args...)
+#else
+#define SUBTITLE_DEBUG(fmt, ...)
+#endif
+#endif
+
+//HUMANHEAD rww
+/*
+===============
+idSoundSystemLocal::SetSubtitleData
+ Get soundSubtitleList_s index by shader name. Create new if not exists.
+===============
+*/
+int idSoundSystemLocal::GetSubtitleIndex(const char *soundName)
+{
+	int i;
+
+	for(i = 0; i < soundSubtitleList.Num(); i++)
+	{
+		if(!idStr::Icmp(soundName, soundSubtitleList[i].soundName))
+		{
+			SUBTITLE_DEBUG("subtitle %s exists -> %d\n", soundName, i);
+			return i;
+		}
+	}
+	soundSubtitleList_s l;
+	l.soundName = soundName;
+	i = soundSubtitleList.Append(l);
+	SUBTITLE_DEBUG("subtitle %s not exists, create -> %d\n", soundName, i);
+	return i;
+}
+
+/*
+===============
+idSoundSystemLocal::SetSubtitleData
+ Set a soundSub_t data.
+===============
+*/
+void idSoundSystemLocal::SetSubtitleData(int subIndex, int subNum, const char *subText, float subTime, int subChannel)
+{
+	int i;
+	soundSubtitleList_s *list;
+	soundSub_t *sub;
+
+	list = GetSubtitleList(subIndex);
+	assert(NULL != list);
+
+	for(i = 0; i < list->subList.Num(); i++)
+	{
+		sub = &list->subList[i];
+		if(sub->subChannel == subNum)
+		{
+			sub->subTime = subTime;
+			sub->subText = common->GetLanguageDict()->GetString(subText);
+			return;
+		}
+	}
+
+	soundSubtitle_s st;
+	idStr text = common->GetLanguageDict()->GetString(subText);
+	// remove <PROFANITY>xxx</PROFANITY>
+	{
+		text.Replace("<PROFANITY>", "");
+		text.Replace("</PROFANITY>", "");
+	}
+	st.subText = text;
+	st.subTime = subTime;
+	st.subChannel = subChannel;
+	list->subList.Append(st);
+	SUBTITLE_DEBUG("subtitle data added -> %d, %s, %f\n", subChannel, st.subText.c_str(), subTime);
+}
+
+/*
+===============
+idSoundSystemLocal::GetSubtitleList
+ Get a soundSub_t by index and subChannel.
+===============
+*/
+soundSub_t * idSoundSystemLocal::GetSubtitle(int subIndex, int subNum)
+{
+	int i;
+	soundSub_t *sub;
+	soundSubtitleList_t *list;
+
+	list = GetSubtitleList(subIndex);
+	if(!list)
+		return NULL;
+
+	for(i = 0; i < list->subList.Num(); i++)
+	{
+		sub = &list->subList[i];
+		if(sub->subChannel == subNum)
+			return sub;
+	}
+	return NULL;
+}
+
+/*
+===============
+idSoundSystemLocal::GetSubtitleList
+ Get a soundSubtitleList_s by index.
+===============
+*/
+soundSubtitleList_t * idSoundSystemLocal::GetSubtitleList(int subIndex)
+{
+	if(subIndex < 0 || subIndex >= soundSubtitleList.Num())
+		return NULL;
+
+	return &soundSubtitleList[subIndex];
+}
+//HUMANHEAD END
+
+#include "../framework/Session_local.h"
+extern idCVar g_subtitles;
+
+/*
+===============
+idSoundSystemLocal::SB_SetupSubtitle
+ backend: Setup subtitle queue.
+===============
+*/
+void idSoundSystemLocal::SB_SetupSubtitle(void)
+{
+	int i, j;
+	idSoundEmitterLocal *sound;
+
+	if(!g_subtitles.GetBool() || !currentSoundWorld)
+		return;
+
+	if (idSoundSystemLocal::s_singleEmitter.GetInteger() > 0 && idSoundSystemLocal::s_singleEmitter.GetInteger() < currentSoundWorld->emitters.Num()) {
+		sound = currentSoundWorld->emitters[idSoundSystemLocal::s_singleEmitter.GetInteger()];
+
+		if (sound && sound->playing) {
+			// run through all the channels
+			for (j = 0; j < SOUND_MAX_CHANNELS ; j++) {
+				idSoundChannel	*chan = &sound->channels[j];
+
+				// see if we have a sound triggered on this channel
+				if (!chan->triggerState) {
+					continue;
+				}
+
+				if(chan->lastVolume < SND_EPSILON)
+					continue;
+
+                SB_AppendSubtitle(chan);
+			}
+		}
+	}
+	else
+	{
+		for (i = 1; i < currentSoundWorld->emitters.Num(); i++) {
+			sound = currentSoundWorld->emitters[i];
+
+			if (!sound) {
+				continue;
+			}
+
+			// if no channels are active, do nothing
+			if (!sound->playing) {
+				continue;
+			}
+
+			// run through all the channels
+			for (j = 0; j < SOUND_MAX_CHANNELS ; j++) {
+				idSoundChannel	*chan = &sound->channels[j];
+
+				// see if we have a sound triggered on this channel
+				if (!chan->triggerState) {
+					continue;
+				}
+
+				if(chan->lastVolume < SND_EPSILON)
+					continue;
+
+                SB_AppendSubtitle(chan);
+			}
+		}
+	}
+}
+
+/*
+===============
+idSoundSystemLocal::SB_ContainsSubtitle
+ backend: Check subtitle exists in backend subtitle queue.
+===============
+*/
+bool idSoundSystemLocal::SB_ContainsSubtitle(const soundSubtitle_s *sub) const
+{
+    int i;
+
+    for(i = 0; i < sb_subtitleQueue.Num(); i++)
+    {
+        if(sb_subtitleQueue[i].subtitle == sub)
+            return true;
+    }
+    return false;
+}
+
+/*
+===============
+idSoundSystemLocal::SB_AppendSubtitle
+ backend: Append subtitle into backend subtitle queue.
+===============
+*/
+bool idSoundSystemLocal::SB_AppendSubtitle(const idSoundChannel *chan)
+{
+	const soundSub_t *sub, *s, *next;
+	const soundSubtitleList_t *list;
+	int i;
+	float timePlayed;
+	int startTime;
+    int curTime;
+	int timeEnd;
+	int length;
+	float addTime;
+	float total;
+
+	if(!chan || !chan->soundShader || chan->parms.subIndex < 0 || chan->trigger44kHzTime < 0/* loop? */)
+		return false;
+
+	list = GetSubtitleList(chan->parms.subIndex);
+	if(!list)
+		return false;
+
+	sub = NULL;
+	startTime = SamplesToMilliseconds(chan->trigger44kHzTime);
+    curTime = SamplesToMilliseconds(GetCurrent44kHzTime());
+	timePlayed = (float)(curTime - startTime) / 1000.0f;
+	addTime = 0.0f;
+	length = chan->leadinSample->LengthIn44kHzSamples();
+	if (chan->leadinSample->objectInfo.nChannels == 2) {
+		length /= 2;	// stereo samples
+	}
+	total = length / (float)PRIMARYFREQ;
+	for(i = 0; i < list->subList.Num(); i++)
+	{
+		s = &list->subList[i];
+		if(i < list->subList.Num() - 1)
+			next = &list->subList[i + 1];
+		else
+			next = NULL;
+		if(s->subTime < timePlayed)
+		{
+			if(next)
+			{
+				if(next->subTime < timePlayed)
+					continue;
+			}
+			else
+			{
+				if(total < timePlayed)
+					return false;
+			}
+		}
+		if(s->subTime > timePlayed)
+			return false;
+		if(SB_ContainsSubtitle(s))
+			continue; // return false;
+		sub = s;
+		if(next)
+		{
+            timeEnd = startTime + next->subTime * 1000.0f;
+		}
+		else
+		{
+			length = total * 1000;
+            timeEnd = startTime + length;
+		}
+		break;
+	}
+
+	if(!sub)
+		return false;
+
+    sb_soundSubtitle_t item;
+    item.subIndex = chan->parms.subIndex;
+    item.subNum = sub->subChannel;
+    item.endTime = timeEnd;
+	item.subtitle = sub;
+	SUBTITLE_DEBUG("backend append: %p %s   %d-%d   %d\n", sub, sub->subText.c_str(), item.subIndex, item.subNum, item.endTime);
+	SFB_HandleSubtitle(true, &item);
+	return true;
+}
+
+/*
+===============
+idSoundSystemLocal::SFB_HandleSubtitle
+ frontend/backend: All modify operations of backend and frontend subtitle queue with lock.
+===============
+*/
+bool idSoundSystemLocal::SFB_HandleSubtitle(bool fromBackEnd, const void *data)
+{
+	bool changed;
+
+	Sys_EnterCriticalSection(CRITICAL_SECTION_THREE);
+	{
+		if(fromBackEnd) // backend
+		{
+            if(data) // add
+            {
+				const sb_soundSubtitle_t *inSub = (const sb_soundSubtitle_t *)data;
+                sb_subtitleQueue.Append(*inSub);
+                sfb_subtitleChanged = true;
+                SUBTITLE_DEBUG("backend swap: %p %d %s\n", inSub->subtitle, sfb_subtitleChanged, inSub->subtitle->subText.c_str());
+            }
+            else // remove expired
+            {
+                if(this->sb_subtitleQueue.Num())
+                {
+                    int curTime = SamplesToMilliseconds(GetCurrent44kHzTime());
+                    for(int i = 0; i < sb_subtitleQueue.Num();)
+                    {
+                        if(curTime >= sb_subtitleQueue[i].endTime) // >
+                        {
+                            sb_subtitleQueue.RemoveIndex(i);
+							sfb_subtitleChanged = true;
+                        }
+                        else
+                        {
+                            i++;
+                        }
+                    }
+                }
+            }
+    		changed = sfb_subtitleChanged;
+		}
+		else // frontend: copy backend to frontend
+		{
+    		changed = sfb_subtitleChanged;
+			if(sfb_subtitleChanged)
+			{
+				idList<const soundSubtitle_s *> frontend;
+				for(int i = 0; i < sb_subtitleQueue.Num(); i++)
+				{
+					frontend.Append(sb_subtitleQueue[i].subtitle);
+				}
+                SUBTITLE_DEBUG("frontend swap: %d -> %d\n", sf_subtitleQueue.Num(), frontend.Num());
+				sf_subtitleQueue = frontend;
+                sfb_subtitleChanged = false;
+			}
+		}
+	}
+	Sys_LeaveCriticalSection(CRITICAL_SECTION_THREE);
+	return changed;
+}
+
+/*
+===============
+idSoundSystemLocal::SF_ShowSubtitle
+ frontend: Show subtitle to GUI from frontend subtitle queue.
+===============
+*/
+void idSoundSystemLocal::SF_ShowSubtitle(void)
+{
+	bool changed;
+    int i;
+
+	changed = SFB_HandleSubtitle(false);
+	if(!changed)
+		return;
+
+	if(!this->sf_subtitleQueue.Num())
+	{
+		sessLocal.HideSubtitle();
+		SUBTITLE_DEBUG("frontend hide\n");
+		return;
+	}
+
+	if(!g_subtitles.GetBool())
+		return;
+
+    idStrList text;
+#ifdef _DEBUG_SUBTITLE
+	idStr debugText;
+#endif
+    for(i = 0; i < sf_subtitleQueue.Num(); i++)
+    {
+        text.Append(sf_subtitleQueue[i]->subText);
+#ifdef _DEBUG_SUBTITLE
+		debugText.Append('\n');
+		debugText.Append(sf_subtitleQueue[i]->subText);
+#endif
+    }
+	sessLocal.ShowSubtitle(text);
+	SUBTITLE_DEBUG("frontend show: %d %s\n", sf_subtitleQueue.Num(), debugText.c_str());
+}
+
+/*
+===============
+idSoundSystemLocal::SB_HideSubtitle
+ backend: Remove expired subtitle from backend subtitle queue, and update GUI when call SF_ShowSubtitle in main thread.
+===============
+*/
+void idSoundSystemLocal::SB_HideSubtitle(void)
+{
+	SFB_HandleSubtitle(true, NULL);
 }
 #endif

@@ -131,6 +131,9 @@ typedef struct srfTriangles_s {
 	struct vertCache_s 		*indexCache;				// int
 	struct vertCache_s 		*ambientCache;			// idDrawVert
 	struct vertCache_s 		*shadowCache;			// shadowCache_t
+#ifdef _SHADOW_MAPPING
+	bool 			        shadowIsPrelight; // flag is prelight shadow from prelight shadow model
+#endif
 } srfTriangles_t;
 
 typedef idList<srfTriangles_t *> idTriList;
@@ -206,7 +209,7 @@ class idRenderModel
 		virtual void				LoadModel() = 0;
 
 		// internal use
-		virtual bool				IsLoaded() = 0;
+		virtual bool				IsLoaded() const = 0;
 		virtual void				SetLevelLoadReferenced(bool referenced) = 0;
 		virtual bool				IsLevelLoadReferenced() = 0;
 

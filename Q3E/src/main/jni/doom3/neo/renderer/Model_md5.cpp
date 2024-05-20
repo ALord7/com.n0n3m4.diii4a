@@ -251,7 +251,7 @@ void idMD5Mesh::ParseMesh(idLexer &parser, int numJoints, const idJointMat *join
 	// silhouette edge connectivity and normal / tangent generation information
 	//
 
-#ifdef __ANDROID__
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
 	const size_t alloc_size = texCoords.Num() * sizeof(idDrawVert);
 	_DROID_ALLOC16_DEF(idDrawVert, alloc_size, verts, 0)
 #else
@@ -266,7 +266,7 @@ void idMD5Mesh::ParseMesh(idLexer &parser, int numJoints, const idJointMat *join
 	TransformVerts(verts, joints);
 	deformInfo = R_BuildDeformInfo(texCoords.Num(), verts, tris.Num(), tris.Ptr(), shader->UseUnsmoothedTangents());
 
-#ifdef __ANDROID__
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
 	_DROID_FREE(verts, 0)
 #endif
 }
@@ -385,7 +385,7 @@ idMD5Mesh::CalcBounds
 idBounds idMD5Mesh::CalcBounds(const idJointMat *entJoints)
 {
 	idBounds	bounds;
-#ifdef __ANDROID__
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
 	const int alloc_size = texCoords.Num() * sizeof(idDrawVert);
 	_DROID_ALLOC16_DEF(idDrawVert, alloc_size, verts, 0)
 #else
@@ -396,7 +396,7 @@ idBounds idMD5Mesh::CalcBounds(const idJointMat *entJoints)
 
 	SIMDProcessor->MinMax(bounds[0], bounds[1], verts, texCoords.Num());
 
-#ifdef __ANDROID__
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
 	_DROID_FREE(verts, 0)
 #endif
 
@@ -553,7 +553,7 @@ void idRenderModelMD5::LoadModel()
 	idJointMat *poseMat3;
 
 #if defined(_RAVEN) || defined(_HUMANHEAD) //k: for GUI view of dynamic model in idRenderWorld::GuiTrace
-	this->staticModelInstance = 0;
+	this->staticModelInstance = NULL;
 #endif
 
 	if (!purged) {
@@ -803,7 +803,7 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel(const struct renderEnti
 	idRenderModelStatic	*staticModel;
 
 #if defined(_RAVEN) || defined(_HUMANHEAD) //k: for GUI view of dynamic model in idRenderWorld::GuiTrace
-	this->staticModelInstance = 0;
+	this->staticModelInstance = NULL;
 #endif
 
 	if (cachedModel && !r_useCachedDynamicModels.GetBool()) {
@@ -1037,7 +1037,7 @@ void idRenderModelMD5::PurgeModel()
 	defaultPose.Clear();
 	meshes.Clear();
 #if defined(_RAVEN) || defined(_HUMANHEAD) //k: md5 model ref def->dynamicModel, set to 0
-	staticModelInstance = 0;
+	staticModelInstance = NULL;
 #endif
 }
 
@@ -1093,4 +1093,9 @@ int idRenderModelMD5::GetSurfaceMask(const char *name) const
 	}
 	return  0;
 }
+#endif
+
+#ifdef _EXTRAS_TOOLS
+#include "model/Model_md5anim.cpp"
+#include "model/Model_test.cpp"
 #endif

@@ -1,8 +1,90 @@
 ## Change logs
-**1.1.0harmattan32(natasha)** - **2023-06-31**
 
 ----------------------------------------------------------------------------------
-### Update
+
+> 1.1.0harmattan50 (2024-04-30)
+
+* Support new stage rendering of heatHaze shaders(e.g. heat haze distortion of BFG9000's projectile, Rocket Gun's explosion) and colorProcess shader(e.g. blood film on mirror of marscity2).
+* Support new shader stage rendering of GLSL shaders in Quake 4(e.g. sniper scope effect of machine gun and bullet hole of machine gun).
+* Add control on-screen joystick visible mode in `Control` tab(always show; hidden; only show when pressed).
+* Improving Phong/Blinn-Phong light model interaction shader with high-precision.
+* Force disable using compression texture in The Dark Mod.
+* Game data directories are standalone in Settings: DOOM3 -> doom3/; Quake4 -> quake4/; Prey -> prey/; Quake1 -> quake1/; Quake2 -> quake2/; Quake3 -> quake3/; RTCW -> rtcw/; The Dark Mod -> darkmod/ (always).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan39 (2024-04-10)
+
+* Support perforated surface shadow in shadow mapping(cvar `r_forceShadowMapsOnAlphaTestedSurfaces`, default 0).
+* Add `LibreCoop` mod of DOOM3 support, game data directory named `librecoop`. More view in [LibreCoop](https://www.moddb.com/mods/librecoop-dhewm3-coop).
+* Add `Quake II` support, game data directory named `baseq2`. More view in [Quake II](https://store.steampowered.com/app/2320/Quake_II/).
+* Add `Quake III Arena` support, game data directory named `baseq3`; Add `Quake III Team Arena` support, game data directory named `missionpack`. More view in [Quake III Arena](https://store.steampowered.com/app/2200/Quake_III_Arena/).
+* Add `Return to Castle Wolfenstein` support, game data directory named `main`. More view in [Return to Castle Wolfenstein](https://www.moddb.com/games/return-to-castle-wolfenstein).
+* Add `The Dark Mod` 2.12 support, game data directory named `darkmod`. More view in [The Dark Mod](https://www.thedarkmod.com).
+* Add a on-screen button theme.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan38 (2024-02-05)
+
+* Fixed shadow mapping on non-Adreno GPU.
+* Support level loading finished pause(cvar `com_skipLevelLoadPause`) in Quake4.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan37 (2024-01-06)
+
+* Fixed on-screen buttons initial keycodes.
+* On-screen slider button can setup clickable.
+* Add dds screenshot support.
+* Add cvar `r_scaleMenusTo43` for 4:3 menu.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan36 (2023-12-31)
+
+* Fixed prelight shadow's shadow mapping.
+* Fixed EFX Reverb in Quake4.
+* Add translucent stencil shadow support in stencil shadow(bool cvar `harm_r_stencilShadowTranslucent`(default 0); float cvar `harm_r_stencilShadowAlpha` for setting transparency).
+* Add float cvar `harm_ui_subtitlesTextScale` control subtitles's text scale in Prey.
+* Support cvar `r_brightness`.
+* Fixed weapon projectile's scorches decals rendering in Prey(2006).
+* Data directory chooser support Android SAF.
+* New default on-screen buttons layout.
+* Add `Stupid Angry Bot`(a7x) mod of DOOM3 support(need DOOM3: RoE game data), game data directory named `sabot`. More view in [SABot(a7x)](https://www.moddb.com/downloads/sabot-alpha-7x).
+* Add `Overthinked DooM^3` mod of DOOM3 support, game data directory named `overthinked`. More view in [Overthinked DooM^3](https://www.moddb.com/mods/overthinked-doom3).
+* Add `Fragging Free` mod of DOOM3 support(need DOOM3: RoE game data), game data directory named `fraggingfree`. More view in [Fragging Free](https://www.moddb.com/mods/fragging-free).
+* Add `HeXen:Edge of Chaos` mod of DOOM3 support, game data directory named `hexeneoc`. More view in [HeXen:Edge of Chaos](https://www.moddb.com/mods/hexen-edge-of-chaos).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan35 (2023-10-29)
+
+* Optimize soft shadow with shadow mapping. Add shadow map with depth texture in OpenGLES2.0.
+* Add OpenAL(soft) and EFX Reverb support.
+* Beam rendering optimization in Prey(2006) by [lvonasek/PreyVR](https://github.com/lvonasek/PreyVR).
+* Add subtitle support in Prey(2006).
+* Fixed gyroscope in invert-landscape mode.
+* Fixed bot head and add bot level control(cvar `harm_si_botLevel`, need extract new `sabot_a9.pk4` resource) in Quake4 MP game.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan33 (2023-10-01)
+
+* Add shadow mapping soft shadow support(testing, has some incorrect rendering), using `r_useShadowMapping` to change from `shadow mapping` or `stencil shadow`.
+* In Quake4, remove Bot FakeClient in multiplayer-game, and add SABot-a9 mod support in multiplayer-game(need extract resource first).
+* Fix Setting's tab GUI in Prey2006.
+* Add `full-body awareness` mod in Quake4. Set bool cvar `harm_pm_fullBodyAwareness` to 1 enable, and using `harm_pm_fullBodyAwarenessOffset` setup offset(also change to third-person mode), and using `harm_pm_fullBodyAwarenessHeadJoint` setup head joint name(view position).
+* Support max FPS limit(cvar `harm_r_maxFps`).
+* Support obj/dae static model, and fix png image load.
+* Add skip intro support.
+* Add simple CVar editor.
+* Change OpenGL vertex index size to 4 bytes for large model.
+* Add GLES3.0 support, can choose in `Graphics` tab.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan32 (2023-06-30)
 
 * Add `Chinese`, `Russian`(by [ALord7](https://4pda.ru/forum/index.php?showuser=5043340)) language.
 * Move some on-screen settings to `Configure on-screen controls` page.
@@ -12,8 +94,6 @@
 * Support jpg/png image texture file.
 
 ----------------------------------------------------------------------------------
-
-### History
 
 > 1.1.0harmattan31 (2023-06-10)
 

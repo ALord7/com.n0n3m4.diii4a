@@ -23,6 +23,7 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
@@ -31,7 +32,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Process;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.DisplayCutout;
@@ -41,17 +44,24 @@ import android.view.inputmethod.InputMethodManager;
 
 import com.n0n3m4.q3e.device.Q3EMouseDevice;
 import com.n0n3m4.q3e.device.Q3EOuya;
+import com.n0n3m4.q3e.karin.KFDManager;
+import com.n0n3m4.q3e.karin.KFileDescriptor;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 public class Q3EUtils
 {
+    private static final String TAG = "Q3EUtils";
     public static Q3EInterface q3ei = new Q3EInterface(); //k: new
     public static boolean isOuya = false;
     public static int UI_FULLSCREEN_HIDE_NAV_OPTIONS = 0;
@@ -119,16 +129,27 @@ public class Q3EUtils
 
     public static void ToggleToolbar(boolean on)
     {
-        if (null != q3ei.callbackObj.vw)
-            q3ei.callbackObj.vw.ToggleToolbar(on);
+        q3ei.callbackObj.ToggleToolbar(on);
     }
 
-    public static void CloseVKB()
+    public static void OpenVKB(View vw)
     {
-        if (null != q3ei.callbackObj.vw)
+        if (null != vw)
         {
-            InputMethodManager imm = (InputMethodManager) q3ei.callbackObj.vw.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.hideSoftInputFromWindow(q3ei.callbackObj.vw.getWindowToken(), 0);
+            InputMethodManager imm = (InputMethodManager) vw.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            //imm.showSoftInput(vw, InputMethodManager.SHOW_FORCED);
+            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+            if (Q3EUtils.q3ei.function_key_toolbar)
+                Q3EUtils.ToggleToolbar(true);
+        }
+    }
+
+    public static void CloseVKB(View vw)
+    {
+        if (null != vw)
+        {
+            InputMethodManager imm = (InputMethodManager) vw.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(vw.getWindowToken(), 0);
         }
     }
 
@@ -259,32 +280,10 @@ public class Q3EUtils
         return deg;
     }
 
-    // 1. try find in /sdcard/Android/data/<package>/files/assets
-    // 2. try find in /<apk>/assets
     public static InputStream OpenResource(Context cnt, String assetname)
     {
         InputStream is;
-        if((is = OpenResource_external(cnt, assetname)) == null)
-            is = OpenResource_assets(cnt, assetname);
-        return is;
-    }
-
-    public static InputStream OpenResource_external(Context cnt, String assetname)
-    {
-        InputStream is = null;
-        try
-        {
-            final String filePath = GetAppStoragePath(cnt, "/assets/" + assetname);
-            File file = new File(filePath);
-            if(file.exists() && file.isFile() && file.canRead())
-            {
-                is = new FileInputStream(file);
-            }
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
+        is = KFDManager.Instance(cnt).OpenRead(assetname);
         return is;
     }
 
@@ -302,6 +301,13 @@ public class Q3EUtils
         return is;
     }
 
+    public static String GetAppStoragePath(Context context)
+    {
+        String path = Q3EUtils.GetAppStoragePath(context, null);
+        File dir = new File(path);
+        return dir.getParent();
+    }
+
     public static String GetAppStoragePath(Context context, String filename)
     {
         String path;
@@ -310,6 +316,18 @@ public class Q3EUtils
             path = externalFilesDir.getAbsolutePath();
         else
             path = Environment.getExternalStorageDirectory() + "/Android/data/" + Q3EGlobals.CONST_PACKAGE_NAME + "/files";
+        if(null != filename && !filename.isEmpty())
+            path += filename;
+        return path;
+    }
+
+    public static String GetAppInternalPath(Context context, String filename)
+    {
+        String path;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+            path = context.getDataDir().getAbsolutePath();
+        else
+            path = context.getCacheDir().getAbsolutePath();
         if(null != filename && !filename.isEmpty())
             path += filename;
         return path;
@@ -333,16 +351,10 @@ public class Q3EUtils
         LinkedHashMap<String, String> list = new LinkedHashMap<>();
         list.put("/android_asset", "Default");
         list.put("", "External");
-        String filePath = GetAppStoragePath(context, "/assets/controls_theme");
-        File dir = new File(filePath);
-        if(dir.exists() && dir.isDirectory())
+        List<String> controls_theme = KFDManager.Instance(context).ListDir("controls_theme");
+        for (String file : controls_theme)
         {
-            File[] files = dir.listFiles();
-            for (File file : files)
-            {
-                if(file.isDirectory())
-                    list.put("controls_theme/" + file.getName(), file.getName());
-            }
+            list.put("controls_theme/" + file, file);
         }
         return list;
     }
@@ -480,6 +492,40 @@ public class Q3EUtils
         return size;
     }
 
+    public static long cp(String src, String dst)
+    {
+        FileInputStream is = null;
+        FileOutputStream os = null;
+        File srcFile = new File(src);
+        if(!srcFile.isFile())
+            return -2;
+        if(!srcFile.canRead())
+            return -3;
+        File dstFile = new File(dst);
+        File dstDir = dstFile.getParentFile();
+        if(null != dstDir && !dstDir.isDirectory())
+        {
+            if(!dstDir.mkdirs())
+                return -4;
+        }
+        try
+        {
+            is = new FileInputStream(srcFile);
+            os = new FileOutputStream(dst);
+            return Q3EUtils.Copy(os, is);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return -1;
+        }
+        finally
+        {
+            Q3EUtils.Close(is);
+            Q3EUtils.Close(os);
+        }
+    }
+
     /*
     @SuppressLint("InlinedApi")
     private final int m_uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
@@ -552,5 +598,144 @@ public class Q3EUtils
         /*int w = width * scale;
         int h = width * scale;*/
         return new int[]{w, h};
+    }
+
+    public static boolean file_put_contents(String path, String content)
+    {
+        if(null == path)
+            return false;
+        return file_put_contents(new File(path), content);
+    }
+
+    public static boolean file_put_contents(File file, String content)
+    {
+        if(null == file)
+            return false;
+
+        FileWriter writer = null;
+        try
+        {
+            writer = new FileWriter(file);
+            writer.append(content);
+            writer.flush();
+            return true;
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Close(writer);
+        }
+    }
+
+    public static String file_get_contents(String path)
+    {
+        if(null == path)
+            return null;
+        return file_get_contents(new File(path));
+    }
+
+    public static String file_get_contents(File file)
+    {
+        if(null == file || !file.isFile() || !file.canRead())
+            return null;
+
+        FileReader reader = null;
+        try
+        {
+            reader = new FileReader(file);
+            int BUF_SIZE = 1024;
+            char[] chars = new char[BUF_SIZE];
+            int len;
+            StringBuilder sb = new StringBuilder();
+            while ((len = reader.read(chars)) > 0)
+                sb.append(chars, 0, len);
+            return sb.toString();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return null;
+        }
+        finally
+        {
+            Close(reader);
+        }
+    }
+
+    public static boolean rm(String path)
+    {
+        if(null == path)
+            return false;
+        return rm(new File(path));
+    }
+
+    public static boolean rm(File file)
+    {
+        if(null == file || !file.isFile())
+            return false;
+
+        try
+        {
+            return file.delete();
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static boolean mkdir(String path, boolean p)
+    {
+        File file = new File(path);
+        if(file.exists())
+        {
+            return file.isDirectory();
+        }
+        try
+        {
+            if(p)
+                return file.mkdirs();
+            else
+                return file.mkdir();
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static boolean _dumpPID = false;
+    public static void DumpPID(Context context)
+    {
+        if(_dumpPID || !BuildConfig.DEBUG )
+            return;
+        try
+        {
+            String text = "" + Process.myPid();
+            final String[] Paths;
+            Paths = new String[]{
+                    PreferenceManager.getDefaultSharedPreferences(context).getString(Q3EPreference.pref_datapath, ""),
+                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N ? context.getDataDir().getAbsolutePath() : context.getCacheDir().getAbsolutePath()
+            };
+            for (String dir : Paths)
+            {
+                if(null == dir || dir.isEmpty())
+                    continue;
+                String path = dir + "/.idtech4amm.pid";
+                file_put_contents(path, text);
+                Log.i(TAG, "DumpPID " + text + " to " + path);
+                _dumpPID = true;
+            }
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
     }
 }

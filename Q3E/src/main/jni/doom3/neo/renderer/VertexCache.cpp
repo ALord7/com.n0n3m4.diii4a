@@ -194,7 +194,7 @@ void *idVertexCache::Position(vertCache_t *buffer)
 	if (buffer->vbo _VBO_IS_VALID) {
 		if (r_showVertexCache.GetInteger() == 2) {
 			if (buffer->tag == TAG_TEMP) {
-				common->Printf("GL_ARRAY_BUFFER = %i + %i (%i bytes)\n", buffer->vbo, buffer->offset, buffer->size);
+				common->Printf("GL_ARRAY_BUFFER = %i + %zd (%i bytes)\n", buffer->vbo, buffer->offset, buffer->size);
 			} else {
 				common->Printf("GL_ARRAY_BUFFER = %i (%i bytes)\n", buffer->vbo, buffer->size);
 			}
@@ -813,11 +813,6 @@ vertCache_t* idVertexCache::CreateTempVbo(int bytes, bool indexBuffer)
 	}
 
 	return block;
-}
-
-int idVertexCache::GetNextListNum(void) const
-{
-	return (listNum + 1) % NUM_VERTEX_FRAMES;
 }
 
 #endif

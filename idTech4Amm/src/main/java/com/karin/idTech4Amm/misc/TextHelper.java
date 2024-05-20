@@ -1,6 +1,5 @@
 package com.karin.idTech4Amm.misc;
 
-import android.os.Build;
 import android.text.Html;
 import android.content.Context;
 
@@ -138,6 +137,7 @@ public final class TextHelper
             Constants.CONST_NAME,
             "Update: " + ContextUtility.GetAppVersion(context) + (ContextUtility.BuildIsDebug(context) ? "(debug)" : ""),
             "Release: " + Constants.CONST_RELEASE + " (R" + Constants.CONST_UPDATE_RELEASE + ")",
+            "Build: " + Constants.GetBuildTime("yyyy-MM-dd HH:mm:ss.SSS") + ("(API " + Constants.GetBuildSDKVersion() + ")"),
             "Dev: " + GenLinkText("mailto:" + Constants.CONST_EMAIL, Constants.CONST_DEV),
             "Changes: ",
         };
@@ -148,7 +148,7 @@ public final class TextHelper
                 sb.append(str);
             sb.append(endl);
         }
-        for(String str : Constants.CONST_CHANGES)
+        for(String str : Constants.CONST_CHANGES())
         {
             if(null != str)
                 sb.append(FormatDialogMessageSpace("  * ")).append(str);
@@ -173,14 +173,22 @@ public final class TextHelper
                 " " + GenLinkText("https://www.moddb.com/mods/classic-doom-3", "Classic DOOM3: cdoom"),
                 " " + GenLinkText("https://www.moddb.com/mods/ruiner", "Rivensin: rivensin"),
                 " " + GenLinkText("https://www.moddb.com/mods/hardcorps", "Hardcorps: hardcorps"),
-                /*" " + GenLinkText("https://www.moddb.com/mods/overthinked-doom3", "Overthinked: overthinked"),
-                " " + GenLinkText("https://www.moddb.com/games/doom-3-resurrection-of-evil/downloads/sabot-alpha-7x", "SABot(DOOM3-Resurrection of Evil): sabot"),*/
+                " " + GenLinkText("https://www.moddb.com/mods/overthinked-doom3", "Overthinked DooM^3: overthinked"),
+                " " + GenLinkText("https://www.moddb.com/games/doom-3-resurrection-of-evil/downloads/sabot-alpha-7x", "SABot(DOOM3-Resurrection of Evil) a7x: sabot"),
+                " " + GenLinkText("https://www.moddb.com/mods/fragging-free", "Fragging Free: fraggingfree"),
+                " " + GenLinkText("https://www.moddb.com/mods/hexen-edge-of-chaos", "HeXen:Edge of Chaos: hexeneoc"),
+                " " + GenLinkText("https://www.moddb.com/mods/librecoop-dhewm3-coop", "LibreCoop: librecoop"),
                 " " + GenLinkText("https://store.steampowered.com/app/2210/Quake_4/", "Quake4: q4base"),
                 " Prey(2006): preybase",
+                " " + GenLinkText("https://store.steampowered.com/app/2320/Quake_II/", "Quake II: baseq2"),
+                " " + GenLinkText("https://store.steampowered.com/app/2200/Quake_III_Arena/", "Quake III Arena: baseq3"),
+                " " + GenLinkText("https://store.steampowered.com/app/2200/Quake_III_Arena/", "Quake III Team Arena: missionpack"),
+                " " + GenLinkText("https://www.moddb.com/games/return-to-castle-wolfenstein", "Return to Castle Wolfenstein: main"),
+                " " + GenLinkText("https://www.thedarkmod.com", "The Dark Mod: darkmod"),
                 null,
-            "For playing Prey(2006)(Thanks for `" + GenLinkText("https://github.com/jmarshall23", "jmarshall") + "`'s `" + GenLinkText("https://github.com/jmarshall23/PreyDoom", "PreyDoom") + "`): ",
+            "For playing Prey(2006)(Based on `" + GenLinkText("https://github.com/jmarshall23", "jmarshall") + "`'s `" + GenLinkText("https://github.com/jmarshall23/PreyDoom", "PreyDoom") + "`): ",
             " 1. Putting PC Prey game data file to `preybase` folder and START directly.",
-            " *. Some problems solution: e.g. using cvar `harm_g_translateAlienFont` to translate Alien text on GUI.",
+            " *. Some problems solution: e.g. using cvar `harm_ui_translateAlienFont` to translate Alien text on GUI.",
             " *. Exists bugs: e.g. some incorrect collision(using `noclip`), some GUIs not work(Music CD in RoadHouse).",
             " *. If settings UI is not work, can edit `preyconfig.cfg` for binding extras key.",
             "  bind \"Your key of spirit walk\" \"_impulse54\"",
@@ -188,15 +196,16 @@ public final class TextHelper
             "  bind \"Your key of toggle lighter\" \"_impulse16\"",
             "  bind \"Your key of drop\" \"_impulse25\"",
             null,
-			"For playing Quake 4(Thanks for `" + GenLinkText("https://github.com/jmarshall23", "jmarshall") + "`'s `" + GenLinkText("https://github.com/jmarshall23/Quake4Doom", "Quake4Doom") + "`): ",
+			"For playing Quake 4(Based on `" + GenLinkText("https://github.com/jmarshall23", "jmarshall") + "`'s `" + GenLinkText("https://github.com/jmarshall23/Quake4Doom", "Quake4Doom") + "`): ",
 			" 1. Putting PC Quake 4 game data file to `q4base` folder and START directly.",
-            " 2. Extract Quake 4 patch resource to `q4base` game data folder if need(in menu `Other` -> `Extract resource`).",
-            "  (a). SABot a9 mod files(Bot support, includes scripts, defs and aas files. If you want to add bots in Multiplayer-Game, using command `addbots <bot_file>` or `fillbots` after enter map in console, or set `harm_si_autoFillBots` to 1 for automatic fill bots).",
-            " 3. Then start game directly or choose map level, all levels is working.",
             " *. If running crash on arm32 or low-memory device, trying to check `Use ETC1 compression` or `Disable lighting` for decreasing memory usage.",
-            " *. Exists bugs: e.g. script error on some levels",
             " *. Effect system: Quake4 using new advanced `BSE` particle system, it not open-source(`jmarshall` has realized and added by decompiling `ETQW`'s BSE binary file, also see `" + GenLinkText("https://github.com/jmarshall23/Quake4BSE", "jmarshall23/Quake4BSE") + "`, but it not work yet.). Now implementing a OpenBSE with DOOM3 original FX/Particle system, some effects can played, but has incorrect render.",
-			" *. Multiplayer-Game: It is working well with bots(added SABot a7 mod support, but need SABot a9 mod file and Multiplayer-Game map AAS file, now set cvar `harm_g_autoGenAASFileInMPGame` to 1 for generating a bad AAS file when loading map in Multiplayer-Game and not valid AAS file in current map, you can also put your MP map's AAS file to `maps/mp` folder(aas32)).",
+            " 2. Bot mod in Multi-Player game: ",
+            " *. Extract `q4base/sabot_a9.pk4` file in apk to Quake4 game data folder, it includes some defs, scripts and MP game map AAS file.",
+            " *. Set cvar `harm_g_autoGenAASFileInMPGame` to 1 for generating a bad AAS file when loading map in Multiplayer-Game and not valid AAS file in current map, you can also put your MP map's AAS file to `maps/mp` folder(botaas32).",
+            " *. Set `harm_si_autoFillBots` to 1 for automatic fill bots when start MP game.",
+            " *. Execute `addbots` for add multiplayer bot.",
+            " *. Execute `fillbots` for auto fill multiplayer bots.",
             null,
             "Multi-threading and some GLSL shader using `" + GenLinkText("https://github.com/emileb/d3es-multithread", "emileb/d3es-multithread") + "`.",
             null,
@@ -209,7 +218,7 @@ public final class TextHelper
             "If game running crash(white screen): ",
             " 1. Make sure to allow `WRITE_EXTERNAL_STORAGE` permission.",
             " 2. Make sure `Game working directory` is right.",
-            " 3. Uncheck 4th checkbox named `Use ETC1(or RGBA4444) cache` or clear ETC1 texture cache file manual on resource folder(exam: /sdcard/diii4a/(base/d3xp/d3le/cdoom/rivensin/or...)/dds).",
+            " 3. Uncheck 4th checkbox named `Use ETC1(or RGBA4444) cache` or clear ETC1 texture cache file manual on resource folder(exam: /sdcard/diii4a/(base/d3xp/d3le/cdoom/or...)/dds).",
             null,
             "If game is crash with flash-screen when playing a period of time: ",
             " 1. Out of graphics memory: `Clear vertex buffer` suggest to select 3rd or 2nd for clear vertex buffer every frame! If you select 1st, it will be same as original apk(ver 1.1.0 at 2013). It should work well on `Adreno` GPU of `Snapdragon`. More view in game, on DOOM3 console, cvar named `harm_r_clearVertexBuffer`.",
@@ -219,7 +228,7 @@ public final class TextHelper
             " 2. Check `User special` checkbox. `Commandline` will show `+set fs_game (the game mod)`.",
             " 3. If may want to choose game library, click `GameLib` and choose a game library. `Commandline` will show `+set harm_fs_gameLibPath (selected library path)`.",
 			null,
-			"The `Rivensin` game library support load DOOM3 base game map. But first must add include original DOOM3 all map script into `doom_main.script` of `Rivensin` mod file.",
+			"The `Rivensin` game library support load DOOM3 base game map. But first must add include original DOOM3 all map script into `doom_main.script` of `Rivensin` mod file, or extract `rivensin/play_original_doom3_level.pk4` in apk to `Rivensin` game data folder.",
 			" 1. Edit `doom_main.script` in pak archive file(in `script/` folder) or external folder of file system.",
 			" 2. Add include all map's script to `doom_main.script`.",
 			"  2-1. Find text line `// map specific character scripts`",
@@ -277,15 +286,16 @@ public final class TextHelper
             Constants.CONST_NAME,
             "Changes by " + GenLinkText(Constants.CONST_DEVELOPER, Constants.CONST_DEV)
             + "&lt;" + GenLinkText("mailto:" + Constants.CONST_EMAIL, Constants.CONST_EMAIL) + "&gt;",
-            "Update: " + ContextUtility.GetAppVersion(context) + ("(API " + Build.VERSION.SDK_INT + ")") + (ContextUtility.BuildIsDebug(context) ? "(debug)" : ""),
+            "Update: " + ContextUtility.GetAppVersion(context) + (ContextUtility.BuildIsDebug(context) ? "(debug)" : ""),
             "Release: " + Constants.CONST_RELEASE + " (R" + Constants.CONST_UPDATE_RELEASE + ")",
+            "Build: " + Constants.GetBuildTime("yyyy-MM-dd HH:mm:ss.SSS") + ("(API " + Constants.GetBuildSDKVersion() + ")"),
             null,
             "Rename from `DIII4A++`, base on original `n0n3m4`'s `DIII4A`.",
             "idTech4 engine's games support on Android.",
-            "e.g. `DOOM 3`, `DOOM 3 RoE`, `Quake 4`, Prey(2006), and some mods.",
+            "e.g. `DOOM 3`, `DOOM 3 RoE`, `Quake 4`, `Prey(2006)`, and some mods(e.g. `The Dark Mod`).",
             null,
             "Source in `assets/source` folder in APK file.",
-            " `DIII4A.source.tgz`: launcher frontend source and game source, game source and OpenGLES2.0 shader source in `/Q3E/src/main/jni/doom3` of archive package.",
+            " `DIII4A.source.tgz`: launcher frontend source and game source, game source and OpenGLES2.0/3.0 shader source in `/Q3E/src/main/jni/doom3` of archive package.",
             null,
             "Homepage: ",
             "Github: " + GenLinkText(Constants.CONST_MAIN_PAGE, null),
@@ -296,6 +306,7 @@ public final class TextHelper
             "Special thanks: ",
             GenLinkText("https://4pda.ru/forum/index.php?showuser=7653620", "Sir Cat") + "@" + GenLinkText("https://4pda.ru/forum/index.php?showtopic=929753", "4PDA forum"),
             GenLinkText("https://4pda.ru/forum/index.php?showuser=5043340", "ALord7") + "@" + GenLinkText("https://4pda.to/forum/index.php?showtopic=330329", "4PDA forum"),
+            GenLinkText("https://github.com/lvonasek", "Luboš Vonásek") + "@" + GenLinkText("https://github.com/lvonasek/PreyVR", "PreyVR"),
         };
         final String endl = GetDialogMessageEndl();
         for(String str : ABOUTS)
@@ -310,7 +321,66 @@ public final class TextHelper
     public static CharSequence GetChangesText()
     {
         final ChangeLog[] CHANGES = {
-            ChangeLog.Create(Constants.CONST_RELEASE, Constants.CONST_UPDATE_RELEASE, Constants.CONST_CHANGES),
+            ChangeLog.Create(Constants.CONST_RELEASE, Constants.CONST_UPDATE_RELEASE, Constants.CONST_CHANGES()),
+
+                ChangeLog.Create("2024-04-10", 39,
+                        "Support perforated surface shadow in shadow mapping(cvar `r_forceShadowMapsOnAlphaTestedSurfaces`, default 0).",
+                        "Add `LibreCoop` mod of DOOM3 support, game data directory named `librecoop`. More view in `" + TextHelper.GenLinkText("https://www.moddb.com/mods/librecoop-dhewm3-coop", "LibreCoop") + "`.",
+                        "Add `Quake II` support, game data directory named `baseq2`. More view in `" + TextHelper.GenLinkText("https://store.steampowered.com/app/2320/Quake_II/", "Quake II") + "`.",
+                        "Add `Quake III Arena` support, game data directory named `baseq3`; Add `Quake III Team Arena` support, game data directory named `missionpack`. More view in `" + TextHelper.GenLinkText("https://store.steampowered.com/app/2200/Quake_III_Arena/", "Quake III Arena") + "`.",
+                        "Add `Return to Castle Wolfenstein` support, game data directory named `main`. More view in `" + TextHelper.GenLinkText("https://www.moddb.com/games/return-to-castle-wolfenstein", "Return to Castle Wolfenstein") + "`.",
+                        "Add `The Dark Mod` support, game data directory named `darkmod`. More view in `" + TextHelper.GenLinkText("https://www.thedarkmod.com", "The Dark Mod") + "`.",
+                        "Add a on-screen button theme."
+                ),
+
+                ChangeLog.Create("2024-02-05", 38,
+                        "Fixed shadow mapping on non-Adreno GPU.",
+                        "Support level loading finished pause(cvar `com_skipLevelLoadPause`) in Quake4."
+                ),
+
+                ChangeLog.Create("2024-01-06", 37,
+                        "Fixed on-screen buttons initial keycodes.",
+                        "On-screen slider button can setup clickable.",
+                        "Add dds screenshot support.",
+                        "Add cvar `r_scaleMenusTo43` for 4:3 menu."
+                ),
+
+                ChangeLog.Create("2023-12-31", 36,
+                        "Fixed prelight shadow's shadow mapping.",
+                        "Fixed EFX Reverb in Quake4.",
+                        "Add translucent stencil shadow support in stencil shadow(bool cvar `harm_r_stencilShadowTranslucent`(default 0); float cvar `harm_r_stencilShadowAlpha` for setting transparency).",
+                        "Add float cvar `harm_ui_subtitlesTextScale` control subtitles's text scale in Prey.",
+                        "Support cvar `r_brightness`.",
+                        "Fixed weapon projectile's scorches decals rendering in Prey(2006).",
+                        "Data directory chooser support Android SAF.",
+                        "New default on-screen buttons layout.",
+                        "Add `Stupid Angry Bot`(a7x) mod of DOOM3 support(need DOOM3: RoE game data), game data directory named `sabot`. More view in`" + TextHelper.GenLinkText("https://www.moddb.com/downloads/sabot-alpha-7x", "SABot(a7x)") + "`.",
+                        "Add `Overthinked DooM^3` mod of DOOM3 support, game data directory named `overthinked`. More view in`" + TextHelper.GenLinkText("https://www.moddb.com/mods/overthinked-doom3", "Overthinked DooM^3") + "`.",
+                        "Add `Fragging Free` mod of DOOM3 support(need DOOM3: RoE game data), game data directory named `fraggingfree`. More view in`" + TextHelper.GenLinkText("https://www.moddb.com/mods/fragging-free", "Fragging Free") + "`.",
+                        "Add `HeXen:Edge of Chaos` mod of DOOM3 support, game data directory named `hexeneoc`. More view in`" + TextHelper.GenLinkText("https://www.moddb.com/mods/hexen-edge-of-chaos", "HexenEOC") + "`."
+                ),
+
+                ChangeLog.Create("2023-10-29", 35,
+                        "Optimize soft shadow with shadow mapping. Add shadow map with depth texture in OpenGLES2.0.",
+                        "Add OpenAL(soft) and EFX Reverb support.",
+                        "Beam rendering optimization in Prey(2006) by `" + TextHelper.GenLinkText("https://github.com/lvonasek/PreyVR", "lvonasek/PreyVR") + "`.",
+                        "Add subtitle support in Prey(2006).",
+                        "Fixed gyroscope in invert-landscape mode.",
+                        "Fixed bot head and add bot level control(cvar `harm_si_botLevel`, need extract new `sabot_a9.pk4` resource) in Quake4 MP game."
+                ),
+
+                ChangeLog.Create("2023-10-01", 33,
+                        "Add shadow mapping soft shadow support(testing, has some incorrect rendering), using `r_useShadowMapping` to change from `shadow mapping` or `stencil shadow`.",
+                        "In Quake4, remove Bot FakeClient in multiplayer-game, and add SABot-a9 mod support in multiplayer-game(need extract resource first).",
+                        "Fix Setting's tab GUI in Prey2006.",
+                        "Add `full-body awareness` mod in Quake4. Set bool cvar `harm_pm_fullBodyAwareness` to 1 enable, and using `harm_pm_fullBodyAwarenessOffset` setup offset(also change to third-person mode), and using `harm_pm_fullBodyAwarenessHeadJoint` setup head joint name(view position).",
+                        "Support max FPS limit(cvar `harm_r_maxFps`).",
+                        "Support obj/dae static model, and fix png image load.",
+                        "Add skip intro support.",
+                        "Add simple CVar editor.",
+                        "Change OpenGL vertex index size to 4 bytes for large model.",
+                        "Add GLES3.0 support, can choose in `Graphics` tab."
+                        ),
 
                 ChangeLog.Create("2023-06-30", 32,
                         "Add `Chinese`, `Russian`(by " + TextHelper.GenLinkText("https://4pda.ru/forum/index.php?showuser=5043340", "ALord7") + ") language.",
@@ -367,7 +437,7 @@ public final class TextHelper
                         "Using DOOM3's Fx/Particle system implement Quake4's BSE incompletely for effects in Quake 4. The effects are bad now. Using set `bse_enabled` to 0 for disable effects.",
                         "Remove my cvar `harm_g_alwaysRun`, so set original `in_alwaysRun` to 1 for run in Quake 4.",
                         "Add simple beam model render in Prey(2006).",
-                        "Optimize skybox render in Prey(2006) by " + TextHelper.GenLinkText("https://github.com/lvonasek/PreyVR", "lvonasek/PreyVR") + "`."
+                        "Optimize skybox render in Prey(2006) by `" + TextHelper.GenLinkText("https://github.com/lvonasek/PreyVR", "lvonasek/PreyVR") + "`."
                 ),
 
                 ChangeLog.Create("2023-02-20", 25,

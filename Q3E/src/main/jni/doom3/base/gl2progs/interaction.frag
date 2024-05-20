@@ -15,10 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+	macros:
+		BLINN_PHONG: using blinn-phong instead phong.
+*/
 #version 100
 //#pragma optimize(off)
 
-precision mediump float;
+precision highp float;
 
 /*
  * Pixel values between vertices are interpolated by Gouraud shading by default,
@@ -56,6 +60,9 @@ uniform sampler2D u_fragmentMap2;	/* u_lightProjectionTexture */
 uniform sampler2D u_fragmentMap3;	/* u_diffuseTexture */
 uniform sampler2D u_fragmentMap4;	/* u_specularTexture */
 uniform sampler2D u_fragmentMap5;	/* u_specularFalloffTexture */
+#ifdef _TRANSLUCENT_STENCIL_SHADOW
+uniform mediump float u_uniformParm0; // shadow alpha
+#endif
 
 void main(void)
 {
@@ -99,5 +106,9 @@ void main(void)
 	color *= NdotL * lightProjection;
 	color *= lightFalloff;
 
-	gl_FragColor = vec4(color, 1.0) * var_Color;
+	gl_FragColor = vec4(color, 1.0) * var_Color
+#ifdef _TRANSLUCENT_STENCIL_SHADOW
+        * u_uniformParm0
+#endif
+    ;
 }

@@ -1,8 +1,90 @@
 ## 更新日志
-**1.1.0harmattan32(natasha)** - **2023-06-30**
 
 ----------------------------------------------------------------------------------
-### 更新
+
+> 1.1.0harmattan50 (2024-04-30)
+
+* 支持新渲染通道: 热浪(例如 BFG9000飞行物的扭曲, 火箭炮的爆炸), colorProcess(例如 marscity2镜子前的血色影片).
+* 雷神之锤4支持新GLSL渲染通道(例如 机枪的瞄准镜特效和弹孔).
+* `Control`选项卡新增控制虚拟摇杆的显示模式(总是显示; 隐藏; 仅按下显示).
+* 改进Phong/Blinn-Phong光照模型着色器使用高精度.
+* The Dark Mod中强制禁用压缩纹理.
+* 设置中可以启用每个游戏的数据文件夹独立放置: 毁灭战士3 -> doom3/; 雷神之锤4 -> quake4/; 掠食(2006) -> prey/; 雷神之锤1 -> quake1/; 雷神之锤2 -> quake2/; 雷神之锤3 -> quake3/; 重返德军总部 -> rtcw/; The Dark Mod -> darkmod/ (总是独立).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan39 (2024-04-10)
+
+* 阴影映射支持镂空图层阴影(cvar `r_forceShadowMapsOnAlphaTestedSurfaces`, 默认0).
+* 新增毁灭战士3 mod `LibreCoop`支持, 游戏数据文件夹命名为`librecoop`. 详情[LibreCoop](https://www.moddb.com/mods/librecoop-dhewm3-coop).
+* 新增`雷神之锤2`支持, 游戏数据文件夹命名为`baseq2`. 详情[Quake II](https://store.steampowered.com/app/2320/Quake_II/).
+* 新增`雷神之锤3竞技场`支持, 游戏数据文件夹命名为`baseq3`; 新增`雷神之锤3团队竞技场`支持, 游戏数据文件夹命名为`missionpack`. 详情[Quake III Arena](https://store.steampowered.com/app/2200/Quake_III_Arena/).
+* 新增`重返德军总部`支持, 游戏数据文件夹命名为`main`. 详情[Return to Castle Wolfenstein](https://www.moddb.com/games/return-to-castle-wolfenstein).
+* 新增`The Dark Mod`v2.12支持, 游戏数据文件夹命名为`darkmod`. 详情[The Dark Mod](https://www.thedarkmod.com).
+* 新增一个虚拟按键主题.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan38 (2024-02-05)
+
+* 修复非Adreno GPU的阴影映射阴影.
+* 支持雷神之锤4关卡加载完成暂停等待(cvar `com_skipLevelLoadPause`).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan37 (2024-01-06)
+
+* 修复屏幕按键初始键码配置.
+* 滑动按键支持设置为点击触发.
+* 新增dds格式屏幕截图.
+* 新增cvar `r_scaleMenusTo43`启用4:3比例菜单.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan36 (2023-12-31)
+
+* 修复预烘培阴影图软阴影渲染.
+* 雷神之锤4修复EFX混响.
+* 添加半透明模板阴影支持(bool型cvar `harm_r_stencilShadowTranslucent`(默认 0); 浮点型cvar `harm_r_stencilShadowAlpha`设置透明度).
+* 掠食(2006)添加浮点型cvar `harm_ui_subtitlesTextScale`控制字幕字体大小.
+* 支持cvar `r_brightness`.
+* 掠食(2006)修复武器发射爆炸贴花渲染Z-Fighting.
+* 数据文件目录选择器支持安卓SAF框架.
+* 新的默认屏幕按键布局.
+* 添加毁灭战士3 mod `Stupid Angry Bot`(a7x)(需要邪恶复苏数据包), 游戏数据文件夹名为`sabot`. 详情 [SABot(a7x)](https://www.moddb.com/downloads/sabot-alpha-7x).
+* 添加毁灭战士3 mod `Overthinked DooM^3`, 游戏数据文件夹名为`overthinked`. 详情 [Overthinked DooM^3](https://www.moddb.com/mods/overthinked-doom3).
+* 添加毁灭战士3 mod `Fragging Free`(需要邪恶复苏数据包), 游戏数据文件夹名为`fraggingfree`. 详情 [Fragging Free](https://www.moddb.com/mods/fragging-free).
+* 添加毁灭战士3 mod `HeXen:Edge of Chaos`, 游戏数据文件夹名为`hexeneoc`. 详情 [HeXen:Edge of Chaos](https://www.moddb.com/mods/hexen-edge-of-chaos).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan35 (2023-10-29)
+
+* 优化Shadow mapping软阴影. OpenGLES2.0阴影图使用深度纹理.
+* 新增OpenALA(soft)和EFX混响支持.",
+* 掠食2006 Beam模型渲染优化(by [lvonasek/PreyVR](https://github.com/lvonasek/PreyVR)).
+* 掠食2006新增字幕支持.
+* 修复反横屏下的陀螺仪.
+* 雷神之锤4多人游戏修复Bot头部模型, 新增Bot等级控制支持(cvar `harm_si_botLevel`, 需要重新解压新的`sabot_a9.pk4`资源).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan33 (2023-10-01)
+
+* 新增shadow mapping软阴影支持(测试, 存在一些错误渲染), 使用`r_useShadowMapping`切换`shadow mapping`或`stencil shadow`.
+* 雷神之锤4移除多人游戏Bot伪客户端, 使用SABot-a9 mod替换多人游戏的bot(需要先解压资源文件).
+* 修复掠食2006的设置页面选项卡.
+* 雷神之锤4新增`full-body awareness` mod. 设置布尔型cvar `harm_pm_fullBodyAwareness`为1开启, 并且可以使用`harm_pm_fullBodyAwarenessOffset`设置视角偏移(可以调整为第三人称视角), 使用`harm_pm_fullBodyAwarenessHeadJoint`设置自定义头部关节名称(视角位置).
+* 支持限制最大(cvar `harm_r_maxFps`).
+* 支持obj/dae格式静态模型, 修复png格式图片加载.
+* 新增跳过启动动画支持.
+* 新增简易CVar编辑器.
+* OpenGL顶点索引使用4字节以加载大模型.
+* 新增GLES3.0支持, 在`图形`选项卡切换.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan32 (2023-06-30)
 
 * 添加 `中文`, `俄语`(by [ALord7](https://4pda.ru/forum/index.php?showuser=5043340)).
 * 一些虚拟按键设置移植`Configure on-screen controls`页面.
@@ -13,9 +95,7 @@
 
 ----------------------------------------------------------------------------------
 
-### 历史
-
-> 1.1.0harmattan30 (2023-06-10)
+> 1.1.0harmattan31 (2023-06-10)
 
 * 在`CONTROLS`选项卡下的`Reset on-screen controls`, 新增重置所有虚拟按键的缩放和透明度.
 * 在`CONTROLS`选项卡新增统一设置所有虚拟按键大小功能.

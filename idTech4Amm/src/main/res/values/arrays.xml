@@ -39,11 +39,15 @@
     <string-array name="onscreen_slider_style_labels">
         <item>Left-right</item>
         <item>Down-right</item>
+        <item>Left-right(click)</item>
+        <item>Down-right(click)</item>
     </string-array>
 
     <integer-array name="onscreen_slider_style_values">
         <item>0</item>
         <item>1</item>
+        <item>2</item>
+        <item>3</item>
 	</integer-array>
 
     <string-array name="onscreen_type_labels">
@@ -68,6 +72,18 @@
         <item>en</item>
         <item>zh</item>
         <item>ru</item>
+    </string-array>
+
+    <integer-array name="joystick_visible_mode_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </integer-array>
+
+    <string-array name="joystick_visible_mode_names">
+        <item>Always</item>
+        <item>Hidden</item>
+        <item>Only pressed</item>
     </string-array>
 
     <string-array name="key_map_names">
@@ -156,11 +172,11 @@
         <item>\\</item>
         <item>]</item>
         <item>\'</item>
-        <item>0x2</item>
+<!--        <item>0x2</item>
         <item>0x3</item>
         <item>0x4</item>
         <item>0x5</item>
-        <item>0x6</item>
+        <item>0x6</item>-->
     </string-array>
 
     <integer-array name="key_map_codes">
@@ -249,10 +265,10 @@
         <item>92</item>
         <item>93</item>
         <item>39</item> <!--'-->
-        <item>2</item>
+<!--        <item>2</item>
         <item>3</item>
         <item>4</item>
         <item>5</item>
-        <item>6</item>
+        <item>6</item>-->
     </integer-array>
 </resources>

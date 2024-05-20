@@ -2,7 +2,6 @@ package com.n0n3m4.q3e.onscreen;
 
 import android.view.View;
 
-import com.n0n3m4.q3e.Q3EControlView;
 import com.n0n3m4.q3e.Q3EKeyCodes;
 import com.n0n3m4.q3e.Q3EUtils;
 import com.n0n3m4.q3e.gl.Q3EGL;
@@ -24,17 +23,15 @@ public class Button extends Paintable implements TouchListener
     public int cy;
     public int width;
     public int height;
-    float[] verts = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f};
-    FloatBuffer verts_p;
-    float[] texcoords = {0, 0, 0, 1, 1, 1, 1, 0};
-    FloatBuffer tex_p;
-    byte[] indices = {0, 1, 2, 0, 2, 3};
-    ByteBuffer inds_p;
-    public int tex_ind;
-    public int keycode;
-    public int style;
-    public float initalpha;
-    public boolean canbeheld = false;
+
+    private final FloatBuffer verts_p;
+    private final FloatBuffer tex_p;
+    private final ByteBuffer inds_p;
+    private int tex_ind;
+    private final int keycode;
+    private final int style;
+    private final float initalpha;
+    private final boolean canbeheld;
     private final int m_width_2;
 
     public Button(View vw, GL10 gl, int center_x, int center_y, int w, int h, String texid, int keyc, int stl, boolean canbheld, float a)
@@ -49,6 +46,9 @@ public class Button extends Paintable implements TouchListener
         keycode = keyc;
         style = stl;
         canbeheld = canbheld;
+        float[] verts = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f};
+        float[] texcoords = {0, 0, 0, 1, 1, 1, 1, 0};
+        byte[] indices = {0, 1, 2, 0, 2, 3};
         for (int i = 0; i < verts.length; i += 2)
         {
             verts[i] = verts[i] * w + cx;
@@ -82,7 +82,7 @@ public class Button extends Paintable implements TouchListener
     public void Paint(GL11 gl)
     {
         super.Paint(gl);
-        Q3EGL.DrawVerts(gl, tex_ind, 6, tex_p, verts_p, inds_p, 0, 0, red, green, blue, alpha);
+        Q3EGL.DrawVerts_GL1(gl, tex_ind, 6, tex_p, verts_p, inds_p, 0, 0, red, green, blue, alpha);
     }
 
     private int lx;
@@ -91,20 +91,19 @@ public class Button extends Paintable implements TouchListener
     @Override
     public boolean onTouchEvent(int x, int y, int act)
     {
-        Q3EControlView controlView = (Q3EControlView) (this.view);
         if (canbeheld)
         {
             if (act == 1)
             {
                 if (!heldarr.contains(keycode))
                 {
-                    controlView.sendKeyEvent(true, keycode, 0);
+                    Q3EUtils.q3ei.callbackObj.sendKeyEvent(true, keycode, 0);
                     heldarr.add(keycode);
                     alpha = Math.min(initalpha * 2, 1f);
                 }
                 else
                 {
-                    controlView.sendKeyEvent(false, keycode, 0);
+                    Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, keycode, 0);
                     heldarr.remove(Integer.valueOf(keycode));
                     alpha = initalpha;
                 }
@@ -123,22 +122,22 @@ public class Button extends Paintable implements TouchListener
         {
             lx = x;
             ly = y;
-            controlView.sendKeyEvent(true, keycode, 0);
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(true, keycode, 0);
         }
         else if (act == -1)
-            controlView.sendKeyEvent(false, keycode, 0);
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, keycode, 0);
 
         if (keycode == Q3EKeyCodes.KeyCodes.K_MOUSE1)
         {
             if (Q3EUtils.q3ei.callbackObj.notinmenu)
             {
-                controlView.sendMotionEvent(x - lx, y - ly);
+                Q3EUtils.q3ei.callbackObj.sendMotionEvent(x - lx, y - ly);
                 lx = x;
                 ly = y;
             }
             else
             {
-                controlView.sendMotionEvent(0, 0);//???
+                Q3EUtils.q3ei.callbackObj.sendMotionEvent(0, 0);//???
             }
         }
         return true;

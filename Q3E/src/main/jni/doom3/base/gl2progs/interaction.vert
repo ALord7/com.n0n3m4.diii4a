@@ -15,10 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+	macros:
+		BLINN_PHONG: using blinn-phong instead phong.
+*/
 #version 100
 //#pragma optimize(off)
 
-precision mediump float;
+precision highp float;
 
 /*
  * Pixel values between vertices are interpolated by Gouraud shading by default,

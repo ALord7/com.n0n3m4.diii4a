@@ -47,19 +47,7 @@ void R_LoadImage( const char *name, byte **pic, int *width, int *height, bool ma
  * You may also wish to include "jerror.h".
  */
 
-#ifdef _USING_STB
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_NO_HDR
-#define STBI_NO_LINEAR
-#define STBI_ONLY_JPEG // at least for now, only use it for JPEG
-#define STBI_NO_STDIO  // images are passed as buffers
-
-#define STBI_ONLY_PNG
-
-#include "../externlibs/stb/stb_image.h"
-
-#else
-
+#if !defined(_USING_STB)
 extern "C" {
 #include <jpeglib.h>
 
@@ -183,65 +171,6 @@ void R_WritePalTGA(const char *filename, const byte *data, const byte *palette, 
 static void LoadBMP(const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
 static void LoadTGA(const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
 static void LoadJPG(const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
-#ifdef _USING_STB
-static void LoadPNG(const char *filename, byte **pic, int *width, int *height, ID_TIME_T *timestamp)
-{
-
-	byte	*fbuffer;
-	int	len;
-
-	if (pic) {
-		*pic = NULL;		// until proven otherwise
-	}
-
-	{
-		idFile *f;
-
-		f = fileSystem->OpenFileRead(filename);
-
-		if (!f) {
-			return;
-		}
-
-		len = f->Length();
-
-		if (timestamp) {
-			*timestamp = f->Timestamp();
-		}
-
-		if (!pic) {
-			fileSystem->CloseFile(f);
-			return;	// just getting timestamp
-		}
-
-		fbuffer = (byte *)Mem_ClearedAlloc(len);
-		f->Read(fbuffer, len);
-		fileSystem->CloseFile(f);
-	}
-
-	int w=0, h=0, comp=0;
-	byte* decodedImageData = stbi_load_from_memory( fbuffer, len, &w, &h, &comp, STBI_rgb_alpha );
-
-	Mem_Free( fbuffer );
-
-	if ( decodedImageData == NULL ) {
-		common->Warning( "stb_image was unable to load PNG %s : %s\n",
-					filename, stbi_failure_reason());
-		return;
-	}
-
-	// *pic must be allocated with R_StaticAlloc(), but stb_image allocates with malloc()
-	// (and as there is no R_StaticRealloc(), #define STBI_MALLOC etc won't help)
-	// so the decoded data must be copied once
-	int size = w*h*4;
-	*pic = (byte *)R_StaticAlloc( size );
-	memcpy( *pic, decodedImageData, size );
-	*width = w;
-	*height = h;
-	// now that decodedImageData has been copied into *pic, it's not needed anymore
-	stbi_image_free( decodedImageData );
-}
-#endif
 
 /*
 ========================================================================
@@ -387,7 +316,7 @@ static void LoadBMP(const char *name, byte **pic, int *width, int *height, ID_TI
 	}
 
 	if (bmpHeader.fileSize != length) {
-		common->Error("LoadBMP: header size does not match file size (%lu vs. %d) (%s)\n", bmpHeader.fileSize, length, name);
+		common->Error("LoadBMP: header size does not match file size (%u vs. %d) (%s)\n", bmpHeader.fileSize, length, name);
 	}
 
 	if (bmpHeader.compression != 0) {
@@ -889,59 +818,7 @@ LoadJPG
 static void LoadJPG(const char *filename, unsigned char **pic, int *width, int *height, ID_TIME_T *timestamp)
 {
 #ifdef _USING_STB
-	byte	*fbuffer;
-	int	len;
-
-	if (pic) {
-		*pic = NULL;		// until proven otherwise
-	}
-
-	{
-		idFile *f;
-
-		f = fileSystem->OpenFileRead(filename);
-
-		if (!f) {
-			return;
-		}
-
-		len = f->Length();
-
-		if (timestamp) {
-			*timestamp = f->Timestamp();
-		}
-
-		if (!pic) {
-			fileSystem->CloseFile(f);
-			return;	// just getting timestamp
-		}
-
-		fbuffer = (byte *)Mem_ClearedAlloc(len);
-		f->Read(fbuffer, len);
-		fileSystem->CloseFile(f);
-	}
-
-	int w=0, h=0, comp=0;
-	byte* decodedImageData = stbi_load_from_memory( fbuffer, len, &w, &h, &comp, STBI_rgb_alpha );
-
-	Mem_Free( fbuffer );
-
-	if ( decodedImageData == NULL ) {
-		common->Warning( "stb_image was unable to load JPG %s : %s\n",
-					filename, stbi_failure_reason());
-		return;
-	}
-
-	// *pic must be allocated with R_StaticAlloc(), but stb_image allocates with malloc()
-	// (and as there is no R_StaticRealloc(), #define STBI_MALLOC etc won't help)
-	// so the decoded data must be copied once
-	int size = w*h*4;
-	*pic = (byte *)R_StaticAlloc( size );
-	memcpy( *pic, decodedImageData, size );
-	*width = w;
-	*height = h;
-	// now that decodedImageData has been copied into *pic, it's not needed anymore
-	stbi_image_free( decodedImageData );
+	LoadJPG_stb(filename, pic, width, height, timestamp);
 #else
 	/* This struct contains the JPEG decompression parameters and pointers to
 	 * working space (which is allocated as needed by the JPEG library).
@@ -1189,6 +1066,12 @@ void R_LoadImage(const char *cname, byte **pic, int *width, int *height, ID_TIME
 				name.StripFileExtension();
 				name.DefaultFileExtension(".png");
 				LoadPNG(name.c_str(), pic, width, height, timestamp);
+
+				if ((pic && *pic == 0) || (timestamp && *timestamp == -1)) {
+					name.StripFileExtension();
+					name.DefaultFileExtension(".dds");
+					LoadDDS(name.c_str(), pic, width, height, timestamp);
+				}
 			}
 #endif
 		}
@@ -1202,6 +1085,9 @@ void R_LoadImage(const char *cname, byte **pic, int *width, int *height, ID_TIME
 #ifdef _USING_STB
 	else if (ext == "png") {
 		LoadPNG(name.c_str(), pic, width, height, timestamp);
+	}
+	else if (ext == "dds") {
+		LoadDDS(name.c_str(), pic, width, height, timestamp);
 	}
 #endif
 
@@ -1363,3 +1249,7 @@ bool R_LoadCubeImages(const char *imgName, cubeFiles_t extensions, byte *pics[6]
 
 	return true;
 }
+
+#ifdef _USING_STB
+#include "image/Image_files_ext.cpp"
+#endif

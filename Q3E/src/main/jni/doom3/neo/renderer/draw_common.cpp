@@ -509,13 +509,28 @@ void RB_STD_T_RenderShaderPasses(const drawSurf_t *surf, const float mat[16])
 	const srfTriangles_t	*tri;
 	bool attrIsSet[TG_GLASSWARP - TG_EXPLICIT] = { false };
 	bool uniformIsSet[TG_GLASSWARP - TG_EXPLICIT] = { false };
+	bool newStageAttrIsSet[SHADER_NEW_STAGE_END - SHADER_NEW_STAGE_BEGIN + 1] = { false };
+	bool newStageUniformIsSet[SHADER_NEW_STAGE_END - SHADER_NEW_STAGE_BEGIN + 1] = { false };
 
 	tri = surf->geo;
 	shader = surf->material;
 
+#ifdef _NO_LIGHT
+	if(r_noLight.GetInteger() > 1)
+	{
+		if(!shader->HasAmbient() && !shader->ReceivesLighting())
+			return;
+	}
+	else
+	{
+		if(!shader->HasAmbient())
+			return;
+	}
+#else
 	if (!shader->HasAmbient()) {
 		return;
 	}
+#endif
 
 	if (shader->IsPortalSky()) {
 		return;
@@ -558,7 +573,7 @@ void RB_STD_T_RenderShaderPasses(const drawSurf_t *surf, const float mat[16])
 		pStage = shader->GetStage(stage);
 
 #ifdef _HUMANHEAD //k: scope view support
-		if(backEnd.scopeView /*tr.IsScopeView()*/)
+		if(tr.IsScopeView())
 		{
 			if(pStage->isNotScopeView)
 				continue;
@@ -568,7 +583,7 @@ void RB_STD_T_RenderShaderPasses(const drawSurf_t *surf, const float mat[16])
 			if(pStage->isScopeView)
 				continue;
 		}
-		if(!backEnd.shuttleView /*!tr.IsShuttleView()*/)
+		if(!tr.IsShuttleView())
 		{
 			if(pStage->isShuttleView)
 				continue;
@@ -591,19 +606,175 @@ void RB_STD_T_RenderShaderPasses(const drawSurf_t *surf, const float mat[16])
 		}
 
 		// skip the stages involved in lighting
+#ifdef _NO_LIGHT
+		if(r_noLight.GetInteger() > 1)
+		{
+			if(pStage->lighting != SL_AMBIENT && pStage->lighting != SL_DIFFUSE)
+				continue;
+		}
+		else
+		{
+			if(pStage->lighting != SL_AMBIENT)
+				continue;
+		}
+#else
 		if (pStage->lighting != SL_AMBIENT) {
 			continue;
 		}
+#endif
 
 		// skip if the stage is ( GL_ZERO, GL_ONE ), which is used for some alpha masks
 		if ((pStage->drawStateBits & (GLS_SRCBLEND_BITS|GLS_DSTBLEND_BITS)) == (GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE)) {
 			continue;
 		}
+#ifdef _RAVEN //karin: GLSL newShaderStage
+		// see if we are a new-style stage
+		rvNewShaderStage *newShaderStage = pStage->newShaderStage;
+
+		if (newShaderStage) {
+			//--------------------------
+			//
+			// new style stages GLSL
+			//
+			//--------------------------
+			if ( r_skipNewAmbient.GetBool() ) {
+				continue;
+			}
+
+			if(!newShaderStage->Bind(regs))
+				continue;
+
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_Vertex));
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_TexCoord));
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_Color));
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_Normal));
+
+			GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_Vertex), 3, GL_FLOAT, false, sizeof(idDrawVert), ac->xyz.ToFloatPtr());
+			GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_TexCoord), 2, GL_FLOAT, false, sizeof(idDrawVert), ac->st.ToFloatPtr());
+			GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_Color), 4, GL_UNSIGNED_BYTE, false, sizeof(idDrawVert), &ac->color);
+			GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_Normal), 3, GL_FLOAT, false, sizeof(idDrawVert), ac->normal.ToFloatPtr());
+
+			// set standard transformations
+			GL_UniformMatrix4fv(SHADER_PARM_ADDR(modelViewProjectionMatrix), mat);
+
+			GL_State( pStage->drawStateBits );
+
+			RB_DrawElementsWithCounters( tri );
+
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_Vertex));
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_TexCoord));
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_Color));
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_Normal));
+
+			newShaderStage->Unbind();
+
+			continue;
+		}
+#endif
 
 		// see if we are a new-style stage
 		newShaderStage_t *newStage = pStage->newStage;
 
 		if (newStage) {
+			//--------------------------
+			//
+			// new style stages
+			//
+			//--------------------------
+			if ( r_skipNewAmbient.GetBool() ) {
+				continue;
+			}
+
+			if(newStage->glslProgram <= 0)
+				continue;
+
+			const shaderProgram_t *shaderProgram = shaderManager->Find(newStage->glslProgram);
+			if(!shaderProgram)
+				continue;
+			GL_UseProgram((shaderProgram_t *)shaderProgram);
+			int type = shaderProgram->type;
+			assert(type >= SHADER_NEW_STAGE_BEGIN && type <= SHADER_NEW_STAGE_END);
+			int index = type - SHADER_NEW_STAGE_BEGIN;
+
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_Vertex));
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_TexCoord));
+			GL_EnableVertexAttribArray(SHADER_PARM_ADDR(attr_Color));
+
+			if(!newStageAttrIsSet[index])
+			{
+				GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_Vertex), 3, GL_FLOAT, false, sizeof(idDrawVert), ac->xyz.ToFloatPtr());
+				GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_TexCoord), 2, GL_FLOAT, false, sizeof(idDrawVert), ac->st.ToFloatPtr());
+				GL_VertexAttribPointer(SHADER_PARM_ADDR(attr_Color), 4, GL_UNSIGNED_BYTE, false, sizeof(idDrawVert), &ac->color);
+				newStageAttrIsSet[index] = true;
+			}
+
+			if(!newStageUniformIsSet[index])
+			{
+				// set standard transformations
+				GL_UniformMatrix4fv(SHADER_PARM_ADDR(modelViewProjectionMatrix), mat);
+				float projectionMatrix[16];
+				R_TransposeGLMatrix(backEnd.viewDef->projectionMatrix, projectionMatrix);
+				GL_UniformMatrix4fv(SHADER_PARM_ADDR(projectionMatrix), /*backEnd.viewDef->*/
+									projectionMatrix);
+
+				float modelViewMatrix[16];
+				R_TransposeGLMatrix(surf->space->modelViewMatrix, modelViewMatrix);
+				GL_UniformMatrix4fv(SHADER_PARM_ADDR(modelViewMatrix), /*drawSurf->space->*/
+									modelViewMatrix);
+
+				// we need the model matrix without it being combined with the view matrix
+				// so we can transform local vectors to global coordinates
+				idMat4 modelMatrix;
+				memcpy(&modelMatrix, surf->space->modelMatrix, sizeof(modelMatrix));
+				modelMatrix.TransposeSelf();
+				GL_UniformMatrix4fv(SHADER_PARM_ADDR(modelMatrix), modelMatrix.ToFloatPtr());
+
+				// obsolete: screen power of two correction factor, assuming the copy to _currentRender
+				// also copied an extra row and column for the bilerp
+				// if is pot, glUniform4f(1, 1, 0, 1);
+				// window coord to 0.0 to 1.0 conversion
+				RB_SetProgramEnvironment();
+				newStageUniformIsSet[index] = true;
+			}
+
+			//============================================================================
+
+			// setting local parameters (specified in material definition)
+			for ( int i = 0; i < newStage->numVertexParms; i++ ) {
+				idVec4 vparm;
+				for (int d = 0; d < 4; d++)
+					vparm[d] = regs[ newStage->vertexParms[i][d] ];
+				GL_Uniform4fv(SHADER_PARMS_ADDR(u_vertexParm, i), vparm.ToFloatPtr());
+			}
+
+			// setting textures
+			// note: the textures are also bound to TUs at this moment
+			for ( int i = 0; i < newStage->numFragmentProgramImages; i++ ) {
+				if ( newStage->fragmentProgramImages[i] ) {
+					GL_SelectTexture( i );
+					newStage->fragmentProgramImages[i]->Bind();
+					//GL_Uniform1i(SHADER_PARMS_ADDR(u_fragmentMap, i), i);
+				}
+			}
+
+			GL_State( pStage->drawStateBits );
+
+			RB_DrawElementsWithCounters( tri );
+
+			for ( int i = 0; i < newStage->numFragmentProgramImages; i++ ) {
+				if ( newStage->fragmentProgramImages[i] ) {
+					GL_SelectTexture( i );
+					globalImages->BindNull();
+					//GL_Uniform1i(SHADER_PARMS_ADDR(u_fragmentMap, i), i);
+				}
+			}
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_Vertex));
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_TexCoord));
+			GL_DisableVertexAttribArray(SHADER_PARM_ADDR(attr_Color));
+
+			GL_SelectTextureForce(0);
+			GL_UseProgram(NULL);
+
 			continue;
 		}
 
@@ -725,22 +896,38 @@ void RB_STD_T_RenderShaderPasses(const drawSurf_t *surf, const float mat[16])
 		RB_BindVariableStageImage(&pStage->texture, regs);
 
 		// set the state
-		if (r_noLight.GetBool())
-		{
-			if (pStage->drawStateBits!=9000)
-				GL_State(pStage->drawStateBits);
-			else
-			{
-				if (shader->TestMaterialFlag(MF_POLYGONOFFSET))
-				GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|GLS_DEPTHFUNC_LESS);
-				else
-				GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|backEnd.depthFunc);
-			}
-		}
+#ifdef _NO_LIGHT
+		if (r_noLight.GetBool() || shader->IsNoLight())
+        {
+            if (r_noLight.GetInteger() > 1 && !shader->IsNoLight())
+            {
+                if (pStage->lighting == SL_AMBIENT)
+                    GL_State(pStage->drawStateBits);
+                else
+                {
+                    if (shader->TestMaterialFlag(MF_POLYGONOFFSET))
+                        GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|GLS_DEPTHFUNC_LESS);
+                    else
+                        GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|backEnd.depthFunc);
+                }
+            }
+            else/* if (shader->IsNoLight())*/
+            {
+                if (pStage->drawStateBits!=9000)
+                    GL_State(pStage->drawStateBits);
+                else
+                {
+                    if (shader->TestMaterialFlag(MF_POLYGONOFFSET))
+                        GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|GLS_DEPTHFUNC_LESS);
+                    else
+                        GL_State(GLS_SRCBLEND_ONE|GLS_DSTBLEND_ONE|backEnd.depthFunc);
+                }
+            }
+            // else GL_State(pStage->drawStateBits);
+        }
 		else
-		{
-			GL_State(pStage->drawStateBits);
-		}
+#endif
+		GL_State(pStage->drawStateBits);
 
 		RB_PrepareStageTexturing(pStage, surf, ac);
 
@@ -789,13 +976,20 @@ int RB_STD_DrawShaderPasses(drawSurf_t **drawSurfs, int numDrawSurfs)
 
 	// if we are about to draw the first surface that needs
 	// the rendering in a texture, copy it over
-	if (drawSurfs[0]->material->GetSort() >= SS_POST_PROCESS) {
+	if (drawSurfs[0]->material->GetSort() >= SS_POST_PROCESS
+#ifdef _RAVEN //karin: sniper's blur is 2D and has flag `MF_NEED_CURRENT_RENDER`
+		|| drawSurfs[0]->material->TestMaterialFlag(MF_NEED_CURRENT_RENDER)
+#endif
+	) {
 		if (r_skipPostProcess.GetBool()) {
 			return 0;
 		}
 
 		// only dump if in a 3d view
-		if (backEnd.viewDef->viewEntitys) {
+#if !defined(_RAVEN) //karin: sniper's blur is 2D //TODO: check it for avoid unused operation
+		if (backEnd.viewDef->viewEntitys)
+#endif
+		{
 			globalImages->currentRenderImage->CopyFramebuffer(backEnd.viewDef->viewport.x1,
 			                backEnd.viewDef->viewport.y1,  backEnd.viewDef->viewport.x2 -  backEnd.viewDef->viewport.x1 + 1,
 			                backEnd.viewDef->viewport.y2 -  backEnd.viewDef->viewport.y1 + 1, true);
@@ -881,7 +1075,6 @@ RB_T_Shadow
 the shadow volumes face INSIDE
 =====================
 */
-static idCVar harm_r_shadowCarmackInverse("harm_r_shadowCarmackInverse", "0", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "[Harmattan]: Stencil shadow using Carmack-Inverse.");
 static void RB_T_Shadow(const drawSurf_t *surf)
 {
 	const srfTriangles_t	*tri;
@@ -1461,7 +1654,7 @@ a floating point value
 */
 void RB_STD_LightScale(void)
 {
-#warning RB_STD_LightScale
+//#warning RB_STD_LightScale
 #if 0	//!defined(GL_ES_VERSION_2_0)
 	float	v, f;
 
@@ -1559,7 +1752,9 @@ void	RB_STD_DrawView(void)
 	// main light renderer
 	qglEnable(GL_BLEND);
 
+#ifdef _NO_LIGHT
 	if (!r_noLight.GetBool())
+#endif
 		RB_GLSL_DrawInteractions();
 
 	// disable stencil shadow test

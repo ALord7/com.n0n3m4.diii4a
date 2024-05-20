@@ -1,17 +1,37 @@
 cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR) # 2.6
 project(doom3)
 
-add_definitions(-D__ANDROID__)
-add_definitions(-D_K_CLANG)
-add_definitions(-DID_ENABLE_CURL=1)
-#add_definitions(-DNO_ALSA)
-#add_definitions(-D__DOOM_DLL__)
-#add_definitions(-DHAVE_CONFIG_H)
+# -DCMAKE_TOOLCHAIN_FILE=D:/project/c/vcpkg/scripts/buildsystems/vcpkg.cmake
+set(COMPILE_CURL "1")
+set(CORE_DEFINES "__DOOM_DLL__")
+if(ANDROID)
+	add_definitions(-D__ANDROID__)
+	add_definitions(-D_NO_PTHREAD_CANCEL)
+	set(CORE_DEFINES "${CORE_DEFINES};NO_ALSA;_NO_GAMMA")
+elseif(WIN32)
+	find_package(CURL QUIET)
+	if(CURL_FOUND)
+		set(COMPILE_CURL "1")
+		include_directories(${CURL_INCLUDE_DIR})
+		message(STATUS "libcurl found and enabled")
+	else()
+		message(WARNING "libcurl not found, server downloads won't be available (apart from that doom3 will work)")
+		set(CURL_LIBRARY "")
+		set(COMPILE_CURL "0")
+	endif()
+	set(CORE_DEFINES "${CORE_DEFINES};NO_ALSA")
+else()
+	set(CORE_DEFINES "${CORE_DEFINES};_NO_GAMMA")
+	# apt-get install libasound2-dev # sound alsa support
+	# apt-get install libgles-dev # GLES2/GLES3/EGL headers
+endif()
+
+add_definitions(-D_K_CLANG) # TODO
+add_definitions(-DID_ENABLE_CURL=${COMPILE_CURL})
+
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CORE_DEFINES "__DOOM_DLL__;HAVE_CONFIG_H;NO_ALSA")
-
-# set(CMAKE_BUILD_TYPE "Release")
+# set(CMAKE_BUILD_TYPE "Debug")
 # TODO
 
 # osx: place game .dylib's in the bundle (next to the binary)
@@ -53,39 +73,64 @@ else()
 	set(CMAKE_SKIP_RPATH ON CACHE BOOL "Skip RPATH" FORCE)
 endif()
 
-set(DOOM3BINARY "dante")
+set(IDTECH4LIBRARY "idtech4")
 
 include(CheckCXXCompilerFlag)
 include(GNUInstallDirs OPTIONAL RESULT_VARIABLE GNUINSTALLDIRS)
 
-option(CORE			"Build the core" ON)
-option(DEDICATED	"Build the dedicated server" OFF)
-option(BASE			"Build the base game code" ON)
-option(D3XP			"Build the d3xp game code" ON)
-option(ONATIVE		"Optimize for the host CPU" OFF)
-option(REPRODUCIBLE_BUILD "Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds" OFF)
+if(MSVC)
+	option(TOOLS							"Build the tools game code (Visual Studio+SDL2 only)" OFF)
+endif()
+option(DEDICATED							"Build the dedicated server" 					OFF)
+option(ONATIVE								"Optimize for the host CPU" 					OFF)
+option(REPRODUCIBLE_BUILD 					"Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds" OFF)
 
-option(OPENSLES			"OpenSLES support" ON)
-option(MULTITHREAD			"Multi-Thread support" ON)
-option(USING_STB			"Using stb" ON)
-option(SUPPORT_OBJ			"Support obj model" ON)
-option(SUPPORT_DAE			"Support dae model" ON)
-option(SHADOW_MAPPING			"Shadow mapping support" ON)
-option(OPENGLES3			"OpenGLES3 support" ON)
+# Extras engine extensions
+if(ANDROID)
+	option(OPENSLES							"OpenSLES support"								ON)
+endif()
+option(OPENGLES3							"OpenGLES3 support"								ON)
+option(OPENAL								"OpenAL(soft, OpenSL as backend) support"		ON)
+option(MULTITHREAD							"Multi-Thread support"							ON)
+option(USING_STB							"Using stb"										ON)
+option(SUPPORT_OBJ							"Support obj model"								ON)
+option(SUPPORT_DAE							"Support dae model" 							ON)
+option(SHADOW_MAPPING						"Shadow mapping support" 						ON)
+option(NO_LIGHT								"r_noLight support" 							ON)
+option(TRANSLUCENT_STENCIL_SHADOW			"Translucent stencil shadow support" 			ON)
+option(EXTRAS_TOOLS							"Add extras commands" 							OFF)
+option(BREAK_60FPS_CAP						"Break 60 fps cap" 								OFF)
 
-option(D3LE			"Build the d3le game code" ON)
-option(CDOOM			"Build the cdoom game code" ON)
-option(RIVENSIN			"Build the rivensin game code" ON)
-option(HARDCORPS			"Build the hardcorps game code" ON)
-option(RAVEN_BSE_FX			"OpenBSE with Fx in Raven Quake 4" ON)
-option(QUAKE4			"Build the quake4 game code" ON)
-option(PREY			"Build the prey game code" ON)
-option(RAVEN			"Build the raven core" ON)
-option(HUMANHEAD			"Build the humanhead core" ON)
-option(OVERTHINKED			"Build the overthinked game code" OFF)
-option(SABOT			"Build the sabot game code" OFF)
-option(HEXENEOC			"Build the hexeneoc game code" OFF)
+# DOOM3 cores
+option(CORE									"Build the core" 								ON)
+option(BASE									"Build the base game code" 						ON)
+option(D3XP									"Build the d3xp game code" 						ON)
 
+# DOOM3 mods
+option(D3_MOD_FULL_BODY_AWARENESS			"Build doom3 full body awareness mod support" 	ON)
+option(D3LE									"Build the d3le game code" 						ON)
+option(CDOOM								"Build the cdoom game code" 					ON)
+option(RIVENSIN								"Build the rivensin game code" 					ON)
+option(HARDCORPS							"Build the hardcorps game code" 				ON)
+option(OVERTHINKED							"Build the overthinked game code" 				ON)
+option(SABOT								"Build the sabot game code" 					ON)
+option(HEXENEOC								"Build the hexeneoc game code" 					ON)
+option(FRAGGINGFREE							"Build the fraggingfree game code" 				ON)
+option(LIBRECOOP							"Build the librecoop game code" 				ON)
+
+# Quake4
+option(RAVEN								"Build the raven core" 							ON)
+option(RAVEN_BSE_FX							"OpenBSE with Fx in Raven Quake 4" 				ON)
+option(QUAKE4								"Build the quake4 game code" 					ON)
+option(Q4_MOD_FULL_BODY_AWARENESS			"Build quake4 full body awareness mod support" 	ON)
+option(Q4_MOD_BOTS							"Build quake4 bots mod support" 				ON)
+
+# Prey 2006
+option(HUMANHEAD							"Build the humanhead core" 						ON)
+option(PREY									"Build the prey game code" 						ON)
+option(PREY_MOD_FULL_BODY_AWARENESS			"Build prey full body awareness mod support" 	ON)
+
+# Print env
 if(OPENSLES)
 	add_definitions(-D_OPENSLES)
 	set(sys_libs ${sys_libs} OpenSLES)
@@ -102,6 +147,17 @@ if(OPENGLES3)
 	message(STATUS "Build OpenGLES3 support")
 endif()
 
+if(EXTRAS_TOOLS)
+	add_definitions(-D_EXTRAS_TOOLS)
+	message(STATUS "Build extras tools support")
+endif()
+
+if(BREAK_60FPS_CAP)
+	add_definitions(-D_BREAK_60FPS_CAP)
+	message(STATUS "Build break 60 fps cap support")
+endif()
+
+# Using traditional C++98
 set(CMAKE_CXX_STANDARD "98")
 
 if(NOT CMAKE_SYSTEM_PROCESSOR)
@@ -163,6 +219,14 @@ elseif(cpu MATCHES "[aA][rR][mM].*") # some kind of arm..
 endif()
 
 add_definitions(-DD3_ARCH="${cpu}" -DD3_SIZEOFPTR=${CMAKE_SIZEOF_VOID_P})
+# Stores in variable <var> either 1 or 0 indicating whether the target architecture is big or little endian.
+# test_big_endian(big_endian)
+if(CMAKE_CXX_BYTE_ORDER EQUAL BIG_ENDIAN)
+	set(big_endian, "1")
+else()
+	set(big_endian, "0")
+endif()
+add_definitions(-BUILD_IS_BIG_ENDIAN="${big_endian}")
 
 # target os
 if(APPLE)
@@ -187,13 +251,18 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # precompiled libraries from the dhewm3-libs repo
-if(DHEWM3LIBS)
+#[[if(DHEWM3LIBS)
 	if(CMAKE_CROSSCOMPILING)
 		set(CMAKE_FIND_ROOT_PATH ${DHEWM3LIBS})
 	else()
 		set(ENV{CMAKE_PREFIX_PATH} ${DHEWM3LIBS})
 	endif()
-endif()
+
+	# these are too stupid, give them a hint
+	set(ENV{OPENALDIR} ${DHEWM3LIBS})
+	set(ENV{SDLDIR} ${DHEWM3LIBS})
+	set(ENV{SDL2DIR} ${DHEWM3LIBS})
+endif()]]
 
 if(CMAKE_MAJOR_VERSION LESS 3 OR ( CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION LESS 8 ))
 	# cmake < 3.8 doesn't support source_group(TREE ...) so replace it with a dummy
@@ -201,7 +270,7 @@ if(CMAKE_MAJOR_VERSION LESS 3 OR ( CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_V
 	function(source_group)
 	endfunction()
 	message(STATUS "Using CMake < 3.8, doesn't support source_group(TREE ...), replacing it with a dummy")
-	message(STATUS "  (this is only relevants for IDEs, doesn't matter for just compiling dhewm3)")
+	message(STATUS "  (this is only relevants for IDEs, doesn't matter for just compiling doom3)")
 #else()
 #	message(STATUS "Using CMake >= 3.8, supports source_group(TREE ...)")
 endif()
@@ -210,70 +279,263 @@ endif()
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIRS})
 
+# OpenAL using internal OpenAL-soft
+#[[find_package(OpenAL REQUIRED)
+include_directories(${OPENAL_INCLUDE_DIR})]]
+
+
+if(WIN32)
+	# skip SDL2main
+	if(APPLE OR WIN32)
+		set(SDL2_BUILDING_LIBRARY TRUE)
+	endif()
+	find_package(SDL2 REQUIRED)
+	include_directories(${SDL2_INCLUDE_DIR})
+	set(SDLx_LIBRARY ${SDL2_LIBRARIES})
+	add_definitions(-D_SDL)
+	include_directories("externlibs/include")
+	set(sys_libs ${sys_libs} ${SDLx_LIBRARY})
+endif()
+
 if(REPRODUCIBLE_BUILD)
 	# don't use __DATE__ and __TIME__ macros so builds are reproducible
 	add_definitions(-DID_REPRODUCIBLE_BUILD)
 endif()
 
-# libbacktrace support - TODO: might work with MinGW? we don't have a crash handler for win32 though..
-include(CheckCSourceCompiles)
-set(CMAKE_REQUIRED_LIBRARIES backtrace)
-check_c_source_compiles( "#include <backtrace.h>
+
+# cURL using internal
+#[[find_package(CURL QUIET)
+if(CURL_FOUND)
+	set(ID_ENABLE_CURL ON)
+	include_directories(${CURL_INCLUDE_DIR})
+	message(STATUS "libcurl found and enabled")
+else()
+	message(WARNING "libcurl not found, server downloads won't be available (apart from that doom3 will work)")
+	set(ID_ENABLE_CURL OFF)
+	set(CURL_LIBRARY "")
+endif()]]
+
+if(MSVC)
+	# This is required for tools on windows.
+	find_package(MFC)
+
+	if(TOOLS AND NOT MFC_FOUND)
+		message(SEND_ERROR "MFC ('Microsoft Foundation Classes for C++') couldn't be found, but is needed for TOOLS!")
+		message(FATAL_ERROR "If you're using VS2013, you'll also need the 'Multibyte MFC Library for Visual Studio 2013': https://www.microsoft.com/en-us/download/details.aspx?id=40770 (VS2015 and 2017 include that in the default MFC package)")
+	endif()
+
+else() # not MSVC
+
+	if(NOT WIN32 AND NOT ANDROID)
+		# libbacktrace support - TODO: might work with MinGW? we don't have a crash handler for win32 though..
+		include(CheckCSourceCompiles)
+		set(CMAKE_REQUIRED_LIBRARIES backtrace)
+		check_c_source_compiles( "#include <backtrace.h>
 	int main() { backtrace_create_state(NULL, 0, NULL, NULL); return 0; }" HAVE_LIBBACKTRACE )
-unset(CMAKE_REQUIRED_LIBRARIES)
+		unset(CMAKE_REQUIRED_LIBRARIES)
+
+		if(HAVE_LIBBACKTRACE)
+			set(sys_libs ${sys_libs} backtrace)
+			add_definitions(-DD3_HAVE_LIBBACKTRACE)
+			message(STATUS "Using libbacktrace")
+		else()
+			message(WARNING "libbacktrace wasn't found. It's not required but recommended, because it provides useful backtraces if doom3 crashes")
+		endif()
+	endif() # NOT WIN32
+
+endif() # not MSVC
 
 # compiler specific flags
-add_compile_options(-pipe)
-#add_compile_options(-Wall)
-add_compile_options(-w)
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+	add_compile_options(-pipe)
+	#k add_compile_options(-Wall)
 
-if(NOT CMAKE_CROSSCOMPILING AND ONATIVE)
-	add_compile_options(-march=native)
-elseif(NOT APPLE AND cpu STREQUAL "x86")
-	add_compile_options(-march=pentium3)
-endif()
-
-set(CMAKE_C_FLAGS_DEBUG "-g -ggdb -D_DEBUG -O0")
-set(CMAKE_C_FLAGS_DEBUGALL "-g -ggdb -D_DEBUG")
-set(CMAKE_C_FLAGS_PROFILE "-g -ggdb -D_DEBUG -O1 -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -fno-math-errno -fno-trapping-math -fomit-frame-pointer")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -ggdb -O2 -fno-math-errno -fno-trapping-math -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_MINSIZEREL "-Os -fno-math-errno -fno-trapping-math -fomit-frame-pointer")
-
-set(CMAKE_CXX_FLAGS_DEBUGALL ${CMAKE_C_FLAGS_DEBUGALL})
-set(CMAKE_CXX_FLAGS_PROFILE ${CMAKE_C_FLAGS_PROFILE})
-
-add_compile_options(-fno-strict-aliasing)
-# dear idiot compilers, don't fuck up math code with useless FMA "optimizations"
-# (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100839)
-add_compile_options(-ffp-contract=off)
-
-if(NOT AROS)
-	CHECK_CXX_COMPILER_FLAG("-fvisibility=hidden" cxx_has_fvisibility)
-	if(NOT cxx_has_fvisibility)
-		message(FATAL_ERROR "Compiler does not support -fvisibility")
+	if(NOT CMAKE_CROSSCOMPILING AND ONATIVE)
+		add_compile_options(-march=native)
+	elseif(NOT APPLE AND cpu STREQUAL "x86")
+		add_compile_options(-march=pentium3)
 	endif()
-	add_compile_options(-fvisibility=hidden)
+
+	set(CMAKE_C_FLAGS_DEBUG "-g -ggdb -D_DEBUG -O0 -fPIC")
+	set(CMAKE_C_FLAGS_DEBUGALL "-g -ggdb -D_DEBUG -fPIC")
+	set(CMAKE_C_FLAGS_PROFILE "-g -ggdb -D_DEBUG -O1 -fno-omit-frame-pointer -fPIC")
+	set(CMAKE_C_FLAGS_RELEASE "-O2 -fno-math-errno -fno-trapping-math -fomit-frame-pointer -fPIC")
+	set(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -ggdb -O2 -fno-math-errno -fno-trapping-math -fno-omit-frame-pointer -fPIC")
+	set(CMAKE_C_FLAGS_MINSIZEREL "-Os -fno-math-errno -fno-trapping-math -fomit-frame-pointer -fPIC")
+
+	set(CMAKE_CXX_FLAGS_DEBUGALL ${CMAKE_C_FLAGS_DEBUGALL})
+	set(CMAKE_CXX_FLAGS_PROFILE ${CMAKE_C_FLAGS_PROFILE})
+
+	add_compile_options(-fno-strict-aliasing)
+	# dear idiot compilers, don't fuck up math code with useless FMA "optimizations"
+	# (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100839)
+	add_compile_options(-ffp-contract=off)
+
+	if(NOT AROS)
+		CHECK_CXX_COMPILER_FLAG("-fvisibility=hidden" cxx_has_fvisibility)
+		if(NOT cxx_has_fvisibility)
+			message(FATAL_ERROR "Compiler does not support -fvisibility")
+		endif()
+		add_compile_options(-fvisibility=hidden)
+	endif()
+
+	# TODO fix these warnings
+	add_compile_options(-Wno-sign-compare)
+	add_compile_options(-Wno-switch)
+	add_compile_options(-Wno-format-security)
+
+	#k ignore these
+	add_compile_options(-Wno-unknown-pragmas)
+	add_compile_options(-Wno-unused-private-field)
+	add_compile_options(-Wno-unused-variable)
+	#add_compile_options(-Wall)
+	#add_compile_options(-w)
+	add_compile_options(-Wno-local-type-template-args -Wno-parentheses-equality -Wno-unused-value)
+	add_compile_options(-Wno-self-assign-field -Wno-logical-not-parentheses -Wno-overloaded-virtual -Wno-c++11-compat-deprecated-writable-strings)
+	add_compile_options(-Wno-undefined-inline -Wno-null-conversion -Wno-extra-tokens -Wno-c++11-extensions)
+	if(NOT ANDROID)
+		CHECK_CXX_COMPILER_FLAG("-Woverloaded-virtual" cxx_has_Woverload_virtual)
+		if(cxx_has_Woverload_virtual)
+			add_compile_options(-Woverloaded-virtual)
+		endif()
+	endif()
+
+	# shut up about using memcpy() on classes, in the cases doom3 uses it it seems to be fine
+	CHECK_CXX_COMPILER_FLAG("-Wno-class-memaccess" cxx_has_Wno-class-memaccess)
+	if(cxx_has_Wno-class-memaccess)
+		add_compile_options(-Wno-class-memaccess)
+	endif()
+
+	if(AROS)
+		set(CMAKE_SHARED_LIBRARY_SUFFIX ".aros-${cpu}")
+		add_definitions(-DIOAPI_NO_64)
+	elseif(APPLE)
+		add_definitions(-DMACOS_X=1)
+
+		if(cpu STREQUAL "x86_64")
+			add_compile_options(-arch x86_64 -mmacosx-version-min=10.9)
+			set(ldflags "${ldflags} -arch x86_64 -mmacosx-version-min=10.9")
+		elseif(cpu STREQUAL "arm64")
+			add_compile_options(-arch arm64 -mmacosx-version-min=11.0)
+			set(ldflags "${ldflags} -arch arm64 -mmacosx-version-min=11.0")
+		elseif(cpu STREQUAL "x86")
+			CHECK_CXX_COMPILER_FLAG("-arch i386" cxx_has_arch_i386)
+			if(cxx_has_arch_i386)
+				add_compile_options(-arch i386)
+				set(ldflags "${ldflags} -arch i386")
+			endif()
+
+			add_compile_options(-mmacosx-version-min=10.4)
+			set(ldflags "${ldflags} -mmacosx-version-min=10.4")
+		elseif(cpu STREQUAL "ppc")
+			CHECK_CXX_COMPILER_FLAG("-arch ppc" cxx_has_arch_ppc)
+			if(cxx_has_arch_ppc)
+				add_compile_options(-arch ppc -mone-byte-bool)
+				set(ldflags "${ldflags} -arch ppc -mone-byte-bool")
+			endif()
+
+			add_compile_options(-mmacosx-version-min=10.4)
+			set(ldflags "${ldflags} -mmacosx-version-min=10.4")
+		else()
+			message(FATAL_ERROR "Unsupported CPU architecture for OSX")
+		endif()
+
+		set(sys_libs ${sys_libs} "-framework Carbon -framework Cocoa -framework IOKit")
+	elseif(WIN32)
+		set(ldflags "${ldflags} -static-libgcc -static-libstdc++")
+	elseif(os STREQUAL "linux")
+		set(sys_libs ${sys_libs} dl)
+	elseif(os STREQUAL "freebsd")
+		find_library(EXECINFO_LIBRARIES execinfo /usr/lib /usr/local/lib)
+		set(sys_libs ${sys_libs} ${EXECINFO_LIBRARIES})
+	endif()
+elseif(MSVC)
+	add_compile_options(/MP) # parallel build (use all cores, or as many as configured in VS)
+
+	add_compile_options(/W3) # TODO: was /W4, caused trouble with VS2019 (and/or its integrated CMake? or only HarrieVG's setup?)
+	add_compile_options(/we4840) # treat as error when passing a class to a vararg-function (probably printf-like)
+	# treat several kinds of truncating int<->pointer conversions as errors (for more 64bit-safety)
+	add_compile_options(/we4306 /we4311 /we4312 /we4302)
+	# ignore the following warnings:
+	add_compile_options(/wd4100) # unreferenced formal parameter
+	add_compile_options(/wd4127) # conditional expression is constant
+	add_compile_options(/wd4244) # possible loss of data
+	add_compile_options(/wd4245) # signed/unsigned mismatch
+	add_compile_options(/wd4267) # possible loss of data
+	add_compile_options(/wd4714) # 'function' marked as __forceinline not inlined
+	add_compile_options(/wd4996) # 'function': was declared deprecated
+	add_compile_options(/wd4068) # unknown pragma
+	add_compile_options(/wd4458) # declaration of 'variable' hides class member
+	add_definitions(-D_ALLOW_KEYWORD_MACROS) # because of the "#define private public" and "#define protected public" in TypeInfo.cpp
+	set(CMAKE_C_FLAGS_DEBUG "-D_DEBUG /Od /Zi /MDd")
+	set(CMAKE_C_FLAGS_RELEASE "/Ox /Oy /MD")
+	set(CMAKE_C_FLAGS_RELWITHDEBINFO "/Ox /Oy /Zi /MD")
+	set(CMAKE_C_FLAGS_MINSIZEREL "/Ox /Oy /Os /MD")
+else()
+	message(FATAL_ERROR "Unsupported compiler")
 endif()
 
-# TODO fix these warnings
-add_compile_options(-Wno-sign-compare)
-add_compile_options(-Wno-switch)
-add_compile_options(-Wno-format-security)
-# ignore these
-add_compile_options(-Wno-unknown-pragmas)
-add_compile_options(-Wno-unused-private-field)
-add_compile_options(-Wno-unused-variable)
+set(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+# disable assertions in release builds
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG ${CMAKE_C_FLAGS_RELEASE}")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "-DNDEBUG ${CMAKE_C_FLAGS_MINSIZEREL}")
 
-CHECK_CXX_COMPILER_FLAG("-Woverloaded-virtual" cxx_has_Woverload_virtual)
-if(cxx_has_Woverload_virtual)
-	add_compile_options(-Woverloaded-virtual)
+# mingw and msvc
+if(WIN32)
+	add_definitions(-DWINVER=0x0501)
+	add_definitions(-D_WIN32_WINNT=0x0501)
+
+	set(sys_libs ${sys_libs}
+			winmm
+			iphlpapi
+			wsock32
+			ole32
+			dsound ksuser #k
+			)
+elseif(ANDROID)
+	set(sys_libs ${sys_libs} android dl EGL z)
+else() #TODO linux
+	set(sys_libs ${sys_libs} X11 dl EGL z pthread)
 endif()
 
-# shut up about using memcpy() on classes, in the cases doom3 uses it it seems to be fine
-CHECK_CXX_COMPILER_FLAG("-Wno-class-memaccess" cxx_has_Wno-class-memaccess)
-if(cxx_has_Wno-class-memaccess)
-	add_compile_options(-Wno-class-memaccess)
+# fallback for cmake versions without GNUInstallDirs
+if(GNUINSTALLDIRS MATCHES "NOTFOUND")
+	set(CMAKE_INSTALL_BINDIR		"bin"
+			CACHE PATH "user executables (bin)")
+	set(CMAKE_INSTALL_LIBDIR		"lib${LIB_SUFFIX}"
+			CACHE PATH "object code libraries (lib${LIB_SUFFIX})")
+	set(CMAKE_INSTALL_DATAROOTDIR	"share"
+			CACHE PATH "read-only architecture-independent data root (share)")
+	set(CMAKE_INSTALL_DATADIR		"${CMAKE_INSTALL_DATAROOTDIR}"
+			CACHE PATH "read-only architecture-independent data (DATAROOTDIR)")
+
+	mark_as_advanced(CMAKE_INSTALL_BINDIR CMAKE_INSTALL_LIBDIR CMAKE_INSTALL_DATAROOTDIR CMAKE_INSTALL_DATADIR)
+	foreach(dir BINDIR LIBDIR DATAROOTDIR DATADIR)
+		if(NOT IS_ABSOLUTE ${CMAKE_INSTALL_${dir}})
+			set(CMAKE_INSTALL_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_${dir}}")
+		else()
+			set(CMAKE_INSTALL_FULL_${dir} "${CMAKE_INSTALL_${dir}}")
+		endif()
+	endforeach()
+endif()
+
+set(bindir		"${CMAKE_INSTALL_FULL_BINDIR}")
+set(libdir		"${CMAKE_INSTALL_FULL_LIBDIR}")
+set(datadir		"${CMAKE_INSTALL_FULL_DATADIR}")
+
+#[[configure_file(
+		"${CMAKE_SOURCE_DIR}/config.h.in"
+		"${CMAKE_BINARY_DIR}/config.h"
+)]]
+
+message(STATUS "Building ${CMAKE_BUILD_TYPE} for ${os}-${cpu}")
+
+if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+	message(STATUS "The install target will use the following directories:")
+	message(STATUS "  Binary directory:  ${bindir}")
+	message(STATUS "  Library directory: ${libdir}")
+	message(STATUS "  Data directory:    ${datadir}")
 endif()
 
 # I'm a bit sloppy with headers and just glob them in..
@@ -285,9 +547,16 @@ function(add_globbed_headers SRCLIST PATHPREFIX)
 	set(${SRCLIST} ${tmp_hdrs} ${${SRCLIST}})
 endfunction()
 
-set(sys_libs ${sys_libs} dl)
-set(sys_libs ${sys_libs} EGL android z)
-set(local_libs ogg curl)
+set(local_libs static_ogg)
+if(COMPILE_CURL STREQUAL "1")
+	if(NOT WIN32)
+		set(local_libs ${local_libs} static_curl)
+	else()
+		set(sys_libs ${sys_libs} ${CURL_LIBRARY})
+	endif()
+	message(STATUS "Build cURL")
+endif()
+
 if(USING_STB)
 	set(CORE_DEFINES "${CORE_DEFINES};_USING_STB")
 	message(STATUS "Using stb jpeg image")
@@ -304,6 +573,23 @@ if(SHADOW_MAPPING)
 	set(CORE_DEFINES "${CORE_DEFINES};_SHADOW_MAPPING")
 	message(STATUS "Add shadow mapping support")
 endif()
+if(NO_LIGHT)
+	set(CORE_DEFINES "${CORE_DEFINES};_NO_LIGHT")
+	message(STATUS "Add r_noLight support")
+endif()
+if(TRANSLUCENT_STENCIL_SHADOW)
+	set(CORE_DEFINES "${CORE_DEFINES};_TRANSLUCENT_STENCIL_SHADOW")
+	message(STATUS "Add translucent stencil shadow support")
+endif()
+
+if(OPENAL)
+	if(ANDROID)
+		add_subdirectory (externlibs/openal-soft)
+	endif()
+	add_definitions(-D_OPENAL -D_OPENAL_EFX -D_OPENAL_SOFT)
+	message(STATUS "Build OpenAL(soft) support")
+endif()
+
 #//k jpeg
 set(src_jpeg
 		externlibs/jpeg-8d/jaricom.c
@@ -356,47 +642,9 @@ set(src_jpeg
 
 add_globbed_headers(src_jpeg "externlibs/jpeg-8d")
 include_directories("externlibs/jpeg-8d")
-add_library(jpeg STATIC ${src_jpeg})
+add_library(static_jpeg STATIC ${src_jpeg})
 
-set(local_libs ${local_libs} jpeg)
-
-set(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
-# disable assertions in release builds
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG ${CMAKE_C_FLAGS_RELEASE}")
-set(CMAKE_CXX_FLAGS_MINSIZEREL "-DNDEBUG ${CMAKE_C_FLAGS_MINSIZEREL}")
-
-# fallback for cmake versions without GNUInstallDirs
-if(GNUINSTALLDIRS MATCHES "NOTFOUND")
-	set(CMAKE_INSTALL_BINDIR		"bin"
-		CACHE PATH "user executables (bin)")
-	set(CMAKE_INSTALL_LIBDIR		"lib${LIB_SUFFIX}"
-		CACHE PATH "object code libraries (lib${LIB_SUFFIX})")
-	set(CMAKE_INSTALL_DATAROOTDIR	"share"
-		CACHE PATH "read-only architecture-independent data root (share)")
-	set(CMAKE_INSTALL_DATADIR		"${CMAKE_INSTALL_DATAROOTDIR}"
-		CACHE PATH "read-only architecture-independent data (DATAROOTDIR)")
-
-	mark_as_advanced(CMAKE_INSTALL_BINDIR CMAKE_INSTALL_LIBDIR CMAKE_INSTALL_DATAROOTDIR CMAKE_INSTALL_DATADIR)
-	foreach(dir BINDIR LIBDIR DATAROOTDIR DATADIR)
-		if(NOT IS_ABSOLUTE ${CMAKE_INSTALL_${dir}})
-			set(CMAKE_INSTALL_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_${dir}}")
-		else()
-			set(CMAKE_INSTALL_FULL_${dir} "${CMAKE_INSTALL_${dir}}")
-		endif()
-	endforeach()
-endif()
-
-set(bindir		"${CMAKE_INSTALL_FULL_BINDIR}")
-set(libdir		"${CMAKE_INSTALL_FULL_LIBDIR}/doom3")
-set(datadir		"${CMAKE_INSTALL_FULL_DATADIR}/doom3")
-
-message(STATUS "Building ${CMAKE_BUILD_TYPE} for ${os}-${cpu}")
-
-message(STATUS "The install target will use the following directories:")
-message(STATUS "  Binary directory:  ${bindir}")
-message(STATUS "  Library directory: ${libdir}")
-message(STATUS "  Data directory:    ${datadir}")
+set(local_libs ${local_libs} static_jpeg)
 
 set(src_renderer
 	renderer/Cinematic.cpp
@@ -447,10 +695,10 @@ set(src_renderer
 	renderer/tr_trace.cpp
 	renderer/tr_trisurf.cpp
 	renderer/tr_turboshadow.cpp
-	renderer/etc_android.cpp
-	renderer/etc_rg_etc1.cpp
+	renderer/etc/etc_android.cpp
+	renderer/etc/etc_rg_etc1.cpp
 	renderer/tr_rendertools.cpp
-	renderer/esTransform.c
+    renderer/matrix/esTransform.c
 )
 
 add_globbed_headers(src_renderer "renderer")
@@ -721,566 +969,118 @@ function(set_src_dir DSTLIST PATHPREFIX SRCLIST)
 	set(${DSTLIST} ${list} PARENT_SCOPE)
 endfunction()
 
-# base
-set(src_game ${base_game_src})
-set_src_dir(src_game "game" ${src_game})
-add_globbed_headers(src_game "game")
-
-# d3xp
-set(src_d3xp ${base_game_src})
-set(d3xp_game_src
-		Grabber.cpp
-		physics/Force_Grab.cpp
-		)
-list(APPEND src_d3xp ${d3xp_game_src})
-set_src_dir(src_d3xp "d3xp" ${src_d3xp})
-add_globbed_headers(src_d3xp "d3xp")
-
-# d3le
-set(src_d3le ${base_game_src})
-set(d3le_game_src
-		Grabber.cpp
-		physics/Force_Grab.cpp
-		)
-list(APPEND src_d3le ${d3le_game_src})
-set_src_dir(src_d3le "d3le" ${src_d3le})
-add_globbed_headers(src_d3le "d3le")
-
-# cdoom
-set(src_cdoom ${base_game_src})
-set_src_dir(src_cdoom "cdoom" ${src_cdoom})
-add_globbed_headers(src_cdoom "cdoom")
-
-# rivensin
-set(src_rivensin ${base_game_src})
-set(rivensin_game_src
-		Grabber.cpp
-		tracer.cpp
-		TrailGenerator.cpp
-		PlayerCursor.cpp
-		ai/AI_bot.cpp
-		physics/Force_Grab.cpp
-		)
-list(APPEND src_rivensin ${rivensin_game_src})
-set_src_dir(src_rivensin "rivensin" ${src_rivensin})
-add_globbed_headers(src_rivensin "rivensin")
-
-# hardcorps
-set(src_hardcorps ${base_game_src})
-set(hardcorps_game_src
-		Liquid.cpp
-		tracer.cpp
-		TrailGenerator.cpp
-		ai/AI_bot.cpp
-		physics/Physics_Liquid.cpp
-		)
-list(APPEND src_hardcorps ${hardcorps_game_src})
-set_src_dir(src_hardcorps "hardcorps" ${src_hardcorps})
-add_globbed_headers(src_hardcorps "hardcorps")
-
-# overthinked
-set(src_overthinked ${base_game_src})
-set(overthinked_game_src
-		tracer.cpp
-		)
-list(APPEND src_overthinked ${overthinked_game_src})
-set_src_dir(src_overthinked "overthinked" ${src_overthinked})
-add_globbed_headers(src_overthinked "overthinked")
-
-# sabot
-set(src_sabot ${base_game_src})
-set(sabot_game_src
-		Grabber.cpp
-		physics/Force_Grab.cpp
-		bots/BotAASBuild.cpp
-		bots/BotAI.cpp
-		bots/BotSabot.cpp
-		)
-list(APPEND src_sabot ${sabot_game_src})
-set_src_dir(src_sabot "sabot" ${src_sabot})
-add_globbed_headers(src_sabot "sabot")
-
-# hexeneoc
-set(src_hexeneoc ${base_game_src})
-set(hexeneoc_game_src
-		PlayerArtifacts.cpp
-		PlayerScriptEvents.cpp
-		ai/AI_Golem.cpp
-		ai/AI_Shadowspawn.cpp
-		ai/AI_Veloxite.cpp
-		objects/Leaf.cpp
-		objects/LeafEmitter.cpp
-		objects/Tree.cpp
-		projectiles/FireStorm.cpp
-		projectiles/Soul.cpp
-		projectiles/Wraithverge.cpp
-		)
-list(APPEND src_hexeneoc ${hexeneoc_game_src})
-set_src_dir(src_hexeneoc "hexeneoc" ${src_hexeneoc})
-add_globbed_headers(src_hexeneoc "hexeneoc")
-
-# quake4
-set(src_quake4 ${base_game_src})
-set(quake4_game_src
-	Effect.cpp
-	FreeView.cpp
-	Game_Debug.cpp
-	Game_Log.cpp
-	Healing_Station.cpp
-	IconManager.cpp
-	Instance.cpp
-	Playback.cpp
-	Player_Cheats.cpp
-	Player_States.cpp
-	spawner.cpp
-	SplineMover.cpp
-	Icon.cpp
-	LipSync.cpp
-	TramGate.cpp
-	gamesys/State.cpp
-	script/ScriptFuncUtility.cpp
-	vehicle/Vehicle.cpp
-	vehicle/VehicleAnimated.cpp
-	vehicle/VehicleController.cpp
-	vehicle/VehicleDriver.cpp
-	vehicle/VehicleMonster.cpp
-	vehicle/VehicleParts.cpp
-	vehicle/VehiclePosition.cpp
-	vehicle/VehicleRigid.cpp
-	vehicle/VehicleSpline.cpp
-	vehicle/VehicleStatic.cpp
-	vehicle/Vehicle_DropPod.cpp
-	vehicle/Vehicle_Walker.cpp
-	client/ClientAFEntity.cpp
-	client/ClientEffect.cpp
-	client/ClientEntity.cpp
-	client/ClientModel.cpp
-	client/ClientMoveable.cpp
-	ai/AAS_Find.cpp
-	ai/Monster_Berserker.cpp
-	ai/Monster_BossBuddy.cpp
-	ai/Monster_BossMakron.cpp
-	ai/Monster_ConvoyGround.cpp
-	ai/Monster_ConvoyHover.cpp
-	ai/Monster_FailedTransfer.cpp
-	ai/Monster_Fatty.cpp
-	ai/Monster_Gladiator.cpp
-	ai/Monster_Grunt.cpp
-	ai/Monster_Gunner.cpp
-	ai/Monster_Harvester.cpp
-	ai/Monster_HarvesterDispersal.cpp
-	ai/Monster_HeavyHoverTank.cpp
-	ai/Monster_IronMaiden.cpp
-	ai/Monster_LightTank.cpp
-	ai/Monster_NetworkGuardian.cpp
-	ai/Monster_RepairBot.cpp
-	ai/Monster_Scientist.cpp
-	ai/Monster_Sentry.cpp
-	ai/Monster_SlimyTransfer.cpp
-	ai/Monster_StreamProtector.cpp
-	ai/Monster_StroggFlyer.cpp
-	ai/Monster_StroggHover.cpp
-	ai/Monster_StroggMarine.cpp
-	ai/Monster_TeleportDropper.cpp
-	ai/Monster_Turret.cpp
-	ai/Monster_TurretFlying.cpp
-	ai/AI_Actions.cpp
-	ai/AI_Announcements.cpp
-	ai/AI_Debug.cpp
-	ai/AI_Manager.cpp
-	ai/AI_Medic.cpp
-	ai/AI_Move.cpp
-	ai/AI_States.cpp
-	ai/AI_Tactical.cpp
-	ai/AI_Util.cpp
-	ai/VehicleAI.cpp
-	ai/AAS_tactical.cpp
-	weapon/WeaponBlaster.cpp
-	weapon/WeaponGrenadeLauncher.cpp
-	weapon/WeaponMachinegun.cpp
-	weapon/WeaponRailgun.cpp
-	weapon/WeaponDarkMatterGun.cpp
-	weapon/WeaponHyperblaster.cpp
-	weapon/WeaponNailgun.cpp
-	weapon/WeaponRocketLauncher.cpp
-	weapon/WeaponGauntlet.cpp
-	weapon/WeaponLightningGun.cpp
-	weapon/WeaponNapalmGun.cpp
-	weapon/WeaponShotgun.cpp
-	mp/Buying.cpp
-	mp/CTF.cpp
-	mp/GameState.cpp
-	mp/Tourney.cpp
-	mp/VoiceComms.cpp
-	mp/stats/StatEvent.cpp
-	mp/stats/StatManager.cpp
-	mp/stats/StatWindow.cpp
-	physics/Physics_Particle.cpp
-	physics/Physics_VehicleMonster.cpp
-	bots/BotAASBuild.cpp
-	bots/BotAI.cpp
-	bots/BotSabot.cpp
-		)
-list(REMOVE_ITEM src_quake4
-		Fx.cpp
-		PlayerIcon.cpp
-		SmokeParticles.cpp
-		ai/AI_Vagary.cpp
-		gamesys/TypeInfo.cpp
-		)
-list(APPEND src_quake4 ${quake4_game_src})
-set_src_dir(src_quake4 "quake4" ${src_quake4})
-add_globbed_headers(src_quake4 "quake4")
-
-# prey
-set(src_prey ${base_game_src})
-set(prey_game_src
-	EntityAdditions.cpp
-	physics/Physics_PreyPlayer.cpp
-	Prey/ai_centurion.cpp
-	Prey/ai_crawler.cpp
-	Prey/ai_creaturex.cpp
-	Prey/ai_droid.cpp
-	Prey/ai_gasbag_simple.cpp
-	Prey/ai_harvester_simple.cpp
-	Prey/ai_hunter_simple.cpp
-	Prey/ai_inspector.cpp
-	Prey/ai_jetpack_harvester_simple.cpp
-	Prey/ai_keeper_simple.cpp
-	Prey/ai_mutate.cpp
-	Prey/ai_mutilatedhuman.cpp
-	Prey/ai_passageway.cpp
-	Prey/ai_possessedTommy.cpp
-	Prey/ai_reaction.cpp
-	Prey/ai_spawncase.cpp
-	Prey/ai_speech.cpp
-	Prey/ai_sphereboss.cpp
-	Prey/anim_baseanim.cpp
-	Prey/force_converge.cpp
-	Prey/game_afs.cpp
-	Prey/game_alarm.cpp
-	Prey/game_anim.cpp
-	Prey/game_animBlend.cpp
-	Prey/game_animDriven.cpp
-	Prey/game_animatedentity.cpp
-	Prey/game_animatedgui.cpp
-	Prey/game_animator.cpp
-	Prey/game_arcadegame.cpp
-	Prey/game_barrel.cpp
-	Prey/game_bindController.cpp
-	Prey/game_blackjack.cpp
-	Prey/game_cards.cpp
-	Prey/game_cilia.cpp
-	Prey/game_console.cpp
-	Prey/game_damagetester.cpp
-	Prey/game_dda.cpp
-	Prey/game_deathwraith.cpp
-	Prey/game_debrisspawner.cpp
-	Prey/game_dock.cpp
-	Prey/game_dockedgun.cpp
-	Prey/game_door.cpp
-	Prey/game_eggspawner.cpp
-	Prey/game_energynode.cpp
-	Prey/game_entityfx.cpp
-	Prey/game_entityspawner.cpp
-	Prey/game_events.cpp
-	Prey/game_fixedpod.cpp
-	Prey/game_forcefield.cpp
-	Prey/game_fxinfo.cpp
-	Prey/game_gibbable.cpp
-	Prey/game_gravityswitch.cpp
-	Prey/game_guihand.cpp
-	Prey/game_gun.cpp
-	Prey/game_hand.cpp
-	Prey/game_handcontrol.cpp
-	Prey/game_healthbasin.cpp
-	Prey/game_healthspore.cpp
-	Prey/game_inventory.cpp
-	Prey/game_itemautomatic.cpp
-	Prey/game_itemcabinet.cpp
-	Prey/game_jukebox.cpp
-	Prey/game_jumpzone.cpp
-	Prey/game_light.cpp
-	Prey/game_lightfixture.cpp
-	Prey/game_mine.cpp
-	Prey/game_misc.cpp
-	Prey/game_modeldoor.cpp
-	Prey/game_modeltoggle.cpp
-	Prey/game_monster_ai.cpp
-	Prey/game_monster_ai_events.cpp
-	Prey/game_mountedgun.cpp
-	Prey/game_moveable.cpp
-	Prey/game_mover.cpp
-	Prey/game_note.cpp
-	Prey/game_organtrigger.cpp
-	Prey/game_player.cpp
-	Prey/game_playerview.cpp
-	Prey/game_pod.cpp
-	Prey/game_podspawner.cpp
-	Prey/game_poker.cpp
-	Prey/game_portal.cpp
-	Prey/game_portalframe.cpp
-	Prey/game_proxdoor.cpp
-	Prey/game_rail.cpp
-	Prey/game_railshuttle.cpp
-	Prey/game_renderentity.cpp
-	Prey/game_safeDeathVolume.cpp
-	Prey/game_securityeye.cpp
-	Prey/game_shuttle.cpp
-	Prey/game_shuttledock.cpp
-	Prey/game_shuttletransport.cpp
-	Prey/game_skybox.cpp
-	Prey/game_slots.cpp
-	Prey/game_sphere.cpp
-	Prey/game_spherepart.cpp
-	Prey/game_spring.cpp
-	Prey/game_sunCorona.cpp
-	Prey/game_talon.cpp
-	Prey/game_targetproxy.cpp
-	Prey/game_targets.cpp
-	Prey/game_trackmover.cpp
-	Prey/game_trigger.cpp
-	Prey/game_tripwire.cpp
-	Prey/game_utils.cpp
-	Prey/game_vehicle.cpp
-	Prey/game_vomiter.cpp
-	Prey/game_weaponHandState.cpp
-	Prey/game_woundmanager.cpp
-	Prey/game_wraith.cpp
-	Prey/game_zone.cpp
-	Prey/particles_particles.cpp
-	Prey/physics_delta.cpp
-	Prey/physics_preyai.cpp
-	Prey/physics_preyparametric.cpp
-	Prey/physics_simple.cpp
-	Prey/physics_vehicle.cpp
-	Prey/prey_animator.cpp
-	Prey/prey_baseweapons.cpp
-	Prey/prey_beam.cpp
-	Prey/prey_bonecontroller.cpp
-	Prey/prey_camerainterpolator.cpp
-	Prey/prey_firecontroller.cpp
-	Prey/prey_game.cpp
-	Prey/prey_items.cpp
-	Prey/prey_liquid.cpp
-	Prey/prey_local.cpp
-	Prey/prey_projectile.cpp
-	Prey/prey_projectileautocannon.cpp
-	Prey/prey_projectilebounce.cpp
-	Prey/prey_projectilebug.cpp
-	Prey/prey_projectilebugtrigger.cpp
-	Prey/prey_projectilecocoon.cpp
-	Prey/prey_projectilecrawlergrenade.cpp
-	Prey/prey_projectilefreezer.cpp
-	Prey/prey_projectilegasbagpod.cpp
-	Prey/prey_projectilehiderweapon.cpp
-	Prey/prey_projectilemine.cpp
-	Prey/prey_projectilerifle.cpp
-	Prey/prey_projectilerocketlauncher.cpp
-	Prey/prey_projectileshuttle.cpp
-	Prey/prey_projectilesoulcannon.cpp
-	Prey/prey_projectilespiritarrow.cpp
-	Prey/prey_projectiletracking.cpp
-	Prey/prey_projectiletrigger.cpp
-	Prey/prey_projectilewrench.cpp
-	Prey/prey_script_thread.cpp
-	Prey/prey_sound.cpp
-	Prey/prey_soundleadincontroller.cpp
-	Prey/prey_spiritbridge.cpp
-	Prey/prey_spiritproxy.cpp
-	Prey/prey_spiritsecret.cpp
-	Prey/prey_vehiclefirecontroller.cpp
-	Prey/prey_weapon.cpp
-	Prey/prey_weaponautocannon.cpp
-	Prey/prey_weaponcrawlergrenade.cpp
-	Prey/prey_weaponfirecontroller.cpp
-	Prey/prey_weaponhider.cpp
-	Prey/prey_weaponrifle.cpp
-	Prey/prey_weaponrocketlauncher.cpp
-	Prey/prey_weaponsoulstripper.cpp
-	Prey/prey_weaponspiritbow.cpp
-	Prey/sys_debugger.cpp
-	Prey/sys_preycmds.cpp
-		)
-list(REMOVE_ITEM src_prey
-		ai/AI_Vagary.cpp
-		)
-list(APPEND src_prey ${prey_game_src})
-set_src_dir(src_prey "prey" ${src_prey})
-add_globbed_headers(src_prey "prey")
-
-# raven
-set(raven_idlib_src
-		raven/idlib/LexerFactory.cpp
-		raven/idlib/TextCompiler.cpp
-		raven/idlib/math/Radians.cpp
-		)
-
-set(raven_renderer_src
-		raven/bse/Model_bse.cpp
-		)
-set(raven_framework_src
-		raven/framework/DeclLipSync.cpp
-		raven/framework/DeclPlayback.cpp
-		raven/framework/DeclMatType.cpp
-		raven/framework/DeclPlayerModel.cpp
-		)
-set(raven_fx_bse_src
-		raven/bse/BSE_Fx.cpp
-		raven/bse/BSE_Manager.cpp
-		raven/bse/BSE_Decl.cpp
-		raven/bse/BSE_Particle.cpp
-		)
-set(raven_null_bse_src
-		raven/bse/BSE_Null.cpp
-		)
-
-set(src_core_raven
-		${src_renderer}
-		${raven_renderer_src}
-		${src_framework}
-		${raven_framework_src}
-		${src_cm}
-		${src_aas}
-		${src_roq}
-		${src_snd}
-		${src_ui}
-		${src_tools}
-		${src_renderbump}
-		${src_dmap}
-		)
-if(RAVEN_BSE_FX)
-	list(APPEND src_core_raven ${raven_fx_bse_src})
-else()
-	list(APPEND src_core_raven ${raven_null_bse_src})
-endif()
-add_globbed_headers(raven_renderer_src "raven")
-add_globbed_headers(raven_framework_src "raven")
-add_globbed_headers(raven_fx_bse_src "raven")
-add_globbed_headers(raven_null_bse_src "raven")
-
-# humanhead
-set(humanhead_idlib_src
-		humanhead/idlib/math/prey_math.cpp
-		)
-set(humanhead_renderer_src
-		humanhead/renderer/Model_hhBeam.cpp
-		)
-set(humanhead_framework_src
-		humanhead/framework/declPreyBeam.cpp
-		)
-set(humanhead_ui_src
-		humanhead/ui/TabWindow.cpp
-		humanhead/ui/TabContainerWindow.cpp
-		)
-
-set(src_core_humanhead
-		${src_renderer}
-		${humanhead_renderer_src}
-		${src_framework}
-		${humanhead_framework_src}
-		${humanhead_ui_src}
-		${src_cm}
-		${src_aas}
-		${src_roq}
-		${src_snd}
-		${src_ui}
-		${src_tools}
-		${src_renderbump}
-		${src_dmap}
-		)
-add_globbed_headers(humanhead_renderer_src "humanhead")
-add_globbed_headers(humanhead_framework_src "humanhead")
+set(MOD_DIR "mod")
+set(DOOM3_MOD_DIR "${MOD_DIR}/doom3")
+set(QUAKE4_MOD_DIR "${MOD_DIR}/quake4")
+set(PREY_MOD_DIR "${MOD_DIR}/prey")
 
 include_directories("externlibs")
-#//k curl
-set(src_curl
-	externlibs/curl/lib/base64.c
-	externlibs/curl/lib/connect.c
-	externlibs/curl/lib/cookie.c
-	externlibs/curl/lib/dict.c
-	externlibs/curl/lib/easy.c
-	externlibs/curl/lib/escape.c
-	externlibs/curl/lib/file.c
-	externlibs/curl/lib/formdata.c
-	externlibs/curl/lib/ftp.c
-	externlibs/curl/lib/getdate.c
-	externlibs/curl/lib/getenv.c
-	externlibs/curl/lib/getinfo.c
-	externlibs/curl/lib/hash.c
-	externlibs/curl/lib/hostip.c
-	externlibs/curl/lib/http.c
-	externlibs/curl/lib/http_chunks.c
-	externlibs/curl/lib/if2ip.c
-	externlibs/curl/lib/krb4.c
-	externlibs/curl/lib/ldap.c
-	externlibs/curl/lib/llist.c
-	externlibs/curl/lib/memdebug.c
-	externlibs/curl/lib/mprintf.c
-	externlibs/curl/lib/multi.c
-	externlibs/curl/lib/netrc.c
-	externlibs/curl/lib/progress.c
-	externlibs/curl/lib/security.c
-	externlibs/curl/lib/sendf.c
-	externlibs/curl/lib/share.c
-	externlibs/curl/lib/speedcheck.c
-	externlibs/curl/lib/ssluse.c
-	externlibs/curl/lib/strequal.c
-	externlibs/curl/lib/strtok.c
-	externlibs/curl/lib/telnet.c
-	externlibs/curl/lib/timeval.c
-	externlibs/curl/lib/transfer.c
-	externlibs/curl/lib/url.c
-	externlibs/curl/lib/version.c
-	externlibs/curl/lib/http_digest.c
-	externlibs/curl/lib/http_ntlm.c
-	externlibs/curl/lib/inet_pton.c
-	externlibs/curl/lib/md5.c
-	externlibs/curl/lib/content_encoding.c
-)
 
-add_globbed_headers(src_curl "externlibs/curl/lib")
-include_directories("externlibs/curl/lib")
-include_directories("externlibs/curl/include")
-add_library(curl STATIC ${src_curl})
-set_target_properties(curl PROPERTIES COMPILE_DEFINITIONS "HAVE_CONFIG_H")
+if(NOT WIN32)
+	if(COMPILE_CURL STREQUAL "1")
+		#//k curl
+		set(src_curl
+			externlibs/curl/lib/base64.c
+			externlibs/curl/lib/connect.c
+			externlibs/curl/lib/cookie.c
+			externlibs/curl/lib/dict.c
+			externlibs/curl/lib/easy.c
+			externlibs/curl/lib/escape.c
+			externlibs/curl/lib/file.c
+			externlibs/curl/lib/formdata.c
+			externlibs/curl/lib/ftp.c
+			externlibs/curl/lib/getdate.c
+			externlibs/curl/lib/getenv.c
+			externlibs/curl/lib/getinfo.c
+			externlibs/curl/lib/hash.c
+			externlibs/curl/lib/hostip.c
+			externlibs/curl/lib/http.c
+			externlibs/curl/lib/http_chunks.c
+			externlibs/curl/lib/if2ip.c
+			externlibs/curl/lib/krb4.c
+			externlibs/curl/lib/ldap.c
+			externlibs/curl/lib/llist.c
+			externlibs/curl/lib/memdebug.c
+			externlibs/curl/lib/mprintf.c
+			externlibs/curl/lib/multi.c
+			externlibs/curl/lib/netrc.c
+			externlibs/curl/lib/progress.c
+			externlibs/curl/lib/security.c
+			externlibs/curl/lib/sendf.c
+			externlibs/curl/lib/share.c
+			externlibs/curl/lib/speedcheck.c
+			externlibs/curl/lib/ssluse.c
+			externlibs/curl/lib/strequal.c
+			externlibs/curl/lib/strtok.c
+			externlibs/curl/lib/telnet.c
+			externlibs/curl/lib/timeval.c
+			externlibs/curl/lib/transfer.c
+			externlibs/curl/lib/url.c
+			externlibs/curl/lib/version.c
+			externlibs/curl/lib/http_digest.c
+			externlibs/curl/lib/http_ntlm.c
+			externlibs/curl/lib/inet_pton.c
+			externlibs/curl/lib/md5.c
+			externlibs/curl/lib/content_encoding.c
+		)
 
-#//k ogg
+		add_globbed_headers(src_curl "externlibs/curl/lib")
+		include_directories("externlibs/curl/lib")
+		include_directories("externlibs/curl/include")
+		add_library(static_curl STATIC ${src_curl})
+		set(CURL_DEFINES "HAVE_CONFIG_H") # without autoconf
+		INCLUDE(CheckFunctionExists)
+		check_function_exists(strlcat HAVE_STRLCAT)
+		if(NOT HAVE_STRLCAT)
+			set(CURL_DEFINES "${CURL_DEFINES};_NOT_HAVE_STRLCAT")
+			message(STATUS "No strlcat for cURL")
+		else()
+			message(STATUS "Have strlcat for cURL")
+		endif()
+		set_target_properties(static_curl PROPERTIES COMPILE_DEFINITIONS "${CURL_DEFINES}")
+		target_link_libraries(static_curl z)
+	endif()
+endif()
+
+# Build internal ogg/vorbis
 set(src_ogg
-	externlibs/libogg/bitwise.c
-	externlibs/libogg/framing.c
-	externlibs/libogg/analysis.c
-	externlibs/libogg/floor1.c
-	externlibs/libogg/psy.c
-	externlibs/libogg/tone.c
-	externlibs/libogg/barkmel.c
-	externlibs/libogg/info.c
-	externlibs/libogg/vorbisenc.c
-	externlibs/libogg/bitrate.c
-	externlibs/libogg/lookup.c
-	externlibs/libogg/registry.c
-	externlibs/libogg/vorbisfile.c
-	externlibs/libogg/block.c
-	externlibs/libogg/lpc.c
-	externlibs/libogg/res0.c
-	externlibs/libogg/window.c
-	externlibs/libogg/codebook.c
-	externlibs/libogg/lsp.c
-	externlibs/libogg/sharedbook.c
-	externlibs/libogg/envelope.c
-	externlibs/libogg/mapping0.c
-	externlibs/libogg/smallft.c
-	externlibs/libogg/floor0.c
-	externlibs/libogg/mdct.c
-	externlibs/libogg/synthesis.c
+	externlibs/libogg/src/bitwise.c
+	externlibs/libogg/src/framing.c
+	externlibs/libvorbis/lib/analysis.c
+	externlibs/libvorbis/lib/floor1.c
+	externlibs/libvorbis/lib/psy.c
+	# externlibs/libvorbis/lib/tone.c
+	# externlibs/libvorbis/lib/barkmel.c
+	externlibs/libvorbis/lib/info.c
+	externlibs/libvorbis/lib/vorbisenc.c
+	externlibs/libvorbis/lib/bitrate.c
+	externlibs/libvorbis/lib/lookup.c
+	externlibs/libvorbis/lib/registry.c
+	externlibs/libvorbis/lib/vorbisfile.c
+	externlibs/libvorbis/lib/block.c
+	externlibs/libvorbis/lib/lpc.c
+	externlibs/libvorbis/lib/res0.c
+	externlibs/libvorbis/lib/window.c
+	externlibs/libvorbis/lib/codebook.c
+	externlibs/libvorbis/lib/lsp.c
+	externlibs/libvorbis/lib/sharedbook.c
+	externlibs/libvorbis/lib/envelope.c
+	externlibs/libvorbis/lib/mapping0.c
+	externlibs/libvorbis/lib/smallft.c
+	externlibs/libvorbis/lib/floor0.c
+	externlibs/libvorbis/lib/mdct.c
+	externlibs/libvorbis/lib/synthesis.c
 )
 
 add_globbed_headers(src_ogg "externlibs/libogg")
-include_directories("externlibs/libogg")
-include_directories("sys/android/ogg")
-include_directories("sys/android/vorbis")
+add_globbed_headers(src_ogg "externlibs/libvorbis")
+include_directories("externlibs/libogg/include")
+include_directories("externlibs/libvorbis/include")
 include_directories("sys/android")
-add_library(ogg STATIC ${src_ogg})
+add_library(static_ogg STATIC ${src_ogg})
+target_include_directories(static_ogg PRIVATE "externlibs/libogg/include/ogg")
+target_include_directories(static_ogg PRIVATE "externlibs/libvorbis/include/vorbis")
+target_include_directories(static_ogg PRIVATE "externlibs/libvorbis/lib")
 
 set(src_core
 	${src_renderer}
@@ -1316,47 +1116,103 @@ set(src_sys_base
 	sys/posix/posix_threads.cpp
 	sys/posix/posix_signal.cpp
 	sys/posix/posix_input.cpp
-	sys/android/main.cpp
-	sys/android/sound.cpp
 	sys/linux/gl_extensions.cpp
-	sys/android/input.cpp
 )
 
-set(src_sys_core
-	sys/android/gles2.cpp
-)
+if(ANDROID)
+	set(src_sys_base
+		${src_sys_base}
+		sys/android/main.cpp
+		sys/android/sound.cpp
+		sys/android/input.cpp
+	)
+	set(src_sys_core
+		sys/android/glimp.cpp
+	)
+elseif(WIN32)
+	set(src_sys_base
+			sys/sys_local.cpp
+			sys/sdl/threads.cpp
+			sys/sdl/events.cpp
+			sys/sdl/cpu.cpp
+			sys/sdl/sdl.cpp
+			)
+	set(src_sys_base
+			${src_sys_base}
+			sys/win32/win_input.cpp
+			sys/win32/win_main.cpp
+			sys/win32/win_net.cpp
+			sys/win32/win_shared.cpp
+			sys/win32/win_syscon.cpp
+			sys/win32/SDL_win32_main.c
+			sys/win32/win_aros.cpp
+			sys/win32/win_cpu.cpp
+			sys/win32/win_snd.cpp
+			)
+	set(src_sys_core
+			sys/sdl/glimp.cpp
+			)
+else()
+	set(src_sys_base
+		${src_sys_base}
+		sys/linux/main.cpp
+		sys/linux/input.cpp
+		sys/linux/sound.cpp
+		sys/linux/sound_alsa.cpp
+	)
+	set(src_sys_core
+		sys/linux/gles2.cpp
+	)
+endif()
 
 include_directories(${CMAKE_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Build idlib static
+# idSoftware
 add_library(idlib STATIC ${src_idlib})
-set_target_properties(idlib PROPERTIES COMPILE_FLAGS "-fPIC")
+if(NOT MSVC)
+	set_target_properties(idlib PROPERTIES COMPILE_FLAGS "-fPIC")
+endif()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_idlib})
 
 # raven
 if(RAVEN OR QUAKE4)
-set(src_idlib_raven
-		${src_idlib}
-		${raven_idlib_src}
-		)
-add_library(idlib_raven STATIC ${src_idlib_raven})
-set_target_properties(idlib_raven PROPERTIES COMPILE_FLAGS "-fPIC")
-set_target_properties(idlib_raven PROPERTIES COMPILE_DEFINITIONS "_RAVEN")
+	set(raven_idlib_src
+			raven/idlib/LexerFactory.cpp
+			raven/idlib/TextCompiler.cpp
+			raven/idlib/math/Radians.cpp
+			)
+	set(src_idlib_raven
+			${src_idlib}
+			${raven_idlib_src}
+			)
+	add_library(idlib_raven STATIC ${src_idlib_raven})
+	if(NOT MSVC)
+		set_target_properties(idlib_raven PROPERTIES COMPILE_FLAGS "-fPIC")
+	endif()
+	set_target_properties(idlib_raven PROPERTIES COMPILE_DEFINITIONS "_RAVEN")
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_idlib_raven})
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_idlib_raven})
 endif()
+
 # humanhead
 if(HUMANHEAD OR PREY)
-set(src_idlib_humanhead
-		${src_idlib}
-		${humanhead_idlib_src}
-		)
-add_library(idlib_humanhead STATIC ${src_idlib_humanhead})
-set_target_properties(idlib_humanhead PROPERTIES COMPILE_FLAGS "-fPIC")
-set_target_properties(idlib_humanhead PROPERTIES COMPILE_DEFINITIONS "_HUMANHEAD;HUMANHEAD")
+	set(humanhead_idlib_src
+			humanhead/idlib/math/prey_math.cpp
+			)
+	set(src_idlib_humanhead
+			${src_idlib}
+			${humanhead_idlib_src}
+			)
+	add_library(idlib_humanhead STATIC ${src_idlib_humanhead})
+	if(NOT MSVC)
+		set_target_properties(idlib_humanhead PROPERTIES COMPILE_FLAGS "-fPIC")
+	endif()
+	set_target_properties(idlib_humanhead PROPERTIES COMPILE_DEFINITIONS "_HUMANHEAD;HUMANHEAD")
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_idlib_humanhead})
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_idlib_humanhead})
 endif()
 
 if(CORE)
@@ -1389,6 +1245,12 @@ endif()
 if(HEXENEOC)
 	message(STATUS "Build hexeneoc")
 endif()
+if(FRAGGINGFREE)
+	message(STATUS "Build fraggingfree")
+endif()
+if(LIBRECOOP)
+	message(STATUS "Build librecoop")
+endif()
 if(RAVEN)
 	message(STATUS "Build raven core")
 endif()
@@ -1411,15 +1273,30 @@ message(STATUS "build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "-l: ${sys_libs}")
 message(STATUS "-l(static): ${local_libs}")
 
-#message(FATAL_ERROR "stop!!!!!!!!!!!!!!!!!!!!")
+message(STATUS "pointer size: ${CMAKE_SIZEOF_VOID_P}")
+message(STATUS "CORE_DEFINES: ${CORE_DEFINES}")
+message(STATUS "ldflags: ${ldflags}")
+
+#message(FATAL_ERROR "STOP")
 
 if(CORE)
-	add_library(${DOOM3BINARY} SHARED
-		${src_core}
-		${src_sys_base}
-		${src_sys_core}
-		${src_editor_tools}
-	)
+	if(ANDROID)
+		set(DOOM3BINARY ${IDTECH4LIBRARY})
+		add_library(${IDTECH4LIBRARY} SHARED
+				${src_core}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+				)
+	else()
+		set(DOOM3BINARY "Doom3")
+		add_executable(${DOOM3BINARY}
+				${src_core}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+				)
+	endif()
 
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_core} ${src_sys_base} ${src_sys_core} ${src_editor_tools})
 
@@ -1432,33 +1309,57 @@ if(CORE)
 		${local_libs}
 	)
 
-	install(TARGETS ${DOOM3BINARY}
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS ${DOOM3BINARY}
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(BASE)
+	# base
+	set(src_game ${base_game_src})
+	set_src_dir(src_game "game" ${src_game})
+	add_globbed_headers(src_game "game")
+
 	add_library(game SHARED ${src_game})
 	
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_game})
 	
 	#set_target_properties(game PROPERTIES PREFIX "")
-	set_target_properties(game PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_MOD_FULL_BODY_AWARENESS")
+	set(d3_compile_definitions "GAME_DLL")
+	if(D3_MOD_FULL_BODY_AWARENESS)
+		set(d3_compile_definitions "${d3_compile_definitions};_MOD_FULL_BODY_AWARENESS")
+		message(STATUS "Build doom3 full body awareness mod support")
+	endif()
+	set_target_properties(game PROPERTIES COMPILE_DEFINITIONS "${d3_compile_definitions}")
 	target_include_directories(game PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/game")
 	set_target_properties(game PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(game PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(game idlib)
 
-	install(TARGETS game
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS game
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(D3XP)
+	# d3xp
+	set(src_d3xp ${base_game_src})
+	set(d3xp_game_src
+			Grabber.cpp
+			physics/Force_Grab.cpp
+			)
+	list(APPEND src_d3xp ${d3xp_game_src})
+	set_src_dir(src_d3xp "d3xp" ${src_d3xp})
+	add_globbed_headers(src_d3xp "d3xp")
+
 	add_library(d3xp SHARED ${src_d3xp})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_d3xp})
 	#set_target_properties(d3xp PROPERTIES PREFIX "")
@@ -1468,148 +1369,355 @@ if(D3XP)
 	set_target_properties(d3xp PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(d3xp idlib)
 
-	install(TARGETS d3xp
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS d3xp
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(D3LE)
+	# d3le
+	set(src_d3le ${base_game_src})
+	set(d3le_game_src
+			Grabber.cpp
+			physics/Force_Grab.cpp
+			)
+	list(APPEND src_d3le ${d3le_game_src})
+	set_src_dir(src_d3le "${DOOM3_MOD_DIR}/d3le" ${src_d3le})
+	add_globbed_headers(src_d3le "${DOOM3_MOD_DIR}/d3le")
+
 	add_library(d3le SHARED ${src_d3le})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_d3le})
 	#set_target_properties(d3le PROPERTIES PREFIX "")
 	set_target_properties(d3le PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_D3XP;CTF;_D3LE")
-	target_include_directories(d3le PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/d3le")
+	target_include_directories(d3le PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/d3le")
 	set_target_properties(d3le PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(d3le PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(d3le idlib)
 
-	install(TARGETS d3le
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS d3le
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(CDOOM)
+	# cdoom
+	set(src_cdoom ${base_game_src})
+	set_src_dir(src_cdoom "${DOOM3_MOD_DIR}/cdoom" ${src_cdoom})
+	add_globbed_headers(src_cdoom "${DOOM3_MOD_DIR}/cdoom")
+
 	add_library(cdoom SHARED ${src_cdoom})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_cdoom})
 	#set_target_properties(cdoom PROPERTIES PREFIX "")
 	set_target_properties(cdoom PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_CDOOM")
-	target_include_directories(cdoom PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cdoom")
+	target_include_directories(cdoom PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/cdoom")
 	set_target_properties(cdoom PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(cdoom PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(cdoom idlib)
 
-	install(TARGETS cdoom
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS cdoom
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(RIVENSIN)
+	# rivensin
+	set(src_rivensin ${base_game_src})
+	set(rivensin_game_src
+			Grabber.cpp
+			tracer.cpp
+			TrailGenerator.cpp
+			PlayerCursor.cpp
+			ai/AI_bot.cpp
+			physics/Force_Grab.cpp
+			)
+	list(APPEND src_rivensin ${rivensin_game_src})
+	set_src_dir(src_rivensin "${DOOM3_MOD_DIR}/rivensin" ${src_rivensin})
+	add_globbed_headers(src_rivensin "${DOOM3_MOD_DIR}/rivensin")
+
 	add_library(rivensin SHARED ${src_rivensin})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_rivensin})
 	#set_target_properties(rivensin PROPERTIES PREFIX "")
 	set_target_properties(rivensin PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_RIVENSIN;_DENTONMOD;_PORTALSKY;_HDR")
-	target_include_directories(rivensin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/rivensin")
+	target_include_directories(rivensin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/rivensin")
 	set_target_properties(rivensin PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(rivensin PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(rivensin idlib)
 
-	install(TARGETS rivensin
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS rivensin
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(HARDCORPS)
+	# hardcorps
+	set(src_hardcorps ${base_game_src})
+	set(hardcorps_game_src
+			Liquid.cpp
+			tracer.cpp
+			TrailGenerator.cpp
+			ai/AI_bot.cpp
+			physics/Physics_Liquid.cpp
+			)
+	list(APPEND src_hardcorps ${hardcorps_game_src})
+	set_src_dir(src_hardcorps "${DOOM3_MOD_DIR}/hardcorps" ${src_hardcorps})
+	add_globbed_headers(src_hardcorps "${DOOM3_MOD_DIR}/hardcorps")
+
 	add_library(hardcorps SHARED ${src_hardcorps})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_hardcorps})
 	#set_target_properties(hardcorps PROPERTIES PREFIX "")
 	set_target_properties(hardcorps PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_HARDCORPS;_DENTONMOD;_PORTALSKY;_WATER_PHYSICS")
-	target_include_directories(hardcorps PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hardcorps")
+	target_include_directories(hardcorps PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/hardcorps")
 	set_target_properties(hardcorps PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(hardcorps PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(hardcorps idlib)
 
-	install(TARGETS hardcorps
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS hardcorps
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(OVERTHINKED)
+	# overthinked
+	set(src_overthinked ${base_game_src})
+	set(overthinked_game_src
+			tracer.cpp
+			)
+	list(APPEND src_overthinked ${overthinked_game_src})
+	set_src_dir(src_overthinked "${DOOM3_MOD_DIR}/overthinked" ${src_overthinked})
+	add_globbed_headers(src_overthinked "${DOOM3_MOD_DIR}/overthinked")
+
 	add_library(overthinked SHARED ${src_overthinked})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_overthinked})
 	#set_target_properties(overthinked PROPERTIES PREFIX "")
 	set_target_properties(overthinked PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_OVERTHINKED;_DENTONMOD;_PORTALSKY")
-	target_include_directories(overthinked PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/overthinked")
+	target_include_directories(overthinked PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/overthinked")
 	set_target_properties(overthinked PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(overthinked PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(overthinked idlib)
 
-	install(TARGETS overthinked
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS overthinked
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(SABOT)
+	# sabot
+	set(src_sabot ${base_game_src})
+	set(sabot_game_src
+			Grabber.cpp
+			physics/Force_Grab.cpp
+			bots/BotAASBuild.cpp
+			bots/BotAI.cpp
+			bots/BotSabot.cpp
+			)
+	list(APPEND src_sabot ${sabot_game_src})
+	set_src_dir(src_sabot "${DOOM3_MOD_DIR}/sabot" ${src_sabot})
+	add_globbed_headers(src_sabot "${DOOM3_MOD_DIR}/sabot")
+
 	add_library(sabot SHARED ${src_sabot})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_sabot})
 	#set_target_properties(sabot PROPERTIES PREFIX "")
 	set_target_properties(sabot PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_SABOT;MOD_BOTS;_PORTALSKY;_D3XP;CTF")
-	target_include_directories(sabot PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sabot")
+	target_include_directories(sabot PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/sabot")
 	set_target_properties(sabot PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(sabot PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(sabot idlib)
 
-	install(TARGETS sabot
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS sabot
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(HEXENEOC)
+	# hexeneoc
+	set(src_hexeneoc ${base_game_src})
+	set(hexeneoc_game_src
+			PlayerArtifacts.cpp
+			PlayerScriptEvents.cpp
+			ai/AI_Golem.cpp
+			ai/AI_Shadowspawn.cpp
+			ai/AI_Veloxite.cpp
+			objects/Leaf.cpp
+			objects/LeafEmitter.cpp
+			objects/Tree.cpp
+			projectiles/FireStorm.cpp
+			projectiles/Soul.cpp
+			projectiles/Wraithverge.cpp
+			)
+	list(APPEND src_hexeneoc ${hexeneoc_game_src})
+	set_src_dir(src_hexeneoc "${DOOM3_MOD_DIR}/hexeneoc" ${src_hexeneoc})
+	add_globbed_headers(src_hexeneoc "${DOOM3_MOD_DIR}/hexeneoc")
+
 	add_library(hexeneoc SHARED ${src_hexeneoc})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_hexeneoc})
 	#set_target_properties(hexeneoc PROPERTIES PREFIX "")
 	set_target_properties(hexeneoc PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_HEXENEOC")
-	target_include_directories(hexeneoc PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hexeneoc")
+	target_include_directories(hexeneoc PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/hexeneoc")
 	set_target_properties(hexeneoc PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(hexeneoc PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(hexeneoc idlib)
 
-	install(TARGETS hexeneoc
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS hexeneoc
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
+endif()
+
+if(FRAGGINGFREE)
+	# fraggingfree
+	set(src_fraggingfree ${base_game_src})
+	set(fraggingfree_game_src
+			Grabber.cpp
+			physics/Force_Grab.cpp
+			tracer.cpp
 			)
+	list(APPEND src_fraggingfree ${fraggingfree_game_src})
+	set_src_dir(src_fraggingfree "${DOOM3_MOD_DIR}/fraggingfree" ${src_fraggingfree})
+	add_globbed_headers(src_fraggingfree "${DOOM3_MOD_DIR}/fraggingfree")
+
+	add_library(fraggingfree SHARED ${src_fraggingfree})
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_fraggingfree})
+	#set_target_properties(fraggingfree PROPERTIES PREFIX "")
+	set_target_properties(fraggingfree PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_D3XP;CTF;_FRAGGINGFREE;_DENTONMOD;_PORTALSKY")
+	target_include_directories(fraggingfree PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/fraggingfree")
+	set_target_properties(fraggingfree PROPERTIES LINK_FLAGS "${ldflags}")
+	set_target_properties(fraggingfree PROPERTIES INSTALL_NAME_DIR "@executable_path")
+	target_link_libraries(fraggingfree idlib)
+
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS fraggingfree
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
+endif()
+
+if(LIBRECOOP)
+	# librecoop
+	set(src_librecoop ${base_game_src})
+	set_src_dir(src_librecoop "${DOOM3_MOD_DIR}/librecoop" ${src_librecoop})
+	add_globbed_headers(src_librecoop "${DOOM3_MOD_DIR}/librecoop")
+
+	add_library(librecoop SHARED ${src_librecoop})
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_librecoop})
+	#set_target_properties(librecoop PROPERTIES PREFIX "")
+	set_target_properties(librecoop PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_LIBRECOOP")
+	target_include_directories(librecoop PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/${DOOM3_MOD_DIR}/librecoop")
+	set_target_properties(librecoop PROPERTIES LINK_FLAGS "${ldflags}")
+	set_target_properties(librecoop PROPERTIES INSTALL_NAME_DIR "@executable_path")
+	target_link_libraries(librecoop idlib)
+
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS librecoop
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(RAVEN)
-	set(QUAKE4BINARY "${DOOM3BINARY}_raven")
-	add_library(${QUAKE4BINARY} SHARED
-			${src_core_raven}
-			${src_sys_base}
-			${src_sys_core}
-			${src_editor_tools}
+	# raven engine source
+	set(raven_renderer_src
+			raven/bse/Model_bse.cpp
+			raven/renderer/NewShaderStage.cpp
 			)
+	set(raven_framework_src
+			raven/framework/DeclLipSync.cpp
+			raven/framework/DeclPlayback.cpp
+			raven/framework/DeclMatType.cpp
+			raven/framework/DeclPlayerModel.cpp
+			)
+	set(raven_fx_bse_src
+			raven/bse/BSE_Fx.cpp
+			raven/bse/BSE_Manager.cpp
+			raven/bse/BSE_Decl.cpp
+			raven/bse/BSE_Particle.cpp
+			)
+	set(raven_null_bse_src
+			raven/bse/BSE_Null.cpp
+			)
+	set(src_core_raven
+			${src_renderer}
+			${raven_renderer_src}
+			${src_framework}
+			${raven_framework_src}
+			${src_cm}
+			${src_aas}
+			${src_roq}
+			${src_snd}
+			${src_ui}
+			${src_tools}
+			${src_renderbump}
+			${src_dmap}
+			)
+	if(RAVEN_BSE_FX)
+		list(APPEND src_core_raven ${raven_fx_bse_src})
+	else()
+		list(APPEND src_core_raven ${raven_null_bse_src})
+	endif()
+	add_globbed_headers(raven_renderer_src "raven")
+	add_globbed_headers(raven_framework_src "raven")
+	add_globbed_headers(raven_fx_bse_src "raven")
+	add_globbed_headers(raven_null_bse_src "raven")
+
+	if(ANDROID)
+		set(QUAKE4BINARY "${IDTECH4LIBRARY}_raven")
+		add_library(${QUAKE4BINARY} SHARED
+				${src_core_raven}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+				)
+	else()
+		set(QUAKE4BINARY "Quake4")
+		add_executable(${QUAKE4BINARY}
+				${src_core_raven}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+		)
+	endif()
 
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_core_raven} ${src_sys_base} ${src_sys_core} ${src_editor_tools})
 
+	set(raven_compile_definitions "_RAVEN")
 	if(RAVEN_BSE_FX)
-		set_target_properties(${QUAKE4BINARY} PROPERTIES COMPILE_DEFINITIONS "_RAVEN;_RAVEN_FX;${CORE_DEFINES}")
-	else()
-		set_target_properties(${QUAKE4BINARY} PROPERTIES COMPILE_DEFINITIONS "_RAVEN;${CORE_DEFINES}")
+		set(raven_compile_definitions "${raven_compile_definitions};_RAVEN_FX")
 	endif()
+	set_target_properties(${QUAKE4BINARY} PROPERTIES COMPILE_DEFINITIONS "${raven_compile_definitions};${CORE_DEFINES}")
 	set_target_properties(${QUAKE4BINARY} PROPERTIES LINK_FLAGS "${ldflags}")
 
 	target_link_libraries(${QUAKE4BINARY}
@@ -1618,40 +1726,206 @@ if(RAVEN)
 			${local_libs}
 			)
 
-	install(TARGETS ${QUAKE4BINARY}
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS ${QUAKE4BINARY}
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(QUAKE4)
+	# quake4 game source
+	set(src_quake4 ${base_game_src})
+	set(quake4_game_src
+			Effect.cpp
+			FreeView.cpp
+			Game_Debug.cpp
+			Game_Log.cpp
+			Healing_Station.cpp
+			IconManager.cpp
+			Instance.cpp
+			Playback.cpp
+			Player_Cheats.cpp
+			Player_States.cpp
+			spawner.cpp
+			SplineMover.cpp
+			Icon.cpp
+			LipSync.cpp
+			TramGate.cpp
+			gamesys/State.cpp
+			script/ScriptFuncUtility.cpp
+			vehicle/Vehicle.cpp
+			vehicle/VehicleAnimated.cpp
+			vehicle/VehicleController.cpp
+			vehicle/VehicleDriver.cpp
+			vehicle/VehicleMonster.cpp
+			vehicle/VehicleParts.cpp
+			vehicle/VehiclePosition.cpp
+			vehicle/VehicleRigid.cpp
+			vehicle/VehicleSpline.cpp
+			vehicle/VehicleStatic.cpp
+			vehicle/Vehicle_DropPod.cpp
+			vehicle/Vehicle_Walker.cpp
+			client/ClientAFEntity.cpp
+			client/ClientEffect.cpp
+			client/ClientEntity.cpp
+			client/ClientModel.cpp
+			client/ClientMoveable.cpp
+			ai/AAS_Find.cpp
+			ai/Monster_Berserker.cpp
+			ai/Monster_BossBuddy.cpp
+			ai/Monster_BossMakron.cpp
+			ai/Monster_ConvoyGround.cpp
+			ai/Monster_ConvoyHover.cpp
+			ai/Monster_FailedTransfer.cpp
+			ai/Monster_Fatty.cpp
+			ai/Monster_Gladiator.cpp
+			ai/Monster_Grunt.cpp
+			ai/Monster_Gunner.cpp
+			ai/Monster_Harvester.cpp
+			ai/Monster_HarvesterDispersal.cpp
+			ai/Monster_HeavyHoverTank.cpp
+			ai/Monster_IronMaiden.cpp
+			ai/Monster_LightTank.cpp
+			ai/Monster_NetworkGuardian.cpp
+			ai/Monster_RepairBot.cpp
+			ai/Monster_Scientist.cpp
+			ai/Monster_Sentry.cpp
+			ai/Monster_SlimyTransfer.cpp
+			ai/Monster_StreamProtector.cpp
+			ai/Monster_StroggFlyer.cpp
+			ai/Monster_StroggHover.cpp
+			ai/Monster_StroggMarine.cpp
+			ai/Monster_TeleportDropper.cpp
+			ai/Monster_Turret.cpp
+			ai/Monster_TurretFlying.cpp
+			ai/AI_Actions.cpp
+			ai/AI_Announcements.cpp
+			ai/AI_Debug.cpp
+			ai/AI_Manager.cpp
+			ai/AI_Medic.cpp
+			ai/AI_Move.cpp
+			ai/AI_States.cpp
+			ai/AI_Tactical.cpp
+			ai/AI_Util.cpp
+			ai/VehicleAI.cpp
+			ai/AAS_tactical.cpp
+			weapon/WeaponBlaster.cpp
+			weapon/WeaponGrenadeLauncher.cpp
+			weapon/WeaponMachinegun.cpp
+			weapon/WeaponRailgun.cpp
+			weapon/WeaponDarkMatterGun.cpp
+			weapon/WeaponHyperblaster.cpp
+			weapon/WeaponNailgun.cpp
+			weapon/WeaponRocketLauncher.cpp
+			weapon/WeaponGauntlet.cpp
+			weapon/WeaponLightningGun.cpp
+			weapon/WeaponNapalmGun.cpp
+			weapon/WeaponShotgun.cpp
+			mp/Buying.cpp
+			mp/CTF.cpp
+			mp/GameState.cpp
+			mp/Tourney.cpp
+			mp/VoiceComms.cpp
+			mp/stats/StatEvent.cpp
+			mp/stats/StatManager.cpp
+			mp/stats/StatWindow.cpp
+			physics/Physics_Particle.cpp
+			physics/Physics_VehicleMonster.cpp
+			bots/BotAASBuild.cpp
+			bots/BotAI.cpp
+			bots/BotSabot.cpp
+			)
+	list(REMOVE_ITEM src_quake4
+			Fx.cpp
+			PlayerIcon.cpp
+			SmokeParticles.cpp
+			ai/AI_Vagary.cpp
+			#gamesys/TypeInfo.cpp
+			)
+	list(APPEND src_quake4 ${quake4_game_src})
+	set_src_dir(src_quake4 "quake4" ${src_quake4})
+	add_globbed_headers(src_quake4 "quake4")
+
 	add_library(q4game SHARED ${src_quake4})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_quake4})
 	#set_target_properties(quake4 PROPERTIES PREFIX "")
-	set_target_properties(q4game PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_RAVEN;_QUAKE4;MOD_BOTS;_MOD_FULL_BODY_AWARENESS")
+	set(q4_compile_definitions "GAME_DLL;_RAVEN;_QUAKE4")
+	if(Q4_MOD_FULL_BODY_AWARENESS)
+		set(q4_compile_definitions "${q4_compile_definitions};_MOD_FULL_BODY_AWARENESS")
+		message(STATUS "Build quake4 full body awareness mod support")
+	endif()
+	if(Q4_MOD_BOTS)
+		set(q4_compile_definitions "${q4_compile_definitions};MOD_BOTS")
+		message(STATUS "Build quake4 bots mod support")
+	endif()
+	set_target_properties(q4game PROPERTIES COMPILE_DEFINITIONS "${q4_compile_definitions}")
 	target_include_directories(q4game PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/quake4")
 	set_target_properties(q4game PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(q4game PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(q4game idlib_raven)
 
-	install(TARGETS q4game
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS q4game
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 
 
 if(HUMANHEAD)
-	set(PREYBINARY "${DOOM3BINARY}_humanhead")
-	add_library(${PREYBINARY} SHARED
-			${src_core_humanhead}
-			${src_sys_base}
-			${src_sys_core}
-			${src_editor_tools}
+	# humanhead engine source
+	set(humanhead_renderer_src
+			humanhead/renderer/Model_hhBeam.cpp
 			)
+	set(humanhead_framework_src
+			humanhead/framework/declPreyBeam.cpp
+			)
+	set(humanhead_ui_src
+			humanhead/ui/TabWindow.cpp
+			humanhead/ui/TabContainerWindow.cpp
+			)
+
+	set(src_core_humanhead
+			${src_renderer}
+			${humanhead_renderer_src}
+			${src_framework}
+			${humanhead_framework_src}
+			${humanhead_ui_src}
+			${src_cm}
+			${src_aas}
+			${src_roq}
+			${src_snd}
+			${src_ui}
+			${src_tools}
+			${src_renderbump}
+			${src_dmap}
+			)
+	add_globbed_headers(humanhead_renderer_src "humanhead")
+	add_globbed_headers(humanhead_framework_src "humanhead")
+
+	if(ANDROID)
+		set(PREYBINARY "${IDTECH4LIBRARY}_humanhead")
+		add_library(${PREYBINARY} SHARED
+				${src_core_humanhead}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+				)
+	else()
+		set(PREYBINARY "Prey")
+		add_executable(${PREYBINARY}
+				${src_core_humanhead}
+				${src_sys_base}
+				${src_sys_core}
+				${src_editor_tools}
+				)
+	endif()
 
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_core_humanhead} ${src_sys_base} ${src_sys_core} ${src_editor_tools})
 
@@ -1664,26 +1938,212 @@ if(HUMANHEAD)
 			${local_libs}
 			)
 
-	install(TARGETS ${PREYBINARY}
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS ${PREYBINARY}
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()
 
 if(PREY)
+	# prey game source
+	set(src_prey ${base_game_src})
+	set(prey_game_src
+			EntityAdditions.cpp
+			physics/Physics_PreyPlayer.cpp
+			Prey/ai_centurion.cpp
+			Prey/ai_crawler.cpp
+			Prey/ai_creaturex.cpp
+			Prey/ai_droid.cpp
+			Prey/ai_gasbag_simple.cpp
+			Prey/ai_harvester_simple.cpp
+			Prey/ai_hunter_simple.cpp
+			Prey/ai_inspector.cpp
+			Prey/ai_jetpack_harvester_simple.cpp
+			Prey/ai_keeper_simple.cpp
+			Prey/ai_mutate.cpp
+			Prey/ai_mutilatedhuman.cpp
+			Prey/ai_passageway.cpp
+			Prey/ai_possessedTommy.cpp
+			Prey/ai_reaction.cpp
+			Prey/ai_spawncase.cpp
+			Prey/ai_speech.cpp
+			Prey/ai_sphereboss.cpp
+			Prey/anim_baseanim.cpp
+			Prey/force_converge.cpp
+			Prey/game_afs.cpp
+			Prey/game_alarm.cpp
+			Prey/game_anim.cpp
+			Prey/game_animBlend.cpp
+			Prey/game_animDriven.cpp
+			Prey/game_animatedentity.cpp
+			Prey/game_animatedgui.cpp
+			Prey/game_animator.cpp
+			Prey/game_arcadegame.cpp
+			Prey/game_barrel.cpp
+			Prey/game_bindController.cpp
+			Prey/game_blackjack.cpp
+			Prey/game_cards.cpp
+			Prey/game_cilia.cpp
+			Prey/game_console.cpp
+			Prey/game_damagetester.cpp
+			Prey/game_dda.cpp
+			Prey/game_deathwraith.cpp
+			Prey/game_debrisspawner.cpp
+			Prey/game_dock.cpp
+			Prey/game_dockedgun.cpp
+			Prey/game_door.cpp
+			Prey/game_eggspawner.cpp
+			Prey/game_energynode.cpp
+			Prey/game_entityfx.cpp
+			Prey/game_entityspawner.cpp
+			Prey/game_events.cpp
+			Prey/game_fixedpod.cpp
+			Prey/game_forcefield.cpp
+			Prey/game_fxinfo.cpp
+			Prey/game_gibbable.cpp
+			Prey/game_gravityswitch.cpp
+			Prey/game_guihand.cpp
+			Prey/game_gun.cpp
+			Prey/game_hand.cpp
+			Prey/game_handcontrol.cpp
+			Prey/game_healthbasin.cpp
+			Prey/game_healthspore.cpp
+			Prey/game_inventory.cpp
+			Prey/game_itemautomatic.cpp
+			Prey/game_itemcabinet.cpp
+			Prey/game_jukebox.cpp
+			Prey/game_jumpzone.cpp
+			Prey/game_light.cpp
+			Prey/game_lightfixture.cpp
+			Prey/game_mine.cpp
+			Prey/game_misc.cpp
+			Prey/game_modeldoor.cpp
+			Prey/game_modeltoggle.cpp
+			Prey/game_monster_ai.cpp
+			Prey/game_monster_ai_events.cpp
+			Prey/game_mountedgun.cpp
+			Prey/game_moveable.cpp
+			Prey/game_mover.cpp
+			Prey/game_note.cpp
+			Prey/game_organtrigger.cpp
+			Prey/game_player.cpp
+			Prey/game_playerview.cpp
+			Prey/game_pod.cpp
+			Prey/game_podspawner.cpp
+			Prey/game_poker.cpp
+			Prey/game_portal.cpp
+			Prey/game_portalframe.cpp
+			Prey/game_proxdoor.cpp
+			Prey/game_rail.cpp
+			Prey/game_railshuttle.cpp
+			Prey/game_renderentity.cpp
+			Prey/game_safeDeathVolume.cpp
+			Prey/game_securityeye.cpp
+			Prey/game_shuttle.cpp
+			Prey/game_shuttledock.cpp
+			Prey/game_shuttletransport.cpp
+			Prey/game_skybox.cpp
+			Prey/game_slots.cpp
+			Prey/game_sphere.cpp
+			Prey/game_spherepart.cpp
+			Prey/game_spring.cpp
+			Prey/game_sunCorona.cpp
+			Prey/game_talon.cpp
+			Prey/game_targetproxy.cpp
+			Prey/game_targets.cpp
+			Prey/game_trackmover.cpp
+			Prey/game_trigger.cpp
+			Prey/game_tripwire.cpp
+			Prey/game_utils.cpp
+			Prey/game_vehicle.cpp
+			Prey/game_vomiter.cpp
+			Prey/game_weaponHandState.cpp
+			Prey/game_woundmanager.cpp
+			Prey/game_wraith.cpp
+			Prey/game_zone.cpp
+			Prey/particles_particles.cpp
+			Prey/physics_delta.cpp
+			Prey/physics_preyai.cpp
+			Prey/physics_preyparametric.cpp
+			Prey/physics_simple.cpp
+			Prey/physics_vehicle.cpp
+			Prey/prey_animator.cpp
+			Prey/prey_baseweapons.cpp
+			Prey/prey_beam.cpp
+			Prey/prey_bonecontroller.cpp
+			Prey/prey_camerainterpolator.cpp
+			Prey/prey_firecontroller.cpp
+			Prey/prey_game.cpp
+			Prey/prey_items.cpp
+			Prey/prey_liquid.cpp
+			Prey/prey_local.cpp
+			Prey/prey_projectile.cpp
+			Prey/prey_projectileautocannon.cpp
+			Prey/prey_projectilebounce.cpp
+			Prey/prey_projectilebug.cpp
+			Prey/prey_projectilebugtrigger.cpp
+			Prey/prey_projectilecocoon.cpp
+			Prey/prey_projectilecrawlergrenade.cpp
+			Prey/prey_projectilefreezer.cpp
+			Prey/prey_projectilegasbagpod.cpp
+			Prey/prey_projectilehiderweapon.cpp
+			Prey/prey_projectilemine.cpp
+			Prey/prey_projectilerifle.cpp
+			Prey/prey_projectilerocketlauncher.cpp
+			Prey/prey_projectileshuttle.cpp
+			Prey/prey_projectilesoulcannon.cpp
+			Prey/prey_projectilespiritarrow.cpp
+			Prey/prey_projectiletracking.cpp
+			Prey/prey_projectiletrigger.cpp
+			Prey/prey_projectilewrench.cpp
+			Prey/prey_script_thread.cpp
+			Prey/prey_sound.cpp
+			Prey/prey_soundleadincontroller.cpp
+			Prey/prey_spiritbridge.cpp
+			Prey/prey_spiritproxy.cpp
+			Prey/prey_spiritsecret.cpp
+			Prey/prey_vehiclefirecontroller.cpp
+			Prey/prey_weapon.cpp
+			Prey/prey_weaponautocannon.cpp
+			Prey/prey_weaponcrawlergrenade.cpp
+			Prey/prey_weaponfirecontroller.cpp
+			Prey/prey_weaponhider.cpp
+			Prey/prey_weaponrifle.cpp
+			Prey/prey_weaponrocketlauncher.cpp
+			Prey/prey_weaponsoulstripper.cpp
+			Prey/prey_weaponspiritbow.cpp
+			Prey/sys_debugger.cpp
+			Prey/sys_preycmds.cpp
+			)
+	list(REMOVE_ITEM src_prey
+			ai/AI_Vagary.cpp
+			)
+	list(APPEND src_prey ${prey_game_src})
+	set_src_dir(src_prey "prey" ${src_prey})
+	add_globbed_headers(src_prey "prey")
+
 	add_library(preygame SHARED ${src_prey})
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX neo FILES ${src_prey})
 	#set_target_properties(quake4 PROPERTIES PREFIX "")
-	set_target_properties(preygame PROPERTIES COMPILE_DEFINITIONS "GAME_DLL;_HUMANHEAD;HUMANHEAD;_PREY")
+	set(prey_compile_definitions "GAME_DLL;_HUMANHEAD;HUMANHEAD;_PREY")
+	if(PREY_MOD_FULL_BODY_AWARENESS)
+		set(prey_compile_definitions "${prey_compile_definitions};_MOD_FULL_BODY_AWARENESS")
+		message(STATUS "Build prey full body awareness mod support")
+	endif()
+	set_target_properties(preygame PROPERTIES COMPILE_DEFINITIONS "${prey_compile_definitions}")
 	target_include_directories(preygame PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/prey")
 	set_target_properties(preygame PROPERTIES LINK_FLAGS "${ldflags}")
 	set_target_properties(preygame PROPERTIES INSTALL_NAME_DIR "@executable_path")
 	target_link_libraries(preygame idlib_humanhead)
 
-	install(TARGETS preygame
-			RUNTIME DESTINATION "${bindir}"
-			LIBRARY DESTINATION "${libdir}"
-			ARCHIVE DESTINATION "${libdir}"
-			)
+	if(NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+		install(TARGETS preygame
+				RUNTIME DESTINATION "${bindir}"
+				LIBRARY DESTINATION "${libdir}"
+				ARCHIVE DESTINATION "${libdir}"
+				)
+	endif()
 endif()

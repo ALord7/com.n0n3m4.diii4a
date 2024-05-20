@@ -21,22 +21,27 @@ package com.n0n3m4.q3e;
 
 import android.view.Surface;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-
 public class Q3EJNI {	
-	public static native void setCallbackObject(Object obj);	
-	public static native void init(String LibPath, int width, int height, String GameDir, String Args,
-                                   Surface view,
-                                   int format, // 0x8888, 0x4444, 0x5551, 0x565
-                                   int msaa, // 0, 4, 16
-                                   int glVersion, // 0x00020000, 0x00030000
-                                   boolean redirect_output_to_file,
-                                   boolean no_handle_signals,
-                                   boolean multithread,
-                                   boolean continueNoGLContext
-                                   );
+	public static native void setCallbackObject(Object obj);
+
+    public static native void init(
+            String LibPath, // engine's library file path
+            String nativeLibPath, // apk's dynamic library directory path
+            int width, // surface width
+            int height, // surface height
+            String GameDir, // game data directory(external)
+			String gameSubDir, // game data sub directory(external)
+            String Args, // doom3 command line arguments
+            Surface view, // render surface
+            int format, // OpenGL color buffer format: 0x8888, 0x4444, 0x5551, 0x565
+            int msaa, // MSAA: 0, 4, 16
+            int glVersion, // OpenGLES verison: 0x00020000, 0x00030000
+            boolean redirect_output_to_file, // save runtime log to file
+            boolean no_handle_signals, // not handle signals
+            boolean multithread, // enable multithread
+            boolean usingMouse, // using mouse
+            boolean continueNoGLContext
+    );
 	public static native void drawFrame();
 	public static native void sendKeyEvent(int state,int key,int character);
 	public static native void sendAnalog(int enable,float x,float y);
@@ -48,58 +53,8 @@ public class Q3EJNI {
     public static native void OnResume();
     public static native void SetSurface(Surface view);
 
-    public static boolean IS_NEON = false; // only armv7-a 32. arm64 always support, but using hard
-    public static boolean IS_64 = false;
-    public static boolean SYSTEM_64 = false;
-    public static String ARCH = "";
-    private static boolean _is_detected = false;
-    
-    private static boolean GetCpuInfo()
-    {
-        if (_is_detected)
-            return true;
-        IS_64 = Is64();
-        ARCH = IS_64 ? "aarch64" : "arm";
-        BufferedReader br = null;
-        try
-        {
-            br = new BufferedReader(new FileReader("/proc/cpuinfo"));
-            String l;
-            while ((l = br.readLine()) != null)
-            {
-                if ((l.contains("Features")) && (l.contains("neon")))
-                {
-                    IS_NEON = true;
-                }
-                if (l.contains("Processor") && (l.contains("AArch64")))
-                {
-                    SYSTEM_64 = true;
-                    IS_NEON = true;
-                }
-
-            }
-            _is_detected = true;
-        } catch (Exception e)
-        {
-            e.printStackTrace();
-            _is_detected = false;
-        } finally
-        {
-            try
-            {
-                if (br != null)
-                    br.close();
-            } catch (IOException ioe)
-            {
-                ioe.printStackTrace();
-            }
-        }
-        return _is_detected;
-    }
-
 	static {
 		System.loadLibrary("q3eloader");
-        GetCpuInfo();
 	}
 }
 

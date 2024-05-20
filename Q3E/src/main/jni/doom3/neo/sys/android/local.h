@@ -30,14 +30,31 @@ If you have questions concerning this license or the applicable additional terms
 
 extern glconfig_t glConfig;
 
-#ifdef __ANDROID__
+#ifdef __ANDROID__ //karin: sys::local expose on Android
+
 extern FILE *f_stdout;
 extern int gl_format;
 extern int gl_msaa;
 extern int gl_version;
+extern bool USING_GLES3;
+
+extern float analogx;
+extern float analogy;
+extern int analogenabled;
+extern char *native_library_dir;
+extern int screen_width;
+extern int screen_height;
 
 void Android_GrabMouseCursor(bool grabIt);
 void Android_PollInput(void);
+
+extern void (*attach_thread)(void);
+extern void Q3E_CheckNativeWindowChanged(void);
+extern void Q3E_CloseRedirectOutput(void);
+extern void Q3E_PrintInitialContext(int argc, char **argv);
+extern void Q3E_RedirectOutput(void);
+extern void Q3E_Start(void);
+extern void Q3E_End(void);
 #endif
 
 #endif

@@ -51,7 +51,7 @@ class idRenderModelStatic : public idRenderModel
 		virtual void				PurgeModel();
 		virtual void				Reset() {};
 		virtual void				LoadModel();
-		virtual bool				IsLoaded();
+		virtual bool				IsLoaded() const;
 		virtual void				SetLevelLoadReferenced(bool referenced);
 		virtual bool				IsLevelLoadReferenced();
 		virtual void				TouchData();
@@ -219,6 +219,10 @@ class idRenderModelMD5 : public idRenderModelStatic
 #ifdef _RAVEN //k: for ShowSurface/HideSurface, md5 model using mesh index as mask: 1 << index, name is shader material name
 		virtual int GetSurfaceMask(const char *name) const;
 #endif
+#if defined(_RAVEN) || defined(_HUMANHEAD) //k: for GUI view of dynamic model in idRenderWorld::GuiTrace
+	idRenderModelStatic * DynamicModelSnapshot(void) { return staticModelInstance; }
+	void ClearDynamicModelSnapshot(void) { staticModelInstance = NULL; }
+#endif
 
 	private:
 		idList<idMD5Joint>			joints;
@@ -234,7 +238,6 @@ class idRenderModelMD5 : public idRenderModelStatic
 		idList<idStr> surfaceShaderList;
 #endif
 #if defined(_RAVEN) || defined(_HUMANHEAD) //k: for GUI view of dynamic model in idRenderWorld::GuiTrace
-	public:
 		idRenderModelStatic *staticModelInstance;
 #endif
 };
@@ -253,6 +256,8 @@ struct md3Surface_s;
 class idRenderModelMD3 : public idRenderModelStatic
 {
 	public:
+		idRenderModelMD3();
+
 		virtual void				InitFromFile(const char *fileName);
 		virtual dynamicModel_t		IsDynamicModel() const;
 		virtual idRenderModel 		*InstantiateDynamicModel(const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel);
@@ -263,6 +268,7 @@ class idRenderModelMD3 : public idRenderModelStatic
 		int							dataSize;		// just for listing purposes
 		struct md3Header_s 		*md3;			// only if type == MOD_MESH
 		int							numLods;
+        idList<const idMaterial*>	shaders;		// DG: md3Shader_t::shaderIndex indexes into this array
 
 		void						LerpMeshVertexes(srfTriangles_t *tri, const struct md3Surface_s *surf, const float backlerp, const int frame, const int oldframe) const;
 };

@@ -120,6 +120,8 @@ class idConsoleLocal : public idConsole
 
 		const idMaterial 	*whiteShader;
 		const idMaterial 	*consoleShader;
+
+		void		DumpHistory(void);
 };
 
 static idConsoleLocal localConsole;
@@ -419,9 +421,7 @@ the renderSystem is initialized
 void idConsoleLocal::LoadGraphics()
 {
 #ifdef _RAVEN // quake4 bigchar font
-// jmarshall
     charSetShader = declManager->FindMaterial( "fonts/english/bigchars" );
-// jmarshall end
 #else
 	charSetShader = declManager->FindMaterial("textures/bigchars");
 #endif
@@ -476,7 +476,11 @@ void idConsoleLocal::Clear()
 	int		i;
 
 	for (i = 0 ; i < CON_TEXTSIZE ; i++) {
+#ifdef _RAVEN
+		text[i] = (idStr::ColorIndex(C_COLOR_CONSOLE)<<8) | ' ';
+#else
 		text[i] = (idStr::ColorIndex(C_COLOR_CYAN)<<8) | ' ';
+#endif
 	}
 
 	Bottom();		// go to end
@@ -635,12 +639,31 @@ void idConsoleLocal::KeyDownEvent(int key)
 		cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "\n");
 
 		// copy line to history buffer
-		historyEditLines[nextHistoryLine % COMMAND_HISTORY] = consoleField;
-		nextHistoryLine++;
+		bool record = harm_com_consoleHistory.GetInteger() != 2;
+		if(!record)
+		{
+			const char *cmdbuf = consoleField.GetBuffer();
+			if(cmdbuf[0]) // empty command with single ENTER -> ignore
+			{
+				if(nextHistoryLine > 0)
+				{
+					const char *lastCmdBuf = historyEditLines[(nextHistoryLine - 1) % COMMAND_HISTORY].GetBuffer();
+					if(!lastCmdBuf[0] || idStr::Cmp(cmdbuf, lastCmdBuf) != 0) // dup -> ignore
+						record = true;
+				}
+				else
+					record = true;
+			}
+		}
+		if(record)
+		{
+			historyEditLines[nextHistoryLine % COMMAND_HISTORY] = consoleField;
+			nextHistoryLine++;
+		}
 		historyLine = nextHistoryLine;
 
 		if(harm_com_consoleHistory.GetInteger() == 2)
-			SaveHistory();
+			DumpHistory();
 
 		consoleField.Clear();
 		consoleField.SetWidthInChars(LINE_WIDTH);
@@ -907,7 +930,11 @@ void idConsoleLocal::Linefeed()
 	current++;
 
 	for (i = 0; i < LINE_WIDTH; i++) {
+#ifdef _RAVEN
+		text[(current%TOTAL_LINES)*LINE_WIDTH+i] = (idStr::ColorIndex(C_COLOR_CONSOLE)<<8) | ' ';
+#else
 		text[(current%TOTAL_LINES)*LINE_WIDTH+i] = (idStr::ColorIndex(C_COLOR_CYAN)<<8) | ' ';
+#endif
 	}
 }
 
@@ -934,12 +961,20 @@ void idConsoleLocal::Print(const char *txt)
 
 #endif
 
+#ifdef _RAVEN
+	color = idStr::ColorIndex(C_COLOR_CONSOLE);
+#else
 	color = idStr::ColorIndex(C_COLOR_CYAN);
+#endif
 
 	while ((c = *(const unsigned char *)txt) != 0) {
 		if (idStr::IsColor(txt)) {
 			if (*(txt+1) == C_COLOR_DEFAULT) {
+#ifdef _RAVEN
+				color = idStr::ColorIndex(C_COLOR_CONSOLE);
+#else
 				color = idStr::ColorIndex(C_COLOR_CYAN);
+#endif
 			} else {
 				color = idStr::ColorIndex(*(txt+1));
 			}
@@ -1043,7 +1078,11 @@ void idConsoleLocal::DrawInput()
 		}
 	}
 
+#ifdef _RAVEN
+	renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CONSOLE));
+#else
 	renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CYAN));
+#endif
 
 	renderSystem->DrawSmallChar(1 * SMALLCHAR_WIDTH, y, ']', localConsole.charSetShader);
 
@@ -1155,7 +1194,11 @@ void idConsoleLocal::DrawSolidConsole(float frac)
 
 	// draw the version number
 
+#ifdef _RAVEN
+	renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CONSOLE));
+#else
 	renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CYAN));
+#endif
 
 	idStr version = va("%s.%i", ENGINE_VERSION, BUILD_NUMBER);
 	i = version.Length();
@@ -1176,7 +1219,11 @@ void idConsoleLocal::DrawSolidConsole(float frac)
 	// draw from the bottom up
 	if (display != current) {
 		// draw arrows to show the buffer is backscrolled
+#ifdef _RAVEN
+		renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CONSOLE));
+#else
 		renderSystem->SetColor(idStr::ColorForIndex(C_COLOR_CYAN));
+#endif
 
 		for (x = 0; x < LINE_WIDTH; x += 4) {
 			renderSystem->DrawSmallChar((x+1)*SMALLCHAR_WIDTH, idMath::FtoiFast(y), '^', localConsole.charSetShader);
@@ -1286,7 +1333,8 @@ void	idConsoleLocal::Draw(bool forceFullScreen)
 
 // command history
 #define CONSOLE_HISTORY_FILE ".console_history.dat"
-void idConsoleLocal::SaveHistory() {
+void idConsoleLocal::DumpHistory(void)
+{
 	idFile *f = fileSystem->OpenFileWrite( CONSOLE_HISTORY_FILE );
 	idStr last;
 	for ( int i=0; i < COMMAND_HISTORY; ++i ) {
@@ -1294,13 +1342,17 @@ void idConsoleLocal::SaveHistory() {
 		int line = (nextHistoryLine + i) % COMMAND_HISTORY;
 		const char *s = historyEditLines[line].GetBuffer();
 		if ( s && s[0] ) {
-			if(!idStr::Icmp(last, s))
+			if(!idStr::Cmp(last, s))
 				continue;
 			f->WriteString(s);
 			last = s;
 		}
 	}
 	fileSystem->CloseFile(f);
+}
+
+void idConsoleLocal::SaveHistory() {
+	DumpHistory();
 	common->Printf("[Harmattan]: Console history saved -> %s\n", CONSOLE_HISTORY_FILE);
 }
 

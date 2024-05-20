@@ -499,15 +499,19 @@ void Sys_Sleep(int msec)
 char *Sys_GetClipboardData(void)
 {
 	// Sys_Printf("TODO: Sys_GetClipboardData\n");
+#ifdef __ANDROID__ //karin: from JNI
 	extern char * Android_GetClipboardData(void);
 	return Android_GetClipboardData();
+#endif
 }
 
 void Sys_SetClipboardData(const char *string)
 {
 	// Sys_Printf("TODO: Sys_SetClipboardData\n");
+#ifdef __ANDROID__ //karin: from JNI
 	extern void Android_SetClipboardData(const char *text);
 	Android_SetClipboardData(string);
+#endif
 }
 
 
@@ -1172,13 +1176,58 @@ void Sys_Error(const char *error, ...)
 	Sys_DebugVPrintf(error, argptr);
 	va_end(argptr);
 	Sys_Printf("\n");
+#ifdef __ANDROID__
+	extern void (*show_toast)(const char *text);
+	if(show_toast)
+	{
+		va_start(argptr, error);
+		char text[1024];
+		idStr::vsnPrintf(text, sizeof(text), error, argptr);
+		va_end(argptr);
+		show_toast(text);
+	}
+#endif
 
 	Posix_Exit(EXIT_FAILURE);
 }
 
+void Sys_Trap(void)
+{
+#ifdef __ANDROID__
+	__builtin_trap();
+#elif defined(__unix__)
+    // __builtin_trap() causes an illegal instruction which is kinda ugly.
+    // especially if you'd like to be able to continue after the assertion during debugging
+    raise(SIGTRAP); // this will break into the debugger.
+#elif defined( __GNUC__ )
+    __builtin_trap();
+    _exit(1);
+#else
+	abort();
+#endif
+}
+
+void Sys_Usleep(int usec)
+{
+    usleep(usec);
+}
+
+void Sys_Msleep(int msec)
+{
+    usleep(msec * 1000);
+}
+
 /*
-===============
-Sys_FreeOpenAL
-===============
+================
+Sys_Microseconds
+================
 */
-void Sys_FreeOpenAL(void) { }
+uint64_t Sys_Microseconds( void )
+{
+	struct timeval tp;
+	//returns time since the Epoch (1970-01-01)
+	gettimeofday(&tp, NULL);
+
+	uint64_t curtime = (tp.tv_sec) * 1000000LL + tp.tv_usec;
+	return curtime;
+}

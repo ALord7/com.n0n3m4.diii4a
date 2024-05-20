@@ -36,6 +36,10 @@ If you have questions concerning this license or the applicable additional terms
   back end scene + lights rendering functions
 
 */
+#ifdef _NO_GAMMA //karin: r_brightness when unsupport gamma
+// Hack brightness slider to increase lighting in the game
+float RB_overbright = 1;
+#endif
 
 
 /*
@@ -45,11 +49,7 @@ RB_DrawElementsWithCounters
 */
 void RB_DrawElementsWithCounters(const srfTriangles_t *tri)
 {
-	if (!backEnd.glState.currentProgram) {
-		common->Printf("RB_DrawElementsWithCounters: no current program object\n");
-		__builtin_trap();
-		return;
-	}
+	HARM_CHECK_SHADER("RB_DrawElementsWithCounters");
 
 	backEnd.pc.c_drawElements++;
 	backEnd.pc.c_drawIndexes += tri->numIndexes;
@@ -90,11 +90,7 @@ May not use all the indexes in the surface if caps are skipped
 */
 void RB_DrawShadowElementsWithCounters(const srfTriangles_t *tri, int numIndexes)
 {
-	if (!backEnd.glState.currentProgram) {
-		common->Printf("RB_DrawShadowElementsWithCounters: no current program object\n");
-		__builtin_trap();
-		return;
-	}
+	HARM_CHECK_SHADER("RB_DrawShadowElementsWithCounters");
 
 	backEnd.pc.c_shadowElements++;
 	backEnd.pc.c_shadowIndexes += numIndexes;
@@ -669,6 +665,14 @@ static void RB_SubmittInteraction(drawInteraction_t *din, void (*DrawInteraction
 	        || ((din->specularColor[0] > 0 ||
 	             din->specularColor[1] > 0 ||
 	             din->specularColor[2] > 0) && din->specularImage != globalImages->blackImage)) {
+#ifdef _NO_GAMMA //karin: r_brightness when unsupport gamma
+		if(RB_overbright > 1.0f)
+		{
+			din->diffuseColor[0] *= RB_overbright;
+			din->diffuseColor[1] *= RB_overbright;
+			din->diffuseColor[2] *= RB_overbright;
+		}
+#endif
 		DrawInteraction(din);
 	}
 }

@@ -56,7 +56,7 @@ const float BSE_PARTICLE_TEXCOORDSCALE = (0.01f);
 const unsigned int MEMORY_BLOCK_SIZE = (0x100000);
 const unsigned int BSE_ELEC_MAX_BOLTS = (200);
 
-typedef enum eBSEPerfCounter
+/*typedef*/ enum eBSEPerfCounter
 {
 	PERF_NUM_BSE,
 	PERF_NUM_TRACES,
@@ -66,7 +66,7 @@ typedef enum eBSEPerfCounter
 	NUM_PERF_COUNTERS
 };
 
-typedef enum eBSESegment
+/*typedef*/ enum eBSESegment
 {
 	SEG_NONE = 0,
 	SEG_EFFECT,						// Spawns another effect inheriting data from owner
@@ -97,7 +97,7 @@ enum eBSEParticleType
 	PTYPE_COUNT
 };
 
-typedef enum eBSETrail
+/*typedef*/ enum eBSETrail
 {
 	TRAIL_NONE = 0,
 	TRAIL_BURN,
@@ -153,17 +153,35 @@ extern idCVar bse_render;
 extern idCVar bse_singleEffect;
 extern idCVar bse_debug;
 #ifdef _K_DEV // my debug macros
+#if !defined(_MSC_VER)
 #define BSE_VERBOSE(fmt, args...) { if(bse_debug.GetInteger() >= 1) { common->Printf(fmt, ##args); } }
 #define BSE_DEBUG(fmt, args...) { if(bse_debug.GetInteger() >= 2) { common->Printf(fmt, ##args); } }
 #define BSE_INFO(fmt, args...) { if(bse_debug.GetInteger() >= 3) { common->Printf(fmt, ##args); } }
 #define BSE_WARNING(fmt, args...) { if(bse_debug.GetInteger() >= 4) { common->Printf(fmt, ##args); } }
 #define BSE_ERROR(fmt, args...) { if(bse_debug.GetInteger() >= 5) { common->Printf(fmt, ##args); } }
 #else
+#define BSE_VERBOSE(fmt, ...) { if(bse_debug.GetInteger() >= 1) { common->Printf(fmt, __VA_ARGS__); } }
+#define BSE_DEBUG(fmt, ...) { if(bse_debug.GetInteger() >= 2) { common->Printf(fmt, __VA_ARGS__); } }
+#define BSE_INFO(fmt, ...) { if(bse_debug.GetInteger() >= 3) { common->Printf(fmt, __VA_ARGS__); } }
+#define BSE_WARNING(fmt, ...) { if(bse_debug.GetInteger() >= 4) { common->Printf(fmt, __VA_ARGS__); } }
+#define BSE_ERROR(fmt, ...) { if(bse_debug.GetInteger() >= 5) { common->Printf(fmt, __VA_ARGS__); } }
+#endif
+
+#else
+
+#if !defined(_MSC_VER)
 #define BSE_VERBOSE(fmt, args...)
 #define BSE_DEBUG(fmt, args...)
 #define BSE_INFO(fmt, args...)
 #define BSE_WARNING(fmt, args...)
 #define BSE_ERROR(fmt, args...)
+#else
+#define BSE_VERBOSE(fmt, ...)
+#define BSE_DEBUG(fmt, ...)
+#define BSE_INFO(fmt, ...)
+#define BSE_WARNING(fmt, ...)
+#define BSE_ERROR(fmt, ...)
+#endif
 #endif
 
 typedef struct {
@@ -230,7 +248,7 @@ public:
 
 	virtual bool					SetDefaultText(void);
 	virtual const char* DefaultDefinition(void) const;
-	virtual bool					Parse(const char* text, const int textLength);
+	virtual bool					Parse(const char* text, const int textLength, bool noCaching = false);
 	virtual void					FreeData(void);
 	virtual size_t					Size(void) const;
 #ifdef _RAVEN_FX

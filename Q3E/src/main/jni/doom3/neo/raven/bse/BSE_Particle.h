@@ -11,11 +11,11 @@
 ===============================================================================
 */
 
-typedef enum {
+/*typedef*/ enum {
 	PDIST_POINT = 3, // PDIST_SPHERE + 1
 };
 
-typedef enum {
+/*typedef*/ enum {
 	POR_DIR = 5, // POR_Z + 1
 };
 
@@ -160,7 +160,7 @@ class rvBSEParticle : public idDecl
 
 		virtual size_t			Size(void) const;
 		virtual const char 	*DefaultDefinition(void) const;
-		virtual bool			Parse(const char *text, const int textLength);
+		virtual bool			Parse(const char *text, const int textLength, bool noCaching = false);
 		virtual void			FreeData(void);
 
 		bool					Save(const char *fileName = NULL);

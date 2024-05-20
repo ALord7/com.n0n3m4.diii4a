@@ -487,7 +487,7 @@ bool	R_GenerateSurfaceSubview(drawSurf_t *drawSurf)
 	for (parms = tr.viewDef ; parms ; parms = parms->superView) {
 		if (parms->subviewSurface
 #ifdef _MULTITHREAD
-		    && (parms->subviewSurface->geo == drawSurf->geo || (multithreadActive && parms->subviewSurface->origGeo == drawSurf->origGeo)) //k: Because different with d3es-multithread, `geo` is realloc for backend, `origGeo` is original srfTriangles of model surface from frontend with DIII4A-multithread. So single-thread and d3es-multithread not need this line.
+		    && (parms->subviewSurface->geo == drawSurf->geo || (multithreadActive && parms->subviewSurface->geoOrig == drawSurf->geoOrig)) //k: Because different with d3es-multithread, `geo` is realloc for backend, `geoOrig` is original srfTriangles of model surface from frontend with DIII4A-multithread. So single-thread and d3es-multithread not need this line.
 #else
 		    && parms->subviewSurface->geo == drawSurf->geo
 #endif
@@ -549,6 +549,7 @@ bool	R_GenerateSurfaceSubview(drawSurf_t *drawSurf)
 				if (!drawSurf->space->entityDef->parms.remoteRenderView) {
 					return false;
 				}
+				// if(tr.viewDef->isSubview) return false;
 
 				//k: idMaterial::directPortalDistance may be max distance for render, also see `materials/portals.mtr`.
 				int index = shader->GetDirectPortalDistance();
@@ -622,8 +623,7 @@ bool	R_GenerateSurfaceSubview(drawSurf_t *drawSurf)
 				}
 
 				//lvonasek: Allow max 1 skybox per frame
-				static int lastRenderSkybox = -1;
-				if(tr.frameCount == lastRenderSkybox || tr.viewDef->isSubview)
+				if(tr.SkyboxRenderedInFrame() || tr.viewDef->isSubview)
 					return false;
 
 				// copy the viewport size from the original
@@ -631,7 +631,7 @@ bool	R_GenerateSurfaceSubview(drawSurf_t *drawSurf)
 				if (!parms) {
 					return false;
 				}
-				lastRenderSkybox = tr.frameCount;
+				tr.RenderSkyboxInFrame();
 				*parms = *tr.viewDef;
 
 				parms->isSubview = true;

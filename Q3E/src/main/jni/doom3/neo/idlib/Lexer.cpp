@@ -109,8 +109,10 @@ punctuation_t default_punctuations[] = {
 	{"$",P_DOLLAR},
 #ifdef _RAVEN
 	// RAVEN BEGIN
+#if defined(__arm__) || defined(__aarch64__) //karin: not ascii, only in char is unsigned, else seg fault. TODO precheck
  {"¡",P_INVERTED_PLING},
  {"¿",P_INVERTED_QUERY},
+#endif
  // RAVEN END
 #endif
 	{NULL, 0}
@@ -3493,7 +3495,7 @@ int Lexer::ReadToken(idToken *token)
 #endif
 
 							//ltoa(token->intvalue, buffer, 10);
-							idStr::snPrintf( buffer, buffersize, "%ld", token->intvalue );
+							idStr::snPrintf( buffer, buffersize, "%d", token->intvalue );
 							assert(token->intvalue == atol(buffer));
 							*token = buffer;
 							token->subtype = TT_INTEGER | TT_DECIMAL | TT_VALUESVALID;
@@ -3529,8 +3531,8 @@ int Lexer::ReadToken(idToken *token)
 #endif
 
 							//ultoa(token->intvalue, buffer, 10);
-							idStr::snPrintf( buffer, buffersize, "%lu", token->intvalue );
-							assert(token->intvalue == ((unsigned long)atol(buffer)));
+							idStr::snPrintf( buffer, buffersize, "%u", token->intvalue );
+							assert(token->intvalue == atol(buffer));
 							*token = buffer;
 							token->subtype = TT_INTEGER | TT_UNSIGNED | TT_DECIMAL | TT_VALUESVALID;
 							break;

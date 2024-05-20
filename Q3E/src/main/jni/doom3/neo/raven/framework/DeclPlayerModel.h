@@ -30,9 +30,9 @@ public:
 
 	virtual size_t			Size( void ) const;
 	virtual const char *	DefaultDefinition() const;
-	virtual bool			Parse( const char *text, const int textLength );
+	virtual bool			Parse( const char *text, const int textLength, bool noCaching = false );
 	virtual void			FreeData( void );
-	virtual void			Print( void );
+	virtual void			Print( void ) const;
 
 	virtual	bool			RebuildTextSource( void ) { return( false ); }
 // jmarshall - not used in quake 4 sdk.

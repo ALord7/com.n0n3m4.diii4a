@@ -72,8 +72,7 @@ public final class Q3EGL
 
     //End GL20
 
-    public static void DrawVerts(GL11 gl, int texid, int cnt, FloatBuffer texcoord, FloatBuffer vertcoord, ByteBuffer inds, float trax, float tray
-            , float r, float g, float b, float a)
+    public static void DrawVerts(GL11 gl, int texid, int cnt, FloatBuffer texcoord, FloatBuffer vertcoord, ByteBuffer inds, float trax, float tray, float r, float g, float b, float a)
     {
         if (usegles20)
         {
@@ -92,7 +91,7 @@ public final class Q3EGL
             GLES20.glUniform4f(gl20tr, -Q3EControlView.orig_width / 2.0f + trax, -Q3EControlView.orig_height / 2.0f + tray, 0.0f, 0.0f);
             GLES20.glUniform4f(gl20cl, r, g, b, a);
             GLES20.glDrawElements(GLES20.GL_TRIANGLES, cnt, GLES20.GL_UNSIGNED_BYTE, inds);
-            if ((!Q3EUtils.q3ei.isQ1) && (!Q3EUtils.q3ei.isD3BFG))
+            /*if ((!Q3EUtils.q3ei.isQ1) && (!Q3EUtils.q3ei.isD3BFG))*/
             {
                 GLES20.glDisableVertexAttribArray(mPositionHandle);
                 GLES20.glDisableVertexAttribArray(mTexHandle);
@@ -108,6 +107,17 @@ public final class Q3EGL
             gl.glDrawElements(GL10.GL_TRIANGLES, cnt, GL10.GL_UNSIGNED_BYTE, inds);
             gl.glTranslatef(-trax, -tray, 0);
         }
+    }
+
+    public static void DrawVerts_GL1(GL11 gl, int texid, int cnt, FloatBuffer texcoord, FloatBuffer vertcoord, ByteBuffer inds, float trax, float tray, float r, float g, float b, float a)
+    {
+        gl.glColor4f(r, g, b, a);
+        gl.glBindTexture(GL10.GL_TEXTURE_2D, texid);
+        gl.glTexCoordPointer(2, GL10.GL_FLOAT, 0, texcoord);
+        gl.glVertexPointer(2, GL10.GL_FLOAT, 0, vertcoord);
+        gl.glTranslatef(trax, tray, 0);
+        gl.glDrawElements(GL10.GL_TRIANGLES, cnt, GL10.GL_UNSIGNED_BYTE, inds);
+        gl.glTranslatef(-trax, -tray, 0);
     }
 
     public static int loadGLTexture(GL10 gl, Bitmap bmp)

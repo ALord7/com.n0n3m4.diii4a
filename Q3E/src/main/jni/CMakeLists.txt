@@ -5,7 +5,10 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-project(doom3)
+project(idtech)
+
+add_definitions(-D__ANDROID__)
+option(ANDROID "Android build" ON)
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -29,6 +32,17 @@ project(doom3)
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
+set(q3e_src
+        q3e.c
+        )
+
+add_subdirectory (deplibs/oboe) # 1.8.1
+
+set(q3e_lib
+        log
+        android
+        )
+
 add_library( # Sets the name of the library.
         q3eloader
 
@@ -36,7 +50,8 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        q3e.c )
+        ${q3e_src}
+        )
 
 target_link_libraries( # Specifies the target library.
         q3eloader
@@ -44,8 +59,25 @@ target_link_libraries( # Specifies the target library.
         # Links the target library to the log library
         # included in the NDK.
         #${log-lib}
-        log
-        android
+        ${q3e_lib}
         )
 
-add_subdirectory (doom3/neo)
+#add_subdirectory(doom3/neo/externlibs/openal-soft)
+
+add_subdirectory (doom3/neo) # DOOM3 | RoE, Quake4, Prey(2006)
+
+add_subdirectory (deplibs) # common depend libraries
+
+add_subdirectory (common)
+
+add_subdirectory (rtcw) # RTCW
+
+add_subdirectory (quake3) # Quake 3 Arena | Team Arena
+
+add_subdirectory (quake2) # Quake 2
+
+add_subdirectory (quake1) # Quake 1
+
+add_subdirectory (tdm) # The Dark Mod
+
+#add_subdirectory (duke4) # DNF

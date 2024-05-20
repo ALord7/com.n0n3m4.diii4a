@@ -4,8 +4,12 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.ProgressDialog;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.UriPermission;
+import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.content.Intent;
 import android.net.Uri;
@@ -15,6 +19,11 @@ import android.content.pm.ApplicationInfo;
 import android.os.Build;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
+import android.support.v4.provider.DocumentFile;
+import android.util.Log;
+import android.view.Display;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.text.util.Linkify;
@@ -22,12 +31,17 @@ import android.text.method.LinkMovementMethod;
 
 import com.karin.idTech4Amm.R;
 import com.karin.idTech4Amm.misc.TextHelper;
+import com.karin.idTech4Amm.sys.Constants;
 import com.n0n3m4.q3e.Q3ELang;
+import com.n0n3m4.q3e.Q3EUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 // import android.widget.Magnifier.Builder;
 
 /**
@@ -105,12 +119,12 @@ public final class ContextUtility
         try
         {
             ApplicationInfo info = context.getApplicationInfo();
-            return (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+            return (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0 || Constants.IsDebug();
         }
         catch (Exception e)
         {
             e.printStackTrace();
-            return false; // default is release
+            return Constants.IsDebug(); // default is release
         }
     }
 
@@ -251,7 +265,7 @@ public final class ContextUtility
     {
         String permission = Manifest.permission.WRITE_EXTERNAL_STORAGE;
         // Android SDK > 28
-/*        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) // Android 11
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) // Android 11
         {
             if(Environment.isExternalStorageManager())
                 return CHECK_PERMISSION_RESULT_GRANTED;
@@ -260,7 +274,7 @@ public final class ContextUtility
             context.startActivityForResult(intent, resultCode);
             return CHECK_PERMISSION_RESULT_REQUEST;
         }
-        else*/ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) // Android M - Q
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) // Android M - Q
         {
             boolean granted = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
             if(granted)
@@ -285,10 +299,10 @@ public final class ContextUtility
         {
             is = context.getAssets().open(path);
             File out = new File(outPath);
-            FileUtility.mkdir(out.getParent(), true);
+            Q3EUtils.mkdir(out.getParent(), true);
             os = new FileOutputStream(out);
 
-            long res = FileUtility.Copy(os, is);
+            long res = Q3EUtils.Copy(os, is);
 
             return res > 0;
         }
@@ -312,12 +326,12 @@ public final class ContextUtility
 
         try
         {
-            FileUtility.mkdir(outPath, true);
+            Q3EUtils.mkdir(outPath, true);
             is = context.getAssets().open(path);
             File out = new File(outPath + File.separator + name);
             os = new FileOutputStream(out);
 
-            long res = FileUtility.Copy(os, is);
+            long res = Q3EUtils.Copy(os, is);
 
             return res > 0;
         }
@@ -342,6 +356,8 @@ public final class ContextUtility
 
     public static void RestartApp(Activity activity)
     {
+        if(null == activity)
+            return;
         activity.finish();
         Intent intent = activity.getPackageManager().getLaunchIntentForPackage(activity.getApplicationContext().getPackageName());
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -427,6 +443,225 @@ public final class ContextUtility
         });
         return dialog;
     }
-    
+
+    public static float SetRefreshRate(Activity context, int modeId)
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        {
+            Display display = null;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+            {
+                display = context.getDisplay();
+            }
+            else
+            {
+                display = context.getWindowManager().getDefaultDisplay();
+            }
+            Display.Mode[] supportedModes = display.getSupportedModes();
+            Display.Mode mode = null;
+            for (Display.Mode supportedMode : supportedModes)
+            {
+                if(supportedMode.getModeId() == modeId)
+                {
+                    mode = supportedMode;
+                    break;
+                }
+            }
+            if(null == mode)
+            {
+                return -1;
+            }
+            Window window = context.getWindow();
+            WindowManager.LayoutParams a = window.getAttributes();
+            a.preferredDisplayModeId = mode.getModeId();
+            a.preferredRefreshRate = mode.getRefreshRate();
+            window.setAttributes(a);
+            return mode.getRefreshRate();
+        }
+        else
+            return 0;
+    }
+
+    public static Map<Integer, Float> GetSupportRefreshRates(Activity context)
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        {
+            Display display = null;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+            {
+                display = context.getDisplay();
+            }
+            else
+            {
+                display = context.getWindowManager().getDefaultDisplay();
+            }
+            Display.Mode[] supportedModes = display.getSupportedModes();
+            Map<Integer, Float> map = new LinkedHashMap<>();
+            for (Display.Mode supportedMode : supportedModes)
+            {
+                map.put(supportedMode.getModeId(), supportedMode.getRefreshRate());
+            }
+            return map;
+        }
+        else
+            return null;
+    }
+
+    public static boolean IsInAppPrivateDirectory(Context context, String path)
+    {
+        final String appPath = Q3EUtils.GetAppStoragePath(context);
+        if(path.startsWith("/sdcard"))
+        {
+            int i = appPath.indexOf("/Android/data");
+            path = appPath.substring(0, i) + path.substring("/sdcard".length());
+        }
+        return path.startsWith(appPath);
+    }
+
+    public static boolean NeedGrantUriPermission(Context context, String path)
+    {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) // <= 10
+            return false;
+        if(!FileUtility.IsSDCardPath(path))
+            return false;
+        path = FileUtility.GetSDCardRelativePath(path);
+        if(path.endsWith("/"))
+            path = path.substring(0, path.length() - 1);
+
+        if (!path.startsWith("/Android/data") && !path.startsWith("/Android/obb"))
+            return false;
+        if (path.equals("/Android/data") || path.equals("/Android/obb"))
+            return Build.VERSION.SDK_INT <= Build.VERSION_CODES.R + 1; // <= 12
+
+        if(path.startsWith("/Android/data"))
+            path = path.substring("/Android/data".length());
+        else if(path.startsWith("/Android/obb"))
+            path = path.substring("/Android/obb".length());
+        if(path.startsWith("/"))
+            path = path.substring(1);
+        if(path.endsWith("/"))
+            path = path.substring(0, path.length() - 1);
+        // Log.e("XXX", path + "|" + path + "="+!path.contains("/"));
+
+        if(path.startsWith(context.getApplicationContext().getPackageName()))
+            return false;
+
+        return true; // !path.contains("/");
+    }
+
+    public static boolean NeedUsingDocumentFile(Context context, String path)
+    {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) // <= 10
+            return false;
+        if(!FileUtility.IsSDCardPath(path))
+            return false;
+        path = FileUtility.GetSDCardRelativePath(path);
+        if (!path.startsWith("/Android/data") && !path.startsWith("/Android/obb"))
+            return false;
+
+        String packageName = context.getApplicationContext().getPackageName();
+        if(path.startsWith("/Android/data/" + packageName) || path.startsWith("/Android/obb/" + packageName))
+            return false;
+        return true;
+    }
+
+    public static boolean NeedListPackagesAsFiles(Context context, String path)
+    {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R + 1) // <= 12
+            return false;
+        if(!FileUtility.IsSDCardPath(path))
+            return false;
+        path = FileUtility.GetSDCardRelativePath(path);
+        if(path.endsWith("/"))
+            path = path.substring(0, path.length() - 1);
+        return path.equals("/Android/data") || path.equals("/Android/obb");
+    }
+
+    public static boolean IsUriPermissionGrant(Context context, String path)
+    {
+        if(!NeedGrantUriPermission(context, path))
+            return true;
+        List<UriPermission> persistedUriPermissions = context.getContentResolver().getPersistedUriPermissions();
+        for (UriPermission persistedUriPermission : persistedUriPermissions)
+        {
+            Uri uri = FileUtility.PathUri(path);
+            //Log.e("TAG", "IsUriPermissionGrant: " +uri + "|" + persistedUriPermission.getUri()+"="+persistedUriPermission.getUri().equals(uri));
+            // if(uri.toString().startsWith(persistedUriPermission.getUri().toString()))
+            if(uri.equals(persistedUriPermission.getUri()))
+                return true;
+        }
+        return false;
+    }
+
+    public static boolean GrantUriPermission(Activity activity, String path, int resultCode)
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+        {
+            if(!NeedGrantUriPermission(activity, path))
+                return false;
+            Uri uri;
+
+            uri = FileUtility.PathUri(path);
+            //Log.e("TAG", "111: "+uri);
+            DocumentFile documentFile = DirectoryDocument(activity, path);
+            if(null != documentFile)
+                uri = documentFile.getUri();
+            else
+                uri = FileUtility.PathGrantUri(path);
+            //Log.e("TAG", "222: "+uri);
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+            );
+            intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+            activity.startActivityForResult(intent, resultCode);
+            return true;
+        }
+        return false;
+    }
+
+    public static void PersistableUriPermission(Activity activity, Uri uri)
+    {
+        //Log.e("TAG", "PersistableUriPermission: "+uri);
+        activity.getContentResolver()
+                .takePersistableUriPermission(uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                );
+    }
+
+    public static String[] ListPackages(Context context)
+    {
+        List<PackageInfo> installedPackages = context.getPackageManager().getInstalledPackages(0);
+        String[] res = new String[installedPackages.size()];
+        for (int i = 0; i < installedPackages.size(); i++)
+        {
+            res[i] = installedPackages.get(i).packageName;
+        }
+        return res;
+    }
+
+    public static DocumentFile DirectoryDocument(Context context, String path)
+    {
+        DocumentFile documentFile = DocumentFile.fromTreeUri(context, FileUtility.PathUri(path));
+        return documentFile;
+    }
+
+    public static void OpenDocumentsUI(Context context)
+    {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        ComponentName name = new ComponentName("com.google.android.documentsui", "com.android.documentsui.files.FilesActivity");
+        intent.setComponent(name);
+        context.startActivity(intent);
+    }
+
+    public static boolean InScopedStorage()
+    {
+        return (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R); // >= 11
+    }
+
 	private ContextUtility() {}
 }
