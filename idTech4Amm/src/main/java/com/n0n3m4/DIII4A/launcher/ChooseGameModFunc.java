@@ -75,10 +75,11 @@ public final class ChooseGameModFunc extends GameLauncherFunc
                 Q3EGlobals.GAME_BASE_DOOM3,
                 Q3EGlobals.GAME_BASE_QUAKE4,
                 Q3EGlobals.GAME_BASE_PREY,
-                Q3EGlobals.GAME_BASE_QUAKE1,
+                Q3EGlobals.GAME_BASE_QUAKE1_DIR,
                 Q3EGlobals.GAME_BASE_QUAKE2,
                 Q3EGlobals.GAME_BASE_QUAKE3,
                 Q3EGlobals.GAME_BASE_RTCW,
+                Q3EGlobals.GAME_BASE_DOOM3BFG,
                 Q3EGlobals.GAME_BASE_TDM
         ));
         List<String> blackList = new ArrayList<>();
@@ -163,7 +164,7 @@ public final class ChooseGameModFunc extends GameLauncherFunc
             }
             else if(Q3EUtils.q3ei.isQ1)
             {
-                if(Q3EGlobals.GAME_BASE_QUAKE1.equals(fileModel.name))
+                if(Q3EGlobals.GAME_BASE_QUAKE1_DIR.equals(fileModel.name))
                     name = Q3EGlobals.GAME_NAME_QUAKE1;
             }
             else if(Q3EUtils.q3ei.isQ2)
@@ -223,6 +224,10 @@ public final class ChooseGameModFunc extends GameLauncherFunc
                         break;
                     case Q3EGlobals.GAME_TDM:
                         if(!Q3EUtils.q3ei.isTDM)
+                            continue;
+                        break;
+                    case Q3EGlobals.GAME_DOOM3BFG:
+                        if(!Q3EUtils.q3ei.isD3BFG)
                             continue;
                         break;
                     case Q3EGlobals.GAME_DOOM3:

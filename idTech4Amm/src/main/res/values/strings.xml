@@ -37,7 +37,7 @@
     <string name="phong">Phong</string>
     <string name="blinn_phong">Blinn-Phong</string>
     <string name="specular_exponent_cvar_harm_r_specularexponent">Specular exponent(harm_r_specularExponent):</string>
-    <string name="specular_exponent_in_interaction_light_model_default_is_4_0">Specular exponent in interaction light model(default is 4.0)</string>
+    <string name="specular_exponent_in_interaction_light_model_default_is_4_0">Specular exponent in interaction light model(default 4.0)</string>
     <string name="sound">Sound(s_driver)</string>
     <string name="load_quicksave_when_start_game">Load QuickSave when start game</string>
     <string name="edit_autoexec_cfg">Edit autoexec.cfg</string>
@@ -293,6 +293,7 @@
     <string name="quake_2_zaero">Quake II:zaero</string>
     <string name="rtcw_base">Return to Castle Wolfenstein</string>
     <string name="tdm_base">The Dark Mod</string>
+    <string name="d3bfg_base">DOOM 3 BFG</string>
     <string name="quake_3_base">Quake III:Arena</string>
     <string name="quake_3_teamarena">Quake III:Team Arena</string>
     <string name="stop">Stop</string>
@@ -305,7 +306,7 @@
     <string name="sub_directory">Sub directory: </string>
     <string name="app_is_rebooting">App is rebooting......</string>
     <string name="standalone_game_data_directory">Standalone game data directory</string>
-    <string name="game_data_directories_are_standalone"><![CDATA[Game data directories are standalone: DOOM3 -> doom3/; Quake4 -> quake4/; Prey -> prey/; Quake1 -> quake1/; Quake2 -> quake2/; Quake3 -> quake3/; RTCW -> rtcw/; The Dark Mod -> darkmod/ (always)]]></string>
+    <string name="game_data_directories_are_standalone"><![CDATA[DOOM3: doom3\nQuake4: quake4\nPrey(2006): prey\nQuake1: quake1\nQuake2: quake2\nQuake3: quake3\nRTCW: rtcw\nThe Dark Mod: darkmod/ (always)\nDOOM3 BFG: doom3bfg/ (always)]]></string>
     <string name="load_local_engine_library">Load local engine library</string>
     <string name="pid">PID</string>
     <string name="get_application_pid">Get application PID</string>
@@ -314,5 +315,10 @@
     <string name="open_documents">Android Storage Access Framework</string>
     <string name="open_system_file_browser">Open Android Storage Access Framework</string>
     <string name="application_pid">"Application PID: "</string>
+    <string name="doom_3_bfg">DOOM 3 BFG</string>
+    <string name="stencil_shadow_alpha_harm_r_stencilshadowalpha">Translucent stencil shadow alpha(harm_r_stencilShadowAlpha):</string>
+    <string name="_0_1_default_0_5">0 - 1(default 0.5)</string>
+    <string name="soft_stencil_shadow_only_opengles3_1_harm_r_stencilshadowsoft">Soft stencil shadow(Only OpenGLES3.1+)(harm_r_stencilShadowSoft)</string>
+    <string name="soft_0_1_default_0_5">0 - 1(default 0.5)</string>
 
 </resources>

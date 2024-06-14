@@ -29,6 +29,8 @@ public final class CVarSettingUI
                 "r_useShadowMapping",
                 "harm_r_stencilShadowTranslucent",
                 "harm_fs_gameLibDir",
+                "harm_r_stencilShadowAlpha",
+                "harm_r_stencilShadowSoft",
         };
         if(Utility.ArrayContains(IgnoreCVars, cvar.name))
             return TYPE_NONE;

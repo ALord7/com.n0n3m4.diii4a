@@ -32,6 +32,12 @@ If you have questions concerning this license or the applicable additional terms
 #include "qgl.h"
 
 extern bool USING_GLES3;
+#ifdef _OPENGLES3
+extern int GLES3_VERSION;
+#define USING_GLES30 (GLES3_VERSION > -1)
+#define USING_GLES31 (GLES3_VERSION > 0)
+#define USING_GLES32 (GLES3_VERSION > 1)
+#endif
 
 //#define _SHADOW_MAPPING
 #ifdef _SHADOW_MAPPING
@@ -39,7 +45,6 @@ extern bool USING_GLES3;
 //#define SHADOW_MAPPING_DEBUG
 
 #define MAX_SHADOWMAP_RESOLUTIONS 5
-#include "rb/Framebuffer.h"
 
 // RB: added multiple subfrustums for cascaded shadow mapping
 enum frustumPlanes_t
@@ -65,6 +70,9 @@ enum
 	MAX_FRUSTUMS,
 };
 #endif
+
+#include "rb/Framebuffer.h"
+#include "rb/OfflineScreenRenderer.h"
 #include "Image.h"
 
 #include "MegaTexture.h"
@@ -675,9 +683,9 @@ typedef struct {
 	bool		forceGlState;		// the next GL_State will ignore glStateBits and set everything
 
 	shaderProgram_s	*currentProgram;
-#ifdef _SHADOW_MAPPING
-	Framebuffer*		currentFramebuffer;
-#endif
+//#ifdef _SHADOW_MAPPING
+	idFramebuffer*		currentFramebuffer;
+//#endif
 } glstate_t;
 
 
@@ -757,6 +765,8 @@ static const int	MAX_RENDER_CROPS = 8;
 #ifdef _MULTITHREAD
 #include "rb/RenderThread.h"
 void RB_SetupRenderTools(void);
+void R_ShowSurfaceInfo(void); // run on frontend instead of RB_ShowSurfaceInfo
+extern idCVar harm_r_renderToolsMultithread;
 #endif
 
 /*
@@ -1510,9 +1520,14 @@ typedef enum {
 	SHADER_INTERACTIONBLINNPHONGSPOTLIGHT,
 #endif
 	// translucent stencil shadow
-#ifdef _TRANSLUCENT_STENCIL_SHADOW
+#ifdef _STENCIL_SHADOW_IMPROVE
 	SHADER_INTERACTIONTRANSLUCENT,
 	SHADER_INTERACTIONBLINNPHONGTRANSLUCENT,
+
+#ifdef _SOFT_STENCIL_SHADOW
+	SHADER_INTERACTIONSOFT,
+	SHADER_INTERACTIONBLINNPHONGSOFT,
+#endif
 #endif
     // costum
 	SHADER_CUSTOM,
@@ -1529,9 +1544,14 @@ typedef enum {
 #define SHADER_SHADOW_MAPPING_END SHADER_INTERACTIONBLINNPHONGSPOTLIGHT
 #endif
 
-#ifdef _TRANSLUCENT_STENCIL_SHADOW
+#ifdef _STENCIL_SHADOW_IMPROVE
+#ifdef _SOFT_STENCIL_SHADOW
+#define SHADER_STENCIL_SHADOW_BEGIN SHADER_INTERACTIONTRANSLUCENT
+#define SHADER_STENCIL_SHADOW_END SHADER_INTERACTIONBLINNPHONGSOFT
+#else
 #define SHADER_STENCIL_SHADOW_BEGIN SHADER_INTERACTIONTRANSLUCENT
 #define SHADER_STENCIL_SHADOW_END SHADER_INTERACTIONBLINNPHONGTRANSLUCENT
+#endif
 #endif
 
 /*
@@ -2214,9 +2234,15 @@ void R_SetupFrontEndViewDefMVP(void);
 
 #endif
 
-#ifdef _TRANSLUCENT_STENCIL_SHADOW
+#ifdef _STENCIL_SHADOW_IMPROVE
 extern idCVar harm_r_stencilShadowTranslucent;
 extern idCVar harm_r_stencilShadowAlpha;
+
+#ifdef _SOFT_STENCIL_SHADOW
+extern idCVar harm_r_stencilShadowSoft;
+extern idCVar harm_r_stencilShadowSoftBias;
+extern idCVar harm_r_stencilShadowSoftCopyStencilBuffer;
+#endif
 #endif
 
 #ifdef _NO_GAMMA //karin: r_brightness when unsupport gamma

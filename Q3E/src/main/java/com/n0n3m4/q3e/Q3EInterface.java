@@ -25,6 +25,9 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.n0n3m4.q3e.karin.KStr;
+import com.n0n3m4.q3e.karin.KidTech4Command;
+import com.n0n3m4.q3e.karin.KidTechCommand;
+import com.n0n3m4.q3e.karin.KidTechQuakeCommand;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -79,7 +82,7 @@ public class Q3EInterface
 	public boolean joystick_unfixed = false;
 	public boolean joystick_smooth = true; // Q3EView::analog
 
-	public String app_storage_path;
+	public String app_storage_path = "/sdcard/diii4a";
 	
 	//RTCW4A:
 	/*
@@ -107,6 +110,8 @@ public class Q3EInterface
 			return Q3EGlobals.LIB_ENGINE4_TDM;
 		else if(isQ1)
 			return Q3EGlobals.LIB_ENGINE1_QUAKE;
+		else if(isD3BFG)
+			return Q3EGlobals.LIB_ENGINE4_D3BFG;
 		else
 			return Q3EGlobals.LIB_ENGINE_ID;
 	}
@@ -127,6 +132,8 @@ public class Q3EInterface
 			return Q3EGlobals.CONFIG_FILE_TDM;
 		else if(isQ1)
 			return Q3EGlobals.CONFIG_FILE_QUAKE1;
+		else if(isD3BFG)
+			return Q3EGlobals.CONFIG_FILE_DOOM3BFG;
 		else
 			return Q3EGlobals.CONFIG_FILE_DOOM3;
 	}
@@ -147,6 +154,8 @@ public class Q3EInterface
 			return Q3EGlobals.GAME_NAME_TDM;
 		else if(isQ1)
 			return Q3EGlobals.GAME_NAME_QUAKE1;
+		else if(isD3BFG)
+			return Q3EGlobals.GAME_NAME_DOOM3BFG;
 		else
 			return Q3EGlobals.GAME_NAME_DOOM3;
 	}
@@ -167,6 +176,8 @@ public class Q3EInterface
 			return Q3EGlobals.GAME_TDM;
 		else if(isQ1)
 			return Q3EGlobals.GAME_QUAKE1;
+		else if(isD3BFG)
+			return Q3EGlobals.GAME_DOOM3BFG;
 		else
 			return Q3EGlobals.GAME_DOOM3;
 	}
@@ -187,6 +198,8 @@ public class Q3EInterface
 			return Q3EGlobals.GAME_BASE_TDM;
 		else if(isQ1)
 			return Q3EGlobals.GAME_BASE_QUAKE1;
+		else if(isD3BFG)
+			return Q3EGlobals.GAME_BASE_DOOM3BFG;
 		else
 			return Q3EGlobals.GAME_BASE_DOOM3;
 	}
@@ -207,6 +220,8 @@ public class Q3EInterface
 			return Q3EGlobals.TDM_LIBS;
 		else if(isQ1)
 			return Q3EGlobals.Q1_LIBS;
+		else if(isD3BFG)
+			return Q3EGlobals.D3BFG_LIBS;
 		else
 			return Q3EGlobals.LIBS;
 	}
@@ -227,6 +242,8 @@ public class Q3EInterface
 			return Q3EGlobals.GAME_SUBDIR_QUAKE1;
 		else if(isTDM)
 			return Q3EGlobals.GAME_SUBDIR_TDM;
+		else if(isD3BFG)
+			return Q3EGlobals.GAME_SUBDIR_DOOMBFG;
 		else
 			return Q3EGlobals.GAME_SUBDIR_DOOM3;
 	}
@@ -252,6 +269,8 @@ public class Q3EInterface
 			Q3EKeyCodes.InitD3Keycodes();
 		else if(isQ1)
 			Q3EKeyCodes.InitQ1Keycodes();
+		else if(isD3BFG)
+			Q3EKeyCodes.InitD3BFGKeycodes();
 		else
 			Q3EKeyCodes.InitD3Keycodes();
 	}
@@ -267,6 +286,8 @@ public class Q3EInterface
 		if(standalone)
 			subdatadir = subdir;
 		else if(isTDM)
+			subdatadir = subdir;
+		else if(isD3BFG)
 			subdatadir = subdir;
 			// else if(IS_D3()) return null;
 		else
@@ -302,6 +323,8 @@ public class Q3EInterface
 			SetupTDM();
 		else if(Q3EGlobals.GAME_QUAKE1.equalsIgnoreCase(name))
 			SetupQuake1();
+		else if(Q3EGlobals.GAME_DOOM3BFG.equalsIgnoreCase(name))
+			SetupDoom3BFG();
 		else
 			SetupDOOM3();
 	}
@@ -326,6 +349,7 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = false;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -339,6 +363,7 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = false;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -352,12 +377,13 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = false;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
     }
 
 	public void SetupTDM()
 	{
-		isD3 = true;
+		isD3 = false; // true
 		isPrey = false;
 		isQ4 = false;
 		isTDM = true;
@@ -365,6 +391,7 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = false;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -378,6 +405,7 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = false;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -391,6 +419,7 @@ public class Q3EInterface
 		isQ3 = false;
 		isRTCW = true;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -404,6 +433,7 @@ public class Q3EInterface
 		isRTCW = false;
 		isQ3 = true;
 		isQ1 = false;
+		isD3BFG = false;
 		SetupGameConfig();
 	}
 
@@ -417,6 +447,21 @@ public class Q3EInterface
 		isRTCW = false;
 		isQ3 = false;
 		isQ1 = true;
+		isD3BFG = false;
+		SetupGameConfig();
+	}
+
+	public void SetupDoom3BFG()
+	{
+		isD3 = false;
+		isPrey = false;
+		isQ4 = false;
+		isTDM = false;
+		isQ2 = false;
+		isRTCW = false;
+		isQ3 = false;
+		isQ1 = false;
+		isD3BFG = true;
 		SetupGameConfig();
 	}
 
@@ -445,6 +490,11 @@ public class Q3EInterface
 		return isQ1;
 	}
 
+	public boolean IsIdTech4BFG()
+	{
+		return isD3BFG;
+	}
+
 	public String GetGameCommandParm()
 	{
 		if(isPrey)
@@ -458,11 +508,39 @@ public class Q3EInterface
 		else if(isRTCW)
 			return "fs_game";
 		else if(isTDM)
-			return "fs_mod";
+			return "fs_currentfm"; // fs_mod
 		else if(isQ1)
 			return "game";
+		else if(isD3BFG)
+			return "fs_game";
 		else
 			return "fs_game";
+	}
+
+	public char GetGameCommandPrefix()
+	{
+		if(isQ1)
+			return KidTechCommand.ARG_PREFIX_QUAKETECH;
+		else
+			return KidTechCommand.ARG_PREFIX_IDTECH;
+	}
+
+	public String GetGameModSubDirectory()
+	{
+		if(isQ1)
+			return "darkplaces";
+		else if(isTDM)
+			return "fms";
+		else
+			return null;
+	}
+
+	public KidTechCommand GetGameCommandEngine(String cmd)
+	{
+		if(isQ1)
+			return new KidTechQuakeCommand(cmd);
+		else
+			return new KidTech4Command(cmd);
 	}
 
     public void InitTextureTable()
@@ -677,6 +755,8 @@ public class Q3EInterface
 			return Q3EPreference.pref_harm_tdm_fs_game;
 		else if(Q3EUtils.q3ei.isQ1)
 			return Q3EPreference.pref_harm_q1_fs_game;
+		else if(Q3EUtils.q3ei.isD3BFG)
+			return Q3EPreference.pref_harm_d3bfg_fs_game;
 		else
 			return Q3EPreference.pref_harm_fs_game;
 	}
@@ -697,6 +777,8 @@ public class Q3EInterface
 			return Q3EPreference.pref_harm_tdm_user_mod;
 		else if(Q3EUtils.q3ei.isQ1)
 			return Q3EPreference.pref_harm_q1_user_mod;
+		else if(Q3EUtils.q3ei.isD3BFG)
+			return Q3EPreference.pref_harm_d3bfg_user_mod;
 		else
 			return Q3EPreference.pref_harm_user_mod;
 	}
@@ -717,6 +799,8 @@ public class Q3EInterface
 			return Q3EPreference.pref_harm_tdm_game_lib;
 		else if(Q3EUtils.q3ei.isQ1)
 			return Q3EPreference.pref_harm_q1_game_lib;
+		else if(Q3EUtils.q3ei.isD3BFG)
+			return Q3EPreference.pref_harm_d3bfg_game_lib;
 		else
 			return Q3EPreference.pref_harm_game_lib;
 	}
@@ -737,8 +821,20 @@ public class Q3EInterface
 			return Q3EPreference.pref_params_tdm;
 		else if(Q3EUtils.q3ei.isQ1)
 			return Q3EPreference.pref_params_q1;
+		else if(Q3EUtils.q3ei.isD3BFG)
+			return Q3EPreference.pref_params_d3bfg;
 		else
 			return Q3EPreference.pref_params;
+	}
+
+	public String GetGameHomeDirectoryPath()
+	{
+		if(Q3EUtils.q3ei.isD3BFG)
+			return ".local/share/rbdoom3bfg";
+		else if(Q3EUtils.q3ei.isQ2)
+			return ".yq2";
+		else
+			return null;
 	}
 
 	public void LoadTypeAndArgTablePreference(Context context)
@@ -787,6 +883,8 @@ public class Q3EInterface
 			return Q3EGlobals.GAME_SUBDIR_TDM;
 		else if(Q3EGlobals.GAME_QUAKE1.equalsIgnoreCase(name))
 			return Q3EGlobals.GAME_SUBDIR_QUAKE1;
+		else if(Q3EGlobals.GAME_DOOM3BFG.equalsIgnoreCase(name))
+			return Q3EGlobals.GAME_SUBDIR_DOOMBFG;
 		else
 			return Q3EGlobals.GAME_SUBDIR_DOOM3;
 	}

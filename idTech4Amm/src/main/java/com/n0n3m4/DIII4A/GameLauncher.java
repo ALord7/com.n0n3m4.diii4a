@@ -92,17 +92,15 @@ import com.n0n3m4.q3e.Q3EAd;
 import com.n0n3m4.q3e.Q3EControlView;
 import com.n0n3m4.q3e.Q3EGlobals;
 import com.n0n3m4.q3e.Q3EInterface;
-import com.n0n3m4.q3e.Q3EJNI;
 import com.n0n3m4.q3e.Q3EKeyCodes;
 import com.n0n3m4.q3e.Q3ELang;
-import com.n0n3m4.q3e.Q3EMain;
 import com.n0n3m4.q3e.Q3EPreference;
 import com.n0n3m4.q3e.Q3EUiConfig;
 import com.n0n3m4.q3e.Q3EUtils;
 import com.n0n3m4.q3e.gl.Q3EGLConstants;
 import com.n0n3m4.q3e.karin.KStr;
 import com.n0n3m4.q3e.karin.KUncaughtExceptionHandler;
-import com.n0n3m4.q3e.karin.KidTech4Command;
+import com.n0n3m4.q3e.karin.KidTechCommand;
 import com.n0n3m4.q3e.onscreen.Q3EControls;
 
 import java.io.File;
@@ -111,7 +109,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @SuppressLint({"ApplySharedPref", "CommitPrefEdits"})
 public class GameLauncher extends Activity
@@ -319,7 +316,14 @@ public class GameLauncher extends Activity
 			{
 				setProp("harm_r_stencilShadowTranslucent", isChecked);
 				PreferenceManager.getDefaultSharedPreferences(GameLauncher.this).edit()
-						.putBoolean(Q3EPreference.pref_harm_s_useOpenAL, isChecked)
+						.putBoolean(Q3EPreference.pref_harm_r_stencilShadowTranslucent, isChecked)
+						.commit();
+			}
+			else if (id == R.id.cb_stencilShadowSoft)
+			{
+				setProp("harm_r_stencilShadowSoft", isChecked);
+				PreferenceManager.getDefaultSharedPreferences(GameLauncher.this).edit()
+						.putBoolean(Q3EPreference.pref_harm_r_stencilShadowSoft, isChecked)
 						.commit();
 			}
         }
@@ -356,7 +360,7 @@ public class GameLauncher extends Activity
 						.putString(Q3EPreference.pref_harm_r_lightModel, value)
 						.commit();
 			}
-			else if (rgId == R.id.rg_fs_game || rgId == R.id.rg_fs_q4game || rgId == R.id.rg_fs_preygame || rgId == R.id.rg_fs_q2game || rgId == R.id.rg_fs_q3game || rgId == R.id.rg_fs_rtcwgame || rgId == R.id.rg_fs_tdmgame || rgId == R.id.rg_fs_q1game)
+			else if (rgId == R.id.rg_fs_game || rgId == R.id.rg_fs_q4game || rgId == R.id.rg_fs_preygame || rgId == R.id.rg_fs_q2game || rgId == R.id.rg_fs_q3game || rgId == R.id.rg_fs_rtcwgame || rgId == R.id.rg_fs_tdmgame || rgId == R.id.rg_fs_q1game || rgId == R.id.rg_fs_d3bfggame)
 			{
 				RadioButton checked = radioGroup.findViewById(id);
 				SetGameDLL((String)checked.getTag());
@@ -510,6 +514,34 @@ public class GameLauncher extends Activity
                     .commit();
         }
     }
+	private class SaveFloatPreferenceTextWatcher implements TextWatcher
+	{
+		private final String name;
+		private final String preference;
+		private final float defValue;
+
+        public SaveFloatPreferenceTextWatcher(String name, String preference, float defValue)
+		{
+			this.name = name;
+			this.preference = preference;
+			this.defValue = defValue;
+		}
+
+		public void onTextChanged(CharSequence s, int start, int before, int count)
+		{
+			SetProp(name, s);
+		}
+
+		public void beforeTextChanged(CharSequence s, int start, int count, int after)
+		{
+		}
+
+		public void afterTextChanged(Editable s)
+		{
+			String value = s.length() == 0 ? "" + defValue : s.toString();
+			Q3EPreference.SetFloatFromString(GameLauncher.this, preference, value, defValue);
+		}
+	}
 
 	private class CommandTextWatcher implements TextWatcher
 	{
@@ -700,13 +732,14 @@ public class GameLauncher extends Activity
 
     public boolean getProp(String name)
     {
-        Boolean b = KidTech4Command.GetBoolProp(GetCmdText(), name, false);
+		Boolean b = Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).GetBoolProp(name, false);
+        // Boolean b = KidTech4Command.GetBoolProp(GetCmdText(), name, false);
         return null != b ? b : false;
     }
 
     public void setProp(String name, boolean val)
     {
-        SetProp(name, KidTech4Command.btostr(val));
+        SetProp(name, KidTechCommand.btostr(val));
     }
 
     public void updatehacktings()
@@ -768,7 +801,14 @@ public class GameLauncher extends Activity
 		if (!IsProp("r_useShadowMapping")) SetProp("r_useShadowMapping", "0");
 
 		V.cb_translucentStencilShadow.setChecked(getProp("harm_r_stencilShadowTranslucent", false));
-		if (!IsProp("harm_r_stencilShadowTranslucent")) setProp("r_useDXT", false);
+		if (!IsProp("harm_r_stencilShadowTranslucent")) setProp("harm_r_stencilShadowTranslucent", false);
+		str = GetProp("harm_r_stencilShadowAlpha");
+		if (null != str)
+			V.edt_harm_r_stencilShadowAlpha.setText(str);
+		if (!IsProp("harm_r_stencilShadowAlpha")) SetProp("harm_r_stencilShadowAlpha", "0.5");
+
+		V.cb_stencilShadowSoft.setChecked(getProp("harm_r_stencilShadowSoft", false));
+		if (!IsProp("harm_r_stencilShadowSoft")) setProp("harm_r_stencilShadowTranslucent", false);
 
 		V.cb_s_useOpenAL.setChecked(getProp("s_useOpenAL", false));
 		if (!IsProp("s_useOpenAL"))
@@ -783,7 +823,7 @@ public class GameLauncher extends Activity
 			if (!IsProp("s_useEAXReverb")) setProp("s_useEAXReverb", false);
 		}
 
-        str = GetProp(Q3EUtils.q3ei.GetGameCommandParm());
+		str = GetGameModFromCommand();
         if (str != null)
         {
             if (!V.fs_game_user.isChecked())
@@ -795,7 +835,7 @@ public class GameLauncher extends Activity
 				}
 /*				else
 				{
-					RemoveProp(Q3EUtils.q3ei.GetGameCommandParm());
+					RemoveGameModFromCommand();
 					RemoveProp("fs_game_base");
 				}*/
             }
@@ -842,15 +882,15 @@ public class GameLauncher extends Activity
         preference.edit().putString(Q3EPreference.pref_harm_game_lib, "").commit();
         if (on)
         {
-            SetProp(Q3EUtils.q3ei.GetGameCommandParm(), game);
+			SetGameModToCommand(game);
             //RemoveProp("fs_game_base");
         }
         else
         {
 			if (!prop.is_user && !game.isEmpty())
-				SetProp(Q3EUtils.q3ei.GetGameCommandParm(), game);
+				SetGameModToCommand(game);
 			else
-				RemoveProp(Q3EUtils.q3ei.GetGameCommandParm());
+				RemoveGameModFromCommand();
             //RemoveProp("fs_game_base");
         }
         V.edt_fs_game.setText(game);
@@ -862,6 +902,7 @@ public class GameLauncher extends Activity
 		V.rg_fs_q3game.setEnabled(!on);
 		V.rg_fs_rtcwgame.setEnabled(!on);
 		V.rg_fs_tdmgame.setEnabled(!on);
+		V.rg_fs_d3bfggame.setEnabled(!on);
         V.fs_game_user.setText(on ? R.string.mod_ : R.string.user_mod);
         //V.launcher_tab1_game_lib_button.setEnabled(on);
         V.edt_fs_game.setEnabled(on);
@@ -967,11 +1008,11 @@ public class GameLauncher extends Activity
         V.launcher_tab2_enable_gyro.setChecked(mPrefs.getBoolean(Q3EPreference.pref_harm_view_motion_control_gyro, false));
 		boolean skipIntro = mPrefs.getBoolean(Q3EPreference.pref_harm_skip_intro, false);
 		V.skip_intro.setChecked(skipIntro);
-		if (skipIntro)
+		if (skipIntro && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.IsIdTech3()))
 			SetCommand_temp("disconnect", true);
         boolean autoQuickLoad = mPrefs.getBoolean(Q3EPreference.pref_harm_auto_quick_load, false);
         V.auto_quick_load.setChecked(autoQuickLoad);
-        if (autoQuickLoad && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.IsIdTech3() || Q3EUtils.q3ei.IsTDMTech()))
+        if (autoQuickLoad && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.isRTCW))
             SetParam_temp("loadGame", "QuickSave");
         boolean multithreading = mPrefs.getBoolean(Q3EPreference.pref_harm_multithreading, false);
         V.multithreading.setChecked(multithreading);
@@ -1013,12 +1054,13 @@ public class GameLauncher extends Activity
 		V.rg_fs_q3game.setOnCheckedChangeListener(m_groupCheckChangeListener);
 		V.rg_fs_rtcwgame.setOnCheckedChangeListener(m_groupCheckChangeListener);
 		V.rg_fs_tdmgame.setOnCheckedChangeListener(m_groupCheckChangeListener);
+		V.rg_fs_d3bfggame.setOnCheckedChangeListener(m_groupCheckChangeListener);
         V.edt_fs_game.addTextChangedListener(new TextWatcher()
         {
             public void onTextChanged(CharSequence s, int start, int before, int count)
             {
                 if (V.fs_game_user.isChecked())
-                    SetProp(Q3EUtils.q3ei.GetGameCommandParm(), s);
+					SetGameModToCommand(s.toString());
             }
 
             public void beforeTextChanged(CharSequence s, int start, int count, int after)
@@ -1047,23 +1089,7 @@ public class GameLauncher extends Activity
 
         //DIII4A-specific
 		SetupCommandTextWatcher(true);
-        V.edt_harm_r_specularExponent.addTextChangedListener(new TextWatcher()
-        {
-            public void onTextChanged(CharSequence s, int start, int before, int count)
-            {
-                SetProp("harm_r_specularExponent", s);
-            }
-
-            public void beforeTextChanged(CharSequence s, int start, int count, int after)
-            {
-            }
-
-            public void afterTextChanged(Editable s)
-            {
-                String value = s.length() == 0 ? "4.0" : s.toString();
-				Q3EPreference.SetFloatFromString(GameLauncher.this, Q3EPreference.pref_harm_r_specularExponent, value, 4.0f);
-            }
-        });
+        V.edt_harm_r_specularExponent.addTextChangedListener(new SaveFloatPreferenceTextWatcher("harm_r_specularExponent", Q3EPreference.pref_harm_r_specularExponent, 4.0f));
 		V.edt_harm_r_maxFps.addTextChangedListener(new TextWatcher()
 		{
 			public void onTextChanged(CharSequence s, int start, int before, int count)
@@ -1154,8 +1180,14 @@ public class GameLauncher extends Activity
 		V.readonly_command.setChecked(readonlyCommand);
 		SetupCommandLine(readonlyCommand);
 		V.readonly_command.setOnCheckedChangeListener(m_checkboxChangeListener);
-		V.cb_translucentStencilShadow.setChecked(mPrefs.getBoolean(Q3EPreference.pref_harm_r_translucentStencilShadow, false));
+		V.cb_translucentStencilShadow.setChecked(mPrefs.getBoolean(Q3EPreference.pref_harm_r_stencilShadowTranslucent, false));
 		V.cb_translucentStencilShadow.setOnCheckedChangeListener(m_checkboxChangeListener);
+		V.edt_harm_r_stencilShadowAlpha.setText(Q3EPreference.GetStringFromFloat(mPrefs, Q3EPreference.pref_harm_r_stencilShadowAlpha, 0.5f));
+		V.edt_harm_r_stencilShadowAlpha.addTextChangedListener(new SaveFloatPreferenceTextWatcher("harm_r_stencilShadowAlpha", Q3EPreference.pref_harm_r_stencilShadowAlpha, 0.5f));
+
+		V.cb_stencilShadowSoft.setChecked(mPrefs.getBoolean(Q3EPreference.pref_harm_r_stencilShadowSoft, false));
+		V.cb_stencilShadowSoft.setOnCheckedChangeListener(m_checkboxChangeListener);
+
 		SetupTempCommandLine(false);
 		V.editable_temp_command.setOnCheckedChangeListener(m_checkboxChangeListener);
 		V.edt_cmdline_temp.addTextChangedListener(new TextWatcher()
@@ -1247,13 +1279,15 @@ public class GameLauncher extends Activity
     {
 		if(!LockCmdUpdate())
 			return;
-        SetCmdText(KidTech4Command.SetProp(GetCmdText(), name, val));
+		SetCmdText(Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).SetProp(name, val).toString());
+        //SetCmdText(KidTech4Command.SetProp(GetCmdText(), name, val));
         UnlockCmdUpdate();
     }
 
     private String GetProp(String name)
     {
-        return KidTech4Command.GetProp(GetCmdText(), name);
+		return Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).Prop(name);
+		// return KidTech4Command.GetProp(GetCmdText(), name);
     }
 
     private void RemoveProp(String name)
@@ -1261,7 +1295,8 @@ public class GameLauncher extends Activity
 		if(!LockCmdUpdate())
 			return;
         boolean[] res = {false};
-        String str = KidTech4Command.RemoveProp(GetCmdText(), name, res);
+        // String str = KidTech4Command.RemoveProp(GetCmdText(), name, res);
+		String str = Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).RemoveProp(name, res).toString();
         if (res[0])
             SetCmdText(str);
         UnlockCmdUpdate();
@@ -1269,7 +1304,8 @@ public class GameLauncher extends Activity
 
     private boolean IsProp(String name)
     {
-        return KidTech4Command.IsProp(GetCmdText(), name);
+		return Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).IsProp(name);
+        // return KidTech4Command.IsProp(GetCmdText(), name);
     }
 
     private void EditFile(String file)
@@ -1278,11 +1314,12 @@ public class GameLauncher extends Activity
             m_editConfigFileFunc = new EditConfigFileFunc(this, CONST_RESULT_CODE_REQUEST_EXTERNAL_STORAGE_FOR_EDIT_CONFIG_FILE);
 
         Bundle bundle = new Bundle();
-        String game = GetProp(Q3EUtils.q3ei.GetGameCommandParm());
+        String game = GetGameModFromCommand();
         if (game == null || game.isEmpty())
             game = Q3EUtils.q3ei.game_base;
+		String path = KStr.AppendPath(V.edt_path.getText().toString(), Q3EUtils.q3ei.subdatadir, Q3EUtils.q3ei.GetGameHomeDirectoryPath());
         bundle.putString("game", game);
-		bundle.putString("path", KStr.AppendPath(V.edt_path.getText().toString(), Q3EUtils.q3ei.subdatadir));
+		bundle.putString("path", path);
         bundle.putString("file", file);
         m_editConfigFileFunc.Start(bundle);
     }
@@ -1438,6 +1475,11 @@ public class GameLauncher extends Activity
 			ChangeGame(Q3EGlobals.GAME_TDM);
 			return true;
 		}
+		else if (itemId == R.id.main_menu_game_doom3bfg)
+		{
+			ChangeGame(Q3EGlobals.GAME_DOOM3BFG);
+			return true;
+		}
 		else if (itemId == android.R.id.home)
 		{
 			ChangeGame();
@@ -1587,7 +1629,9 @@ public class GameLauncher extends Activity
 		mEdtr.putBoolean(Q3EPreference.pref_harm_s_useOpenAL, V.cb_s_useOpenAL.isChecked());
 		mEdtr.putBoolean(Q3EPreference.pref_harm_s_useEAXReverb, V.cb_s_useEAXReverb.isChecked());
 		mEdtr.putBoolean(PreferenceKey.READONLY_COMMAND, V.readonly_command.isChecked());
-		mEdtr.putBoolean(Q3EPreference.pref_harm_r_translucentStencilShadow, V.cb_translucentStencilShadow.isChecked());
+		mEdtr.putBoolean(Q3EPreference.pref_harm_r_stencilShadowTranslucent, V.cb_translucentStencilShadow.isChecked());
+		mEdtr.putFloat(Q3EPreference.pref_harm_r_stencilShadowAlpha, Q3EUtils.parseFloat_s(V.edt_harm_r_stencilShadowAlpha.getText().toString(), 0.5f));
+		mEdtr.putBoolean(Q3EPreference.pref_harm_r_stencilShadowSoft, V.cb_stencilShadowSoft.isChecked());
 
 		// mEdtr.putString(Q3EUtils.q3ei.GetGameModPreferenceKey(), V.edt_fs_game.getText().toString());
         mEdtr.commit();
@@ -1985,6 +2029,7 @@ public class GameLauncher extends Activity
         Resources res = getResources();
         int colorId = GameManager.GetGameThemeColor();
         int iconId = GameManager.GetGameIcon();
+
         boolean d3Visible = false;
         boolean q4Visible = false;
         boolean preyVisible = false;
@@ -1993,12 +2038,17 @@ public class GameLauncher extends Activity
 		boolean q3Visible = false;
 		boolean rtcwVisible = false;
 		boolean tdmVisible = false;
+		boolean d3bfgVisible = false;
+
 		boolean rendererVisible = true;
 		boolean soundVisible = true;
 		boolean otherVisible = true;
 		boolean openglVisible = true;
 		boolean modVisible = true;
 		boolean dllVisible = true;
+		boolean quickloadVisible = true;
+		boolean skipintroVisible = true;
+
         if (Q3EUtils.q3ei.isPrey)
         {
             preyVisible = true;
@@ -2014,8 +2064,10 @@ public class GameLauncher extends Activity
 			soundVisible = false;
 			otherVisible = false;
 			openglVisible = false;
-			modVisible = false;
+			// modVisible = false;
 			dllVisible = false;
+			quickloadVisible = false;
+			skipintroVisible = false;
 		}
 		else if (Q3EUtils.q3ei.isQ2)
 		{
@@ -2025,6 +2077,8 @@ public class GameLauncher extends Activity
 			otherVisible = false;
 			openglVisible = false;
 			dllVisible = false;
+			quickloadVisible = false;
+			skipintroVisible = false;
 		}
 		else if (Q3EUtils.q3ei.isQ3)
 		{
@@ -2034,6 +2088,7 @@ public class GameLauncher extends Activity
 			otherVisible = false;
 			openglVisible = false;
 			dllVisible = false;
+			quickloadVisible = false;
 		}
 		else if (Q3EUtils.q3ei.isRTCW)
 		{
@@ -2051,8 +2106,21 @@ public class GameLauncher extends Activity
 			soundVisible = false;
 			otherVisible = false;
 			openglVisible = false;
-			modVisible = false;
+			// modVisible = false;
 			dllVisible = false;
+			quickloadVisible = false;
+			skipintroVisible = false;
+		}
+		else if (Q3EUtils.q3ei.isD3BFG)
+		{
+			d3bfgVisible = true;
+			rendererVisible = false;
+			soundVisible = false;
+			otherVisible = false;
+			openglVisible = false;
+			dllVisible = false;
+			quickloadVisible = false;
+			skipintroVisible = false;
 		}
         else
         {
@@ -2074,6 +2142,7 @@ public class GameLauncher extends Activity
 		V.rg_fs_q3game.setVisibility(q3Visible ? View.VISIBLE : View.GONE);
 		V.rg_fs_rtcwgame.setVisibility(rtcwVisible ? View.VISIBLE : View.GONE);
 		V.rg_fs_tdmgame.setVisibility(tdmVisible ? View.VISIBLE : View.GONE);
+		V.rg_fs_d3bfggame.setVisibility(d3bfgVisible ? View.VISIBLE : View.GONE);
 
 		V.renderer_section.setVisibility(rendererVisible ? View.VISIBLE : View.GONE);
 		V.sound_section.setVisibility(soundVisible ? View.VISIBLE : View.GONE);
@@ -2081,7 +2150,8 @@ public class GameLauncher extends Activity
 		V.opengl_section.setVisibility(openglVisible ? View.VISIBLE : View.GONE);
 		V.mod_section.setVisibility(modVisible ? View.VISIBLE : View.GONE);
 		V.dll_section.setVisibility(dllVisible ? View.VISIBLE : View.GONE);
-		V.auto_quick_load.setVisibility(q2Visible ? View.GONE : View.VISIBLE);
+		V.auto_quick_load.setVisibility(quickloadVisible ? View.VISIBLE : View.GONE);
+		V.skip_intro.setVisibility(skipintroVisible ? View.VISIBLE : View.GONE);
 
 		String subdir = Q3EUtils.q3ei.subdatadir;
 		if(null == subdir)
@@ -2130,6 +2200,9 @@ public class GameLauncher extends Activity
 		GameManager.GameProp prop = m_gameManager.ChangeGameMod(game, userMod);
 		HandleGameProp(prop);
 		SelectCheckbox(GetGameModRadioGroup(), prop.index);
+
+		Q3EUtils.q3ei.start_temporary_extra_command = GetTempBaseCommand();
+		UpdateTempCommand();
     }
 
 	private void SetupCommandTextWatcher(boolean b)
@@ -2160,7 +2233,8 @@ public class GameLauncher extends Activity
         if(!LockCmdUpdate())
         	return false;
         boolean[] res = {false};
-        String str = KidTech4Command.RemoveParam(GetCmdText(), name, res);
+        // String str = KidTech4Command.RemoveParam(GetCmdText(), name, res);
+		String str = Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).RemoveParam(name, res).toString();
         if (res[0])
             SetCmdText(str);
         UnlockCmdUpdate();
@@ -2171,13 +2245,15 @@ public class GameLauncher extends Activity
     {
 		if(!LockCmdUpdate())
 			return;
-        SetCmdText(KidTech4Command.SetParam(GetCmdText(), name, val));
+        SetCmdText(Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).SetParam(name, val).toString());
+		// SetCmdText(KidTech4Command.SetParam(GetCmdText(), name, val));
         UnlockCmdUpdate();
     }
 
     private String GetParam(String name)
     {
-        return KidTech4Command.GetParam(GetCmdText(), name);
+		return Q3EUtils.q3ei.GetGameCommandEngine(GetCmdText()).Param(name);
+        // return KidTech4Command.GetParam(GetCmdText(), name);
     }
 
 	private String GetTempCmdText()
@@ -2188,7 +2264,8 @@ public class GameLauncher extends Activity
     private void RemoveParam_temp(String name)
     {
         boolean[] res = {false};
-        String str = KidTech4Command.RemoveParam(GetTempCmdText(), name, res);
+        String str = Q3EUtils.q3ei.GetGameCommandEngine(GetTempCmdText()).RemoveParam(name, res).toString();
+		// String str = KidTech4Command.RemoveParam(GetTempCmdText(), name, res);
         if (res[0])
             Q3EUtils.q3ei.start_temporary_extra_command = str;
 		UpdateTempCommand();
@@ -2196,20 +2273,25 @@ public class GameLauncher extends Activity
 
     private void SetParam_temp(String name, Object val)
     {
-        Q3EUtils.q3ei.start_temporary_extra_command = (KidTech4Command.SetParam(GetTempCmdText(), name, val));
+		String str = Q3EUtils.q3ei.GetGameCommandEngine(GetTempCmdText()).SetParam(name, val).toString();
+		// String str = KidTech4Command.SetParam(GetTempCmdText(), name, val);
+        Q3EUtils.q3ei.start_temporary_extra_command = str;
 		UpdateTempCommand();
     }
 
 	private void SetCommand_temp(String name, boolean prepend)
 	{
-		Q3EUtils.q3ei.start_temporary_extra_command = (KidTech4Command.SetCommand(GetTempCmdText(), name, prepend));
+		String str = Q3EUtils.q3ei.GetGameCommandEngine(GetTempCmdText()).SetCommand(name, prepend).toString();
+		// String str = KidTech4Command.SetCommand(GetTempCmdText(), name, prepend);
+		Q3EUtils.q3ei.start_temporary_extra_command = str;
 		UpdateTempCommand();
 	}
 
 	private void RemoveCommand_temp(String name)
 	{
 		boolean[] res = {false};
-		String str = KidTech4Command.RemoveCommand(GetTempCmdText(), name, res);
+		String str = Q3EUtils.q3ei.GetGameCommandEngine(GetTempCmdText()).RemoveCommand(name, res).toString();
+		// String str = KidTech4Command.RemoveCommand(GetTempCmdText(), name, res);
 		if (res[0])
 			Q3EUtils.q3ei.start_temporary_extra_command = str;
 		UpdateTempCommand();
@@ -2262,6 +2344,8 @@ public class GameLauncher extends Activity
 			return V.rg_fs_rtcwgame;
 		else if(Q3EUtils.q3ei.isTDM)
 			return V.rg_fs_tdmgame;
+		else if(Q3EUtils.q3ei.isD3BFG)
+			return V.rg_fs_d3bfggame;
 		else
         	return V.rg_fs_game;
     }
@@ -2298,7 +2382,7 @@ public class GameLauncher extends Activity
 	private void EditCVar()
 	{
 		Bundle bundle = new Bundle();
-		bundle.putString("game", GetProp(Q3EUtils.q3ei.GetGameCommandParm()));
+		bundle.putString("game", GetGameModFromCommand());
 		bundle.putString("command", Q3EUtils.q3ei.start_temporary_extra_command);
 		bundle.putString("baseCommand", GetTempBaseCommand());
 		CVarEditorFunc cVarEditorFunc = new CVarEditorFunc(this, new Runnable()
@@ -2318,10 +2402,10 @@ public class GameLauncher extends Activity
 		SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(GameLauncher.this);
 		String tempCmd = "";
 		boolean skipIntro = preferences.getBoolean(Q3EPreference.pref_harm_skip_intro, false);
-		if (skipIntro)
+		if (skipIntro && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.IsIdTech3()))
 			tempCmd += " +disconnect";
 		boolean quickSave = preferences.getBoolean(Q3EPreference.pref_harm_auto_quick_load, false);
-		if (quickSave && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.IsIdTech3() || Q3EUtils.q3ei.IsTDMTech()))
+		if (quickSave && (Q3EUtils.q3ei.IsIdTech4() || Q3EUtils.q3ei.isRTCW))
 			tempCmd += " +loadGame QuickSave";
 		return tempCmd.trim();
 	}
@@ -2354,8 +2438,9 @@ public class GameLauncher extends Activity
 			}
 		});
 		Bundle bundle = new Bundle();
+		String path = KStr.AppendPath(preference.getString(Q3EPreference.pref_datapath, default_gamedata), Q3EUtils.q3ei.subdatadir, Q3EUtils.q3ei.GetGameModSubDirectory());
 		bundle.putString("mod", preference.getString(preferenceKey, ""));
-		bundle.putString("path", KStr.AppendPath(preference.getString(Q3EPreference.pref_datapath, default_gamedata), Q3EUtils.q3ei.subdatadir));
+		bundle.putString("path", path);
 		m_chooseGameModFunc.Start(bundle);
 	}
 
@@ -2382,18 +2467,18 @@ public class GameLauncher extends Activity
 		if(prop.is_user)
 		{
 			if (!prop.fs_game.isEmpty())
-				SetProp(Q3EUtils.q3ei.GetGameCommandParm(), prop.fs_game);
+				SetGameModToCommand(prop.fs_game);
 			else
-				RemoveProp(Q3EUtils.q3ei.GetGameCommandParm());
+				RemoveGameModFromCommand();
 			RemoveProp("fs_game_base");
 			RemoveProp("harm_fs_gameLibPath");
 		}
 		else
 		{
 			if(null == prop.fs_game || prop.fs_game.isEmpty() || !prop.IsValid())
-				RemoveProp(Q3EUtils.q3ei.GetGameCommandParm());
+				RemoveGameModFromCommand();
 			else
-				SetProp(Q3EUtils.q3ei.GetGameCommandParm(), prop.fs_game);
+				SetGameModToCommand(prop.fs_game);
 			if(null == prop.fs_game_base || prop.fs_game_base.isEmpty() || !prop.IsValid())
 				RemoveProp("fs_game_base");
 			else
@@ -2422,6 +2507,7 @@ public class GameLauncher extends Activity
 		groups.put(Q3EGlobals.GAME_QUAKE3, V.rg_fs_q3game);
 		groups.put(Q3EGlobals.GAME_RTCW, V.rg_fs_rtcwgame);
 		groups.put(Q3EGlobals.GAME_TDM, V.rg_fs_tdmgame);
+		groups.put(Q3EGlobals.GAME_DOOM3BFG, V.rg_fs_d3bfggame);
 		Game[] values = Game.values();
 
 		for (Game value : values)
@@ -2470,6 +2556,33 @@ public class GameLauncher extends Activity
 			Toast.makeText(GameLauncher.this, Q3ELang.tr(this, R.string.suggest_game_woring_directory_tips, path), Toast.LENGTH_LONG).show();
 		}
 		m_edtPathFocused = curPath;
+	}
+
+	private void SetGameModToCommand(String mod)
+	{
+		String arg = Q3EUtils.q3ei.GetGameCommandParm();
+		if(Q3EUtils.q3ei.isQ1)
+			SetParam(arg, mod);
+		else
+			SetProp(arg, mod);
+	}
+
+	private String GetGameModFromCommand()
+	{
+		String arg = Q3EUtils.q3ei.GetGameCommandParm();
+		if(Q3EUtils.q3ei.isQ1)
+			return GetParam(arg);
+		else
+			return GetProp(arg);
+	}
+
+	private void RemoveGameModFromCommand()
+	{
+		String arg = Q3EUtils.q3ei.GetGameCommandParm();
+		if(Q3EUtils.q3ei.isQ1)
+			RemoveParam(arg);
+		else
+			RemoveProp(arg);
 	}
 
 
@@ -2554,8 +2667,11 @@ public class GameLauncher extends Activity
 		public RadioGroup rg_fs_q3game;
 		public RadioGroup rg_fs_rtcwgame;
 		public RadioGroup rg_fs_tdmgame;
+		public RadioGroup rg_fs_d3bfggame;
 		public Spinner launcher_tab2_joystick_visible;
 		public TextView launcher_fs_game_subdir;
+		public CheckBox cb_stencilShadowSoft;
+		public EditText edt_harm_r_stencilShadowAlpha;
 
         public void Setup()
         {
@@ -2636,8 +2752,11 @@ public class GameLauncher extends Activity
 			rg_fs_q3game = findViewById(R.id.rg_fs_q3game);
 			rg_fs_rtcwgame = findViewById(R.id.rg_fs_rtcwgame);
 			rg_fs_tdmgame = findViewById(R.id.rg_fs_tdmgame);
+			rg_fs_d3bfggame = findViewById(R.id.rg_fs_d3bfggame);
 			launcher_tab2_joystick_visible = findViewById(R.id.launcher_tab2_joystick_visible);
 			launcher_fs_game_subdir = findViewById(R.id.launcher_fs_game_subdir);
+			cb_stencilShadowSoft = findViewById(R.id.cb_stencilShadowSoft);
+			edt_harm_r_stencilShadowAlpha = findViewById(R.id.edt_harm_r_stencilShadowAlpha);
         }
     }
 }

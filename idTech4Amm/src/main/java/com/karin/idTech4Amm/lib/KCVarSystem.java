@@ -51,11 +51,14 @@ public final class KCVarSystem
                                 "1", "prelight shadow using shadow mapping, others using stencil shadow",
                                 "2", "non-prelight shadow using shadow mapping, others using stencil shadow"
                         ),*/
+                        KCVar.CreateCVar("r_forceShadowMapsOnAlphaTestedSurfaces", "bool", "0", "render perforated surface to shadow map", 0),
 
                         KCVar.CreateCVar("harm_r_stencilShadowTranslucent", "bool", "0", "enable translucent shadow in stencil shadow", 0),
                         KCVar.CreateCVar("harm_r_stencilShadowAlpha", "float", "0.5", "translucent shadow's alpha in stencil shadow", KCVar.FLAG_POSITIVE),
                         KCVar.CreateCVar("harm_r_stencilShadowCombine", "bool", "0", "combine local and global stencil shadow", 0),
-                        KCVar.CreateCVar("r_forceShadowMapsOnAlphaTestedSurfaces", "bool", "0", "render perforated surface to shadow map", 0)
+                        KCVar.CreateCVar("harm_r_stencilShadowSoft", "bool", "0", "enable soft stencil shadow(Only OpenGLES3.1+)", 0),
+                        KCVar.CreateCVar("harm_r_stencilShadowSoftBias", "float", "-1", "soft stencil shadow sampler BIAS(-1 to automatic, 0 to disable)", 0),
+                        KCVar.CreateCVar("harm_r_stencilShadowSoftCopyStencilBuffer", "bool", "0", "copy stencil buffer directly for soft stencil shadow. 0: copy depth buffer and bind and renderer stencil buffer to texture directly; 1: copy stencil buffer to texture directly", 0)
                 );
         KCVar.Group FRAMEWORK_CVARS = new KCVar.Group("Framework", true)
                 .AddCVar(
@@ -151,6 +154,8 @@ public final class KCVarSystem
             else if(Q3EUtils.q3ei.isRTCW)
                 return new ArrayList<>();
             else if(Q3EUtils.q3ei.isTDM)
+                return new ArrayList<>();
+            else if(Q3EUtils.q3ei.isD3BFG)
                 return new ArrayList<>();
             else
                 return Arrays.asList(_cvars.get("RENDERER"), _cvars.get("FRAMEWORK"), _cvars.get("base"));
