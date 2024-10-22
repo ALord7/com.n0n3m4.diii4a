@@ -6,10 +6,15 @@ import android.os.Bundle;
 import android.widget.TextView;
 
 import com.karin.idTech4Amm.R;
+import com.karin.idTech4Amm.lib.FileUtility;
 import com.karin.idTech4Amm.network.NetworkAccessManager;
 import com.karin.idTech4Amm.sys.Constants;
 import com.n0n3m4.DIII4A.GameLauncher;
 import com.n0n3m4.q3e.Q3ELang;
+import com.n0n3m4.q3e.Q3EUtils;
+import com.n0n3m4.q3e.karin.KStr;
+
+import java.io.InputStream;
 
 public final class OpenSourceLicenseFunc extends GameLauncherFunc
 {
@@ -23,7 +28,10 @@ public final class OpenSourceLicenseFunc extends GameLauncherFunc
 
     public void Reset()
     {
-        m_text = Q3ELang.tr(m_gameLauncher, R.string.get_open_source_license);
+        m_text = GetLicenseInAPK();
+        if(KStr.IsBlank(m_text))
+            m_text = Tr(R.string.get_open_source_license);
+
     }
 
     public void Start(Bundle data)
@@ -38,9 +46,9 @@ public final class OpenSourceLicenseFunc extends GameLauncherFunc
             public void run() {
                 m_text = args[0];
                 if(null == m_text)
-                    m_text = Q3ELang.tr(m_gameLauncher, R.string.network_error);
+                    m_text = Tr(R.string.network_error);
                 else if(m_text.isEmpty())
-                    m_text = Q3ELang.tr(m_gameLauncher, R.string.empty_response_data);
+                    m_text = Tr(R.string.empty_response_data);
                 if(null != m_dialog)
                 {
                     TextView message = m_dialog.findViewById(android.R.id.message);
@@ -49,6 +57,25 @@ public final class OpenSourceLicenseFunc extends GameLauncherFunc
                 }
             }
         }, args);
+    }
+
+    private String GetLicenseInAPK()
+    {
+        InputStream is = null;
+        try
+        {
+            is = m_gameLauncher.getAssets().open("source/LICENSE");
+            return Q3EUtils.Read(is);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return "";
+        }
+        finally
+        {
+            FileUtility.CloseStream(is);
+        }
     }
 
     public void run()

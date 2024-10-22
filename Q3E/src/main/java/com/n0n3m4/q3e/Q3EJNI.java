@@ -40,7 +40,9 @@ public class Q3EJNI {
             boolean no_handle_signals, // not handle signals
             boolean multithread, // enable multithread
             boolean usingMouse, // using mouse
-			int refreshRate, // refresh rate
+			int refreshRate, // refresh rate,
+			String appHome, // app home path
+			boolean smoothJoystick, // is smooth joystick
             boolean continueNoGLContext
     );
 	public static native void drawFrame();
@@ -53,6 +55,10 @@ public class Q3EJNI {
     public static native void OnPause();
     public static native void OnResume();
     public static native void SetSurface(Surface view);
+	public static native void PushKeyEvent(int state, int key, int character);
+	public static native void PushAnalogEvent(int enable, float x, float y);
+	public static native void PushMotionEvent(float x, float y);
+	public static native void PreInit(int eventQueueType);
 
 	static {
 		System.loadLibrary("q3eloader");

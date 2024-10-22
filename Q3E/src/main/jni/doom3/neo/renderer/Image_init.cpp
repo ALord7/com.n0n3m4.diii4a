@@ -986,7 +986,8 @@ void R_QuadraticImage(idImage *image)
 static void R_CreateShadowMapImage_##name##_Res##res( idImage* image ) \
 { \
 	int size = shadowMapResolutions[res]; \
-	image->func parms; \
+	image->func parms;                                              \
+    printf("CreateShadowMapImage: %s(%s) -> %d x %d\n", #name, #func, size, size);  \
 }
 
 #define CREATE_SHADOW_MAP_IMAGE_DECL(name, func, parms) \
@@ -1022,6 +1023,33 @@ CREATE_SHADOW_MAP_IMAGE_DECL(GLES2_CUBE_DEPTH, GenerateShadowCubeDepthImage, (si
 #ifdef GL_ES_VERSION_3_0
 CREATE_SHADOW_MAP_IMAGE_DECL(GLES3_2DARRAY_DEPTH, GenerateShadowArray, (size, size, 6, TF_LINEAR, TR_CLAMP_TO_ZERO_ALPHA, 24, true))
 #endif
+
+//#include "image/Image_blueNoiseVC_1M.h" // 256^2 R8 data
+#include "image/Image_blueNoiseVC_2.h" // 512^2 RGB8 data
+
+static void R_CreateBlueNoise256Image( idImage* image )
+{
+	static byte	data[BLUENOISE_TEX_HEIGHT][BLUENOISE_TEX_WIDTH][4];
+
+	for( int x = 0; x < BLUENOISE_TEX_WIDTH; x++ )
+	{
+		for( int y = 0; y < BLUENOISE_TEX_HEIGHT; y++ )
+		{
+#if 1
+			data[x][y][0] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 0 ];
+			data[x][y][1] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 1 ];
+			data[x][y][2] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 2 ];
+#else
+			data[x][y][0] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+			data[x][y][1] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+			data[x][y][2] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+#endif
+			data[x][y][3] = 1;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, BLUENOISE_TEX_WIDTH, BLUENOISE_TEX_HEIGHT, TF_NEAREST, false, TR_REPEAT, TD_HIGH_QUALITY );
+}
 // RB end
 #endif
 
@@ -1146,7 +1174,7 @@ void idImageManager::ChangeTextureFilter(void)
 idImage::Reload
 ===============
 */
-void idImage::Reload(bool checkPrecompressed, bool force)
+void idImage::Reload(bool checkPrecompressed, bool force, bool fromBackEnd)
 {
 	// always regenerate functional images
 	if (generatorFunction) {
@@ -1175,7 +1203,7 @@ void idImage::Reload(bool checkPrecompressed, bool force)
 
 	PurgeImage(
 #ifdef _MULTITHREAD
-			true // AddPurgeList
+            fromBackEnd ? false : true // AddPurgeList
 #endif
 			);
 
@@ -1184,7 +1212,7 @@ void idImage::Reload(bool checkPrecompressed, bool force)
 	// Load is from the front end, so the back end must be synced
 	ActuallyLoadImage(checkPrecompressed, false
 #ifdef _MULTITHREAD
-			, true // AddAllocList
+			, fromBackEnd ? false : true // AddAllocList
 #endif
 			);
 }
@@ -1652,7 +1680,7 @@ idImage *idImageManager::ImageFromFunction(const char *_name, void (*generatorFu
 		image->referencedOutsideLevelLoad = true;
 		image->ActuallyLoadImage(true, false
 #ifdef _MULTITHREAD
-				, true // AddAllocList
+				, renderThread->IsActive() // If call on OpenGL thread! // !true // !AddAllocList
 #endif
 				);
 	}
@@ -1676,7 +1704,7 @@ idImage	*idImageManager::ImageFromFile(const char *_name, textureFilter_t filter
 	int hash;
 
 #ifdef _NO_LIGHT
-	if ( r_noLight./*GetBool*/GetInteger() == 1 && ( depth == TD_BUMP || depth == TD_SPECULAR ) )
+	if ( r_noLight.GetBool() && ( depth == TD_BUMP || depth == TD_SPECULAR ) )
 		return globalImages->defaultImage;
 #endif
 
@@ -1890,7 +1918,7 @@ void idImageManager::PurgeAllImages()
 		image = images[i];
 		image->PurgeImage(
 #ifdef _MULTITHREAD
-				true // AddPurgeList
+				renderThread->IsActive() // PurgeAllImages must run on OpenGL thread! !AddPurgeList
 #endif
 				);
 	}
@@ -1909,6 +1937,22 @@ void idImageManager::ReloadAllImages()
 	SetNormalPalette();
 
 	args.TokenizeString("reloadImages reload", false);
+#ifdef _MULTITHREAD
+    if(multithreadActive)
+    {
+        // this probably isn't necessary...
+        globalImages->ChangeTextureFilter();
+
+        bool all = false;
+        bool checkPrecompressed = false;		// if we are doing this as a vid_restart, look for precompressed like normal
+
+        for (int i = 0 ; i < globalImages->images.Num() ; i++) {
+            idImage	*image = globalImages->images[ i ];
+            image->Reload(checkPrecompressed, all, true /* Only run on OpenGL thread */);
+        }
+    }
+    else
+#endif
 	R_ReloadImages_f(args);
 }
 
@@ -2263,6 +2307,7 @@ void idImageManager::Init()
 		CREATE_SHADOW_MAP_IMAGE_INVOKE(shadowImage, GLES3_2DARRAY_DEPTH)
 	}
 #endif
+	blueNoiseImage256 = globalImages->ImageFromFunction( "_blueNoise256", R_CreateBlueNoise256Image );
 	// RB end
 #endif
 }
@@ -2274,6 +2319,18 @@ Shutdown
 */
 void idImageManager::Shutdown()
 {
+#ifdef _MULTITHREAD //karin: reset address that idMaterial::stages[]::texture::image::imageReferencePtr(it point to address of idMaterial::stages[]::texture::image) to NULL. Because it will access image on idMaterial::FreeData() when reload engine.
+	if (multithreadActive)
+	{
+		for (int i = 0; i < images.Num(); i++)
+		{
+			idImage* image = images[i];
+			if (image && image->imageReferencePtr && *image->imageReferencePtr)
+				*image->imageReferencePtr = NULL;
+            image->imageReferencePtr = NULL;
+		}
+	}
+#endif
 	images.DeleteContents(true);
 #ifdef _MULTITHREAD
 	while(imagesAlloc.Num() > 0)

@@ -10,18 +10,24 @@ import android.content.Context;
 import android.preference.PreferenceManager;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import com.karin.idTech4Amm.LogcatActivity;
 import com.karin.idTech4Amm.R;
 import com.karin.idTech4Amm.lib.ContextUtility;
+import com.karin.idTech4Amm.misc.TextHelper;
 import com.karin.idTech4Amm.sys.Constants;
-import com.n0n3m4.q3e.Q3EMain;
-import com.n0n3m4.q3e.Q3EPreference;
 import com.n0n3m4.q3e.Q3ELang;
-import com.n0n3m4.q3e.Q3EUiConfig;
 import com.n0n3m4.q3e.Q3EUtils;
 import com.n0n3m4.q3e.karin.KUncaughtExceptionHandler;
+
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Debug preference fragment
@@ -55,6 +61,10 @@ public class DebugPreference extends PreferenceFragment implements Preference.On
         else if("open_logcat".equals(key))
         {
             OpenLogcat();
+        }
+        else if("show_preference".equals(key))
+        {
+            ShowPreference();
         }
         return super.onPreferenceTreeClick(preferenceScreen, preference);
     }
@@ -114,6 +124,11 @@ public class DebugPreference extends PreferenceFragment implements Preference.On
     {
         Context activity = ContextUtility.GetContext(this);
         activity.startActivity(new Intent(activity, LogcatActivity.class));
+    }
+
+    private void ShowPreference()
+    {
+        new SharedPreferenceViewer(getContext()).run();
     }
 
     @Override

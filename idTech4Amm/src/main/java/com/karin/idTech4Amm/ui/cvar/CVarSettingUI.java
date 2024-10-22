@@ -22,15 +22,21 @@ public final class CVarSettingUI
             return TYPE_NONE;
         final String[] IgnoreCVars = {
                 "harm_r_clearVertexBuffer",
-                "harm_r_lightModel",
+                "harm_r_lightingModel",
                 "harm_r_specularExponent",
+                "harm_r_specularExponentBlinnPhong",
+                "harm_r_specularExponentPBR",
                 "harm_fs_gameLibPath",
-                "harm_r_maxFps",
+                "r_maxFps",
                 "r_useShadowMapping",
                 "harm_r_stencilShadowTranslucent",
                 "harm_fs_gameLibDir",
                 "harm_r_stencilShadowAlpha",
                 "harm_r_stencilShadowSoft",
+                "harm_r_stencilShadowCombine",
+                "harm_r_autoAspectRatio",
+                "harm_r_shadowMapAlpha",
+                "r_forceShadowMapsOnAlphaTestedSurfaces",
         };
         if(Utility.ArrayContains(IgnoreCVars, cvar.name))
             return TYPE_NONE;

@@ -242,7 +242,7 @@ void Sys_Shutdown(void)
 Sys_GetProcessorId
 ===============
 */
-cpuid_t Sys_GetProcessorId(void)
+int Sys_GetProcessorId(void)
 {
 	return CPUID_GENERIC;
 }
@@ -695,8 +695,8 @@ static void Q3E_FreeArgs(void)
 	free(q3e_argv);
 }
 
-// doom3 game main thread loop
-static void * doom3_main(void *data)
+// idTech4 game main thread loop
+static void * doom3_main(int argc, char **argv)
 {
 	attach_thread(); // attach current to JNI for call Android code
 
@@ -708,10 +708,10 @@ static void * doom3_main(void *data)
 	Q3E_Start();
 
 	Posix_EarlyInit();
-	Sys_Printf("[Harmattan]: Enter doom3 main thread -> %s\n", Sys_GetThreadName());
+	Sys_Printf("[Harmattan]: Enter idTech4 main thread -> %s\n", Sys_GetThreadName());
 
-	if (q3e_argc > 1) {
-		common->Init(q3e_argc-1, (const char **)&q3e_argv[1], NULL);
+	if (argc > 1) {
+		common->Init(argc-1, (const char **)&argv[1], NULL);
 	} else {
 		common->Init(0, NULL, NULL);
 	}
@@ -729,8 +729,13 @@ static void * doom3_main(void *data)
 	common->Quit();
 	Q3E_End();
 	main_thread = 0;
-	Sys_Printf("[Harmattan]: Leave doom3 main thread.\n");
+	Sys_Printf("[Harmattan]: Leave idTech4 main thread.\n");
 	return 0;
+}
+
+static void * Q3E_MainLoop(void *data)
+{
+	return doom3_main(q3e_argc, q3e_argv);
 }
 
 // start game main thread from Android Surface thread
@@ -743,19 +748,19 @@ static void Q3E_StartGameMainThread(void)
 	pthread_attr_init(&attr);
 
 	if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE) != 0) {
-		Sys_Printf("[Harmattan]: ERROR: pthread_attr_setdetachstate doom3 main thread failed\n");
+		Sys_Printf("[Harmattan]: ERROR: pthread_attr_setdetachstate idTech4 main thread failed\n");
 		exit(1);
 	}
 
-	if (pthread_create((pthread_t *)&main_thread, &attr, doom3_main, NULL) != 0) {
-		Sys_Printf("[Harmattan]: ERROR: pthread_create doom3 main thread failed\n");
+	if (pthread_create((pthread_t *)&main_thread, &attr, Q3E_MainLoop, NULL) != 0) {
+		Sys_Printf("[Harmattan]: ERROR: pthread_create idTech4 main thread failed\n");
 		exit(1);
 	}
 
 	pthread_attr_destroy(&attr);
 
 	q3e_running = true;
-	Sys_Printf("[Harmattan]: doom3 main thread start.\n");
+	Sys_Printf("[Harmattan]: idTech4 main thread start.\n");
 }
 
 // shutdown game main thread
@@ -766,17 +771,17 @@ static void Q3E_ShutdownGameMainThread(void)
 
 	q3e_running = false;
 	if (pthread_join(main_thread, NULL) != 0) {
-		Sys_Printf("[Harmattan]: ERROR: pthread_join doom3 main thread failed\n");
+		Sys_Printf("[Harmattan]: ERROR: pthread_join idTech4 main thread failed\n");
 	}
 	main_thread = 0;
-	Sys_Printf("[Harmattan]: doom3 main thread quit.\n");
+	Sys_Printf("[Harmattan]: idTech4 main thread quit.\n");
 }
 
 void ShutdownGame(void)
 {
     if(common->IsInitialized())
     {
-        Sys_TriggerEvent(TRIGGER_EVENT_WINDOW_CREATED); // if doom3 main thread is waiting new window
+        Sys_TriggerEvent(TRIGGER_EVENT_WINDOW_CREATED); // if idTech4 main thread is waiting new window
         Q3E_ShutdownGameMainThread();
         common->Quit();
     }
@@ -784,7 +789,7 @@ void ShutdownGame(void)
 
 static void doom3_exit(void)
 {
-	Sys_Printf("[Harmattan]: doom3 exit.\n");
+	printf("[Harmattan]: idTech4 exit.\n");
 
 	Q3E_CloseRedirectOutput();
 }
@@ -826,18 +831,35 @@ void Sys_ForceResolution(void)
     cvarSystem->SetCVarInteger("r_customWidth", screen_width);
     cvarSystem->SetCVarInteger("r_customHeight", screen_height);
 
-    float r = (float) screen_width / (float) screen_height;
+	int autoAspectRatio = cvarSystem->GetCVarInteger("harm_r_autoAspectRatio");
+	if(autoAspectRatio > 0)
+	{
+        float r = (float) screen_width / (float) screen_height;
 
-    if (r > 1.7f) {
-        cvarSystem->SetCVarInteger("r_aspectRatio", 1);    // 16:9
-    } else if (r > 1.55f) {
-        cvarSystem->SetCVarInteger("r_aspectRatio", 2);    // 16:10
-    } else {
-        cvarSystem->SetCVarInteger("r_aspectRatio", 0);    // 4:3
-    }
+		if(autoAspectRatio == 2)
+		{
+            idStr aspectRatio;
+			if (r > 1.7f) {
+				cvarSystem->SetCVarInteger("r_aspectRatio", 1);    // 16:9
+                aspectRatio = "16:9";
+			} else if (r > 1.55f) {
+				cvarSystem->SetCVarInteger("r_aspectRatio", 2);    // 16:10
+                aspectRatio = "16:10";
+			} else {
+				cvarSystem->SetCVarInteger("r_aspectRatio", 0);    // 4:3
+                aspectRatio = "4:3";
+			}
 
-    Sys_Printf("r_mode(%i), r_customWidth(%i), r_customHeight(%i)",
-               -1, screen_width, screen_height);
+			Sys_Printf("r_mode(%i), r_customWidth(%i), r_customHeight(%i), r_aspectRatio(%i) = %s\n",
+					   -1, screen_width, screen_height, cvarSystem->GetCVarInteger("r_aspectRatio"), aspectRatio.c_str());
+		}
+		else
+		{
+			cvarSystem->SetCVarInteger("r_aspectRatio", -1);
+            Sys_Printf("r_mode(%i), r_customWidth(%i), r_customHeight(%i), r_aspectRatio(%i) = %f\n",
+                       -1, screen_width, screen_height, cvarSystem->GetCVarInteger("r_aspectRatio"), r);
+		}
+	}
 }
 
 #include "sys_android.cpp"

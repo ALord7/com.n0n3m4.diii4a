@@ -37,9 +37,6 @@ Contains the Image implementation for OpenGL.
 
 #include "../RenderCommon.h"
 
-#ifdef _GLES //karin: decompress texture to RGBA instead of glCompressedXXX on OpenGLES
-#include "../DXT/DXTCodec.h"
-#endif
 #if 0
 #define TID(x) {\
 	while(glGetError() != GL_NO_ERROR); \
@@ -48,6 +45,12 @@ Contains the Image implementation for OpenGL.
 	}
 #else
 #define TID(x) x
+#endif
+
+#ifdef _GLES //karin: decompress texture to RGBA instead of glCompressedXXX on OpenGLES
+#include "../DXT/DXTCodec.h"
+
+#include "../etc/etc.cpp"
 #endif
 
 /*
@@ -388,32 +391,43 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		const int dxtWidth = Max(( width + 4 ) & ~4, ( width + 3 ) & ~3);
 		const int dxtHeight = Max(( height + 4 ) & ~4, ( height + 3 ) & ~3);
 		byte *dpic = ( byte* )Mem_Alloc(dxtWidth * dxtHeight * 4, TAG_TEMP );
-		if(opts.format == FMT_DXT1)
-			decoder.DecompressImageDXT1((const byte *)pic, dpic, width, height);
-		else
+		if(dpic)
 		{
-			if( opts.colorFormat == CFM_YCOCG_DXT5 )
-				decoder.DecompressYCoCgDXT5((const byte *)pic, dpic, width, height);
-			else if( opts.colorFormat == CFM_NORMAL_DXT5 )
-				decoder.DecompressNormalMapDXT5Renormalize((const byte *)pic, dpic, width, height);
+			if(opts.format == FMT_DXT1)
+				decoder.DecompressImageDXT1((const byte *)pic, dpic, width, height);
 			else
-				decoder.DecompressImageDXT5((const byte *)pic, dpic, width, height);
-		}
+			{
+				if( opts.colorFormat == CFM_YCOCG_DXT5 )
+					decoder.DecompressYCoCgDXT5((const byte *)pic, dpic, width, height);
+				else if( opts.colorFormat == CFM_NORMAL_DXT5 )
+					decoder.DecompressNormalMapDXT5Renormalize((const byte *)pic, dpic, width, height);
+				else
+					decoder.DecompressImageDXT5((const byte *)pic, dpic, width, height);
+			}
 
 #if 0
-        idStr ff = "ttt/";
-        ff += imgName;
-        ff.StripFileExtension();
-        ff += va("_dxt%d_%d_%d", opts.format == FMT_DXT1 ? 1 : 5, width, height);
-        //ff.SetFileExtension(".png");
-        //R_WritePNG(ff.c_str(), dpic, 4, width, height, true);
-        ff.SetFileExtension(".tga");
-        R_WriteTGA(ff.c_str(), dpic, width, height);
+			idStr ff = "ttt/";
+			ff += imgName;
+			ff.StripFileExtension();
+			ff += va("_dxt%d_%d_%d", opts.format == FMT_DXT1 ? 1 : 5, width, height);
+			//ff.SetFileExtension(".png");
+			//R_WritePNG(ff.c_str(), dpic, 4, width, height, true);
+			ff.SetFileExtension(".tga");
+			R_WriteTGA(ff.c_str(), dpic, width, height);
 #endif
 
-		TID(glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, GL_RGBA /*dataFormat*/, GL_UNSIGNED_BYTE /*dataType*/, dpic ));
-		if( dpic != NULL )
-			Mem_Free( dpic );
+			// update texture data(compression)
+			const char *cachefname = IC_CACHE_FILE_NAME(this);
+            if((image_useCompression) && R_Image_CheckExistsAndNotGenerated(cachefname))
+            {
+                R_Image_TexSubImage2D(cachefname, uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, dpic);
+            }
+            else
+                TID(glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, GL_RGBA /*dataFormat*/, GL_UNSIGNED_BYTE /*dataType*/, dpic ));
+
+			// if( dpic != NULL )
+				Mem_Free( dpic );
+		}
 #else
 		glCompressedTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, internalFormat, compressedSize, pic );
 #endif
@@ -434,6 +448,15 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 			glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 		}
 
+#ifdef _GLES //karin: decompress texture instead of glCompressedXXX or ETC1 ETC2 RGBA4444 on OpenGLES
+		// update texture data(non-compression)
+		const char *cachefname = IC_CACHE_FILE_NAME(this);
+		if((image_useCompression) && (IC_CAN_COMPRESSION(internalFormat, dataFormat, dataType)) && (R_Image_CheckExistsAndNotGenerated(cachefname)))
+		{
+			R_Image_TexSubImage2D(cachefname, uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, pic);
+		}
+		else
+#endif
 		TID(glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, pic ));
 	}
 
@@ -924,13 +947,22 @@ void idImage::AllocImage()
 					{
 						HeapFree( GetProcessHeap(), 0, data );
 					}
-#elif defined(_GLES) //karin: decompress texture instead of glCompressedXXX on OpenGLES
-					compressedSize = w * h * 4;
-					byte* data = ( byte* )Mem_Alloc( compressedSize, TAG_TEMP );
-					TID(glTexImage2D( uploadTarget + side, level, GL_RGBA /*internalFormat*/, w, h, 0, GL_RGBA /*dataFormat*/, GL_UNSIGNED_BYTE /*dataType*/, data ));
-					if( data != NULL )
+#elif defined(_GLES) //karin: decompress texture instead of glCompressedXXX or ETC1 ETC2 RGBA4444 on OpenGLES
+					// alloc texture memory(compression)
+					const char *cachefname = IC_CACHE_FILE_NAME(this);
+					if((image_useCompression) && R_Image_CheckExistsAndNotGenerated(cachefname))
 					{
-						Mem_Free( data );
+						R_Image_TexImage2D(uploadTarget + side, level, w, h);
+					}
+					else
+					{
+						compressedSize = w * h * 4;
+						byte* data = ( byte* )Mem_Alloc( compressedSize, TAG_TEMP );
+						TID(glTexImage2D( uploadTarget + side, level, GL_RGBA /*internalFormat*/, w, h, 0, GL_RGBA /*dataFormat*/, GL_UNSIGNED_BYTE /*dataType*/, data ));
+						if( data != NULL )
+						{
+							Mem_Free( data );
+						}
 					}
 #else
 					byte* data = ( byte* )Mem_Alloc( compressedSize, TAG_TEMP );
@@ -944,6 +976,15 @@ void idImage::AllocImage()
 				}
 				else
 				{
+#ifdef _GLES //karin: decompress texture instead of glCompressedXXX or ETC1 ETC2 RGBA4444 on OpenGLES
+					// alloc texture memory(non-compression)
+					const char *cachefname = IC_CACHE_FILE_NAME(this);
+					if((image_useCompression) && (IC_CAN_COMPRESSION(internalFormat, dataFormat, dataType)) && (R_Image_CheckExistsAndNotGenerated(cachefname)))
+					{
+						R_Image_TexImage2D(uploadTarget + side, level, w, h);
+					}
+					else
+#endif
 					TID(glTexImage2D( uploadTarget + side, level, internalFormat, w, h, 0, dataFormat, dataType, NULL ));
 				}
 

@@ -2,6 +2,62 @@
 
 ----------------------------------------------------------------------------------
 
+> 1.1.0harmattan57 (2024-10-01)
+
+* Add `Wolfenstein: Enemy Territory` support, game standalone directory named `etw`, game data directory named `etmain` and `legacy`. More view in [ET: Legacy](https://www.etlegacy.com).
+* Add `Quake 4: Hardqore` mod of Quake4 support, game data directory named `hardqore`. More view in [Quake 4: Hardqore](https://www.moddb.com/mods/quake-4-hardqore).
+* Add `ambientLighting` shader, add ambient lighting model(`harm_r_lightingModel` to 4) in DOOM3/Quake4/Prey.
+* Add effects color alpha in Quake4.
+* Fix `displacement` and `displacementcube` GLSL shader in Quake4. e.g. water in `recomp` map and blood pool in `waste` map.
+* Fix weapon model depth hack in player view in Quake4.
+* Add player body view in DOOM3/Quake4.
+* Add cvar `harm_in_smoothJoystick` to control setup smooth joystick in DOOM3/Quake4/Prey.
+* Default enable `Standalone game data directory`.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan56 (2024-08-23)
+
+* Optimize PBR interaction lighting model in DOOM3/Quake4/Prey.
+* Fix environment reflection shader in DOOM3/Quake4/Prey.
+* Add ambient lighting model with `harm_r_lightingModel` 0 and remove r_noLight=2 in DOOM3/Quake4/Prey.
+* Reduce game crash when change mod/reloadEngine/vid_restart in DOOM3/Quake4/Prey.
+* Support switch weapon in DOOM 3(write `bind "YOUR_KEY" "IMPULSE_51"` to your DoomConfig.cfg or autoexec.cfg).
+* Add `LibreCoop(RoE)` mod of DOOM3 support, game data directory named `librecoopxp`. More view in [LibreCoop(RoE)](https://www.moddb.com/mods/librecoop-dhewm3-coop).
+* Add `Perfected Doom 3` mod of DOOM3 support, game data directory named `perfected`. More view in [Perfected Doom 3](https://www.moddb.com/mods/perfected-doom-3-version-500).
+* Add `Perfected Doom 3 : Resurrection of Evil` mod of DOOM3 support, game data directory named `perfected_roe`. More view in [Perfected Doom 3 : Resurrection of Evil](https://www.moddb.com/mods/perfected-doom-3-version-500).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan55 (2024-08-05) **DOOM3 20th Anniversary Edition**
+
+* Add PBR interaction lighting model([jmarshall23's idtech4_pbr](https://github.com/jmarshall23/idtech4_pbr))(setup cvar harm_r_lightingModel 3) in DOOM3/Quake4/Prey.
+* Fix large shake of player view with OpenAL in DOOM3/Quake4/Prey.
+* Add command history record manager in launcher.
+* Add `/sdcard/Android/data/com.karin.idTech4Amm/files/diii4a` to game data search path(exclude Quake1), add current game data path tips.
+* Optimize ETC1 compression texture cache in DOOM3/Quake4/Prey, add ETC2 compression texture support(cvar r_useETC2) in OpenGLES3.0.
+* Add launcher theme setting.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan53 (2024-07-17)
+
+* Fix GZDOOM sound.
+* Update screen resolution settings on launcher.
+* Add compression textures support with cvar `harm_image_useCompression` for low memory device(e.g. 32bits device, but load slower), and using cvar `harm_image_useCompressionCache` enable caching on DOOM3-BFG.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan52 (2024-07-11)
+
+* Add soft stencil shadow support(cvar harm_r_stencilShadowSoft) with OpenGLES3.1+ in DOOM3/Quake4/Prey(2006).
+* Optimize soft shadow shader with shadow mapping in DOOM3/Quake4/Prey(2006).
+* Support r_showSurfaceInfo debug render on multi-threading in DOOM3/Quake4/Prey(2006), need to set cvar `harm_r_renderToolsMultithread` to 1 to enable debug render on multi-threading manually.
+* Add GLES3.2 renderer support in Quake2(using +set vid_renderer gles3 for GLES3.2, +set vid_renderer gl1 for GLES1.1).
+* Add GZDOOM support on arm64, game data directory named `gzdoom`. More view in [GZDOOM](https://github.com/ZDoom/gzdoom).
+
+----------------------------------------------------------------------------------
+
 > 1.1.0harmattan51 (2024-05-31)
 
 * Add `DOOM 3 BFG`(RBDOOM-3-BFG ver1.4.0) support, game data directory named `doom3bfg/base`. More view in [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG) and [DOOM-3-BFG](https://store.steampowered.com/agecheck/app/208200/).
@@ -86,7 +142,7 @@
 * In Quake4, remove Bot FakeClient in multiplayer-game, and add SABot-a9 mod support in multiplayer-game(need extract resource first).
 * Fix Setting's tab GUI in Prey2006.
 * Add `full-body awareness` mod in Quake4. Set bool cvar `harm_pm_fullBodyAwareness` to 1 enable, and using `harm_pm_fullBodyAwarenessOffset` setup offset(also change to third-person mode), and using `harm_pm_fullBodyAwarenessHeadJoint` setup head joint name(view position).
-* Support max FPS limit(cvar `harm_r_maxFps`).
+* Support max FPS limit(cvar `r_maxFps`).
 * Support obj/dae static model, and fix png image load.
 * Add skip intro support.
 * Add simple CVar editor.
@@ -348,7 +404,7 @@ Update:
 * Fix `Berserk`, `Grabber`, `Helltime` vision effect(First set cvar `harm_g_skipBerserkVision`, `harm_g_skipWarpVision` and `harm_g_skipHelltimeVision` to 0).
 * Fix screen capture image when quick save game or mission tips.
 * Fix machine gun's ammo panel.
-* Add light model setting with `Phong` and `Blinn-Phong` when render interaction shader pass(string cvar `harm_r_lightModel`).
+* Add light model setting with `Phong` and `Blinn-Phong` when render interaction shader pass(string cvar `harm_r_lightingModel`).
 * Add specular exponent setting in light model(float cvar `harm_r_specularExponent`).
 * Default using program internal OpenGL shader.
 * Reset extras virtual button size, and add Console(~) key.

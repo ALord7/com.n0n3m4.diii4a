@@ -21,6 +21,7 @@ package com.n0n3m4.q3e;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Typeface;
@@ -33,30 +34,35 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import com.n0n3m4.q3e.device.Q3EOuya;
 import com.n0n3m4.q3e.gl.Q3EGL;
 import com.n0n3m4.q3e.karin.KDebugTextView;
+import com.n0n3m4.q3e.karin.KStr;
 import com.n0n3m4.q3e.karin.KUncaughtExceptionHandler;
+import com.n0n3m4.q3e.karin.KidTechCommand;
 
 public class Q3EMain extends Activity
 {
-    private Q3ECallbackObj mAudio;
-    private Q3EView mGLSurfaceView;
+    private       Q3ECallbackObj mAudio;
+    private       Q3EView        mGLSurfaceView;
     // k
-    private boolean m_hideNav = true;
-    private int m_runBackground = 1;
-    private int m_renderMemStatus = 0;
-    private Q3EControlView mControlGLSurfaceView;
-    private KDebugTextView memoryUsageText;
-    private boolean m_coverEdges = true;
+    private       boolean        m_hideNav         = true;
+    private       int            m_runBackground   = 1;
+    private       int            m_renderMemStatus = 0;
+    private       Q3EControlView mControlGLSurfaceView;
+    private       KDebugTextView memoryUsageText;
+    private       boolean        m_coverEdges      = true;
     @SuppressLint("StaticFieldLeak")
-    public static Q3EGameHelper gameHelper;
+    public static Q3EGameHelper  gameHelper;
 
     @SuppressLint("ResourceType")
     @Override
     public void onCreate(Bundle savedInstanceState)
     {
+        Q3E.activity = this;
+
         gameHelper = new Q3EGameHelper();
         gameHelper.SetContext(this);
         
@@ -73,7 +79,7 @@ public class Q3EMain extends Activity
         KUncaughtExceptionHandler.HandleUnexpectedException(this);
 
         // init game environment
-        gameHelper.InitGlobalEnv();
+        SetupGame();
 
         // init gui props
         InitProps();
@@ -96,6 +102,10 @@ public class Q3EMain extends Activity
         // create
         super.onCreate(savedInstanceState);
 
+        // check start
+        if(!CheckStart())
+            return;
+
         Q3EUtils.DumpPID(this);
 
         // setup language environment
@@ -104,12 +114,8 @@ public class Q3EMain extends Activity
         // load game
         if (gameHelper.checkGameFiles())
         {
-            // if game is TDM, extract glsl shader
-            if(Q3EUtils.q3ei.IsTDMTech())
-                gameHelper.ExtractTDMGLSLShaderSource();
-            // if game is D3BFG, extract hlsl shader
-            else if(Q3EUtils.q3ei.IsIdTech4BFG())
-                gameHelper.ExtractDOOM3BFGHLSLShaderSource();
+            // extract game required resource in apk
+            gameHelper.ExtractGameResource();
 
             // init GUI component
             InitGUI();
@@ -149,8 +155,13 @@ public class Q3EMain extends Activity
     @Override
     protected void onDestroy()
     {
+        Q3E.activity = null;
+        Q3E.gameView = null;
+        Q3E.controlView = null;
+
         if (null != mGLSurfaceView)
             mGLSurfaceView.Shutdown();
+
         super.onDestroy();
         if (null != mAudio)
             mAudio.OnDestroy();
@@ -265,16 +276,16 @@ public class Q3EMain extends Activity
             Q3EUtils.isOuya = false;
 
         if (mAudio == null)
-        {
             mAudio = new Q3ECallbackObj();
-            mAudio.InitGUIInterface(this);
-        }
+        mAudio.InitGUIInterface(this);
         Q3EUtils.q3ei.callbackObj = mAudio;
         Q3EJNI.setCallbackObject(mAudio);
         if (mGLSurfaceView == null)
             mGLSurfaceView = new Q3EView(this);
+        Q3E.gameView = mGLSurfaceView;
         if (mControlGLSurfaceView == null)
             mControlGLSurfaceView = new Q3EControlView(this);
+        Q3E.controlView = mControlGLSurfaceView;
         mAudio.vw = mControlGLSurfaceView;
         mControlGLSurfaceView.EnableGyroscopeControl(Q3EUtils.q3ei.view_motion_control_gyro);
         float gyroXSens = preferences.getFloat(Q3EPreference.pref_harm_view_motion_gyro_x_axis_sens, Q3EControlView.GYROSCOPE_X_AXIS_SENS);
@@ -323,5 +334,44 @@ public class Q3EMain extends Activity
     public boolean onKeyUp(int keyCode, KeyEvent event)
     {
         return mControlGLSurfaceView.OnKeyUp(keyCode, event);
+    }
+
+    private boolean CheckStart()
+    {
+        // arm32 not support GZDOOM
+        if(Q3EUtils.q3ei.isDOOM)
+        {
+            if(!Q3EJNI.Is64())
+            {
+                Toast.makeText(this, "GZDOOM not support on arm32 device!", Toast.LENGTH_LONG).show();
+                finish();
+                Q3EUtils.RunLauncher(this);
+                return false;
+            }
+            String iwad = KidTechCommand.GetParam("-+", Q3EUtils.q3ei.cmd, "iwad");
+            if(KStr.IsBlank(iwad))
+            {
+                Toast.makeText(this, "GZDOOM requires -iwad file!", Toast.LENGTH_LONG).show();
+                finish();
+                Q3EUtils.RunLauncher(this);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void SetupGame()
+    {
+        Intent intent = getIntent();
+        String intentGame = null;
+        if(null != intent)
+        {
+            Bundle extras = intent.getExtras();
+            if(null != extras)
+            {
+                intentGame = extras.getString("game");
+            }
+        }
+        gameHelper.InitGlobalEnv(intentGame);
     }
 }

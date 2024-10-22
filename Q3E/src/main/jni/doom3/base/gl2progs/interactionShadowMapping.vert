@@ -1,6 +1,7 @@
 /*
 	macros:
 		BLINN_PHONG: using blinn-phong instead phong.
+		_PBR: using PBR.
 		_POINT_LIGHT: light type is point light.
 		_PARALLEL_LIGHT: light type is parallel light.
 		_SPOT_LIGHT: light type is spot light.
@@ -11,6 +12,7 @@
 precision highp float;
 
 //#define BLINN_PHONG
+//#define _PBR
 
 varying vec2 var_TexDiffuse;
 varying vec2 var_TexNormal;
@@ -18,10 +20,14 @@ varying vec2 var_TexSpecular;
 varying vec4 var_TexLight;
 varying lowp vec4 var_Color;
 varying vec3 var_L;
-#if defined(BLINN_PHONG)
+#if defined(BLINN_PHONG) || defined(_PBR)
 varying vec3 var_H;
-#else
+#endif
+#if !defined(BLINN_PHONG) || defined(_PBR)
 varying vec3 var_V;
+#endif
+#ifdef _PBR
+varying vec3 var_Normal;
 #endif
 
 attribute vec4 attr_TexCoord;
@@ -55,52 +61,56 @@ uniform highp mat4 u_modelMatrix;
 uniform highp vec4 globalLightOrigin;
 
 #ifdef _POINT_LIGHT
-	varying highp vec3 var_LightToVertex;
-	varying highp vec4 var_VertexPosition;
+    varying highp vec3 var_LightToVertex;
+    varying highp vec4 var_VertexPosition;
 #else
-	uniform highp mat4 shadowMVPMatrix;
-	varying highp vec4 var_ShadowCoord;
+    uniform highp mat4 shadowMVPMatrix;
+    varying highp vec4 var_ShadowCoord;
 #endif
 
 void main(void)
 {
-	mat3 M = mat3(attr_Tangent, attr_Bitangent, attr_Normal);
+    mat3 M = mat3(attr_Tangent, attr_Bitangent, attr_Normal);
 
-	var_TexNormal.x = dot(u_bumpMatrixS, attr_TexCoord);
-	var_TexNormal.y = dot(u_bumpMatrixT, attr_TexCoord);
+    var_TexNormal.x = dot(u_bumpMatrixS, attr_TexCoord);
+    var_TexNormal.y = dot(u_bumpMatrixT, attr_TexCoord);
 
-	var_TexDiffuse.x = dot(u_diffuseMatrixS, attr_TexCoord);
-	var_TexDiffuse.y = dot(u_diffuseMatrixT, attr_TexCoord);
+    var_TexDiffuse.x = dot(u_diffuseMatrixS, attr_TexCoord);
+    var_TexDiffuse.y = dot(u_diffuseMatrixT, attr_TexCoord);
 
-	var_TexSpecular.x = dot(u_specularMatrixS, attr_TexCoord);
-	var_TexSpecular.y = dot(u_specularMatrixT, attr_TexCoord);
+    var_TexSpecular.x = dot(u_specularMatrixS, attr_TexCoord);
+    var_TexSpecular.y = dot(u_specularMatrixT, attr_TexCoord);
 
-	var_TexLight.x = dot(u_lightProjectionS, attr_Vertex);
-	var_TexLight.y = dot(u_lightProjectionT, attr_Vertex);
-	var_TexLight.z = dot(u_lightFalloff, attr_Vertex);
-	var_TexLight.w = dot(u_lightProjectionQ, attr_Vertex);
+    var_TexLight.x = dot(u_lightProjectionS, attr_Vertex);
+    var_TexLight.y = dot(u_lightProjectionT, attr_Vertex);
+    var_TexLight.z = dot(u_lightFalloff, attr_Vertex);
+    var_TexLight.w = dot(u_lightProjectionQ, attr_Vertex);
 
-	vec3 L = u_lightOrigin.xyz - attr_Vertex.xyz;
-	vec3 V = u_viewOrigin.xyz - attr_Vertex.xyz;
-#if defined(BLINN_PHONG)
-	vec3 H = normalize(L) + normalize(V);
+    vec3 L = u_lightOrigin.xyz - attr_Vertex.xyz;
+    vec3 V = u_viewOrigin.xyz - attr_Vertex.xyz;
+#if defined(BLINN_PHONG) || defined(_PBR)
+    vec3 H = normalize(L) + normalize(V);
 #endif
 
-	var_L = L * M;
-#if defined(BLINN_PHONG)
-	var_H = H * M;
-#else
-	var_V = V * M;
+    var_L = L * M;
+#if defined(BLINN_PHONG) || defined(_PBR)
+    var_H = H * M;
+#endif
+#if !defined(BLINN_PHONG) || defined(_PBR)
+    var_V = V * M;
+#endif
+#ifdef _PBR
+    var_Normal = attr_Normal * M;
 #endif
 
-	var_Color = (attr_Color / 255.0) * u_colorModulate + u_colorAdd;
+    var_Color = (attr_Color / 255.0) * u_colorModulate + u_colorAdd;
 
 #ifdef _POINT_LIGHT
-	highp vec4 posInLight = u_modelMatrix * attr_Vertex;
-	var_LightToVertex = posInLight.xyz - globalLightOrigin.xyz;
-	var_VertexPosition = attr_Vertex;
+    highp vec4 posInLight = u_modelMatrix * attr_Vertex;
+    var_LightToVertex = posInLight.xyz - globalLightOrigin.xyz;
+    var_VertexPosition = attr_Vertex;
 #else
-	var_ShadowCoord = attr_Vertex * shadowMVPMatrix;
+    var_ShadowCoord = attr_Vertex * shadowMVPMatrix;
 #endif
-	gl_Position = u_modelViewProjectionMatrix * attr_Vertex;
+    gl_Position = u_modelViewProjectionMatrix * attr_Vertex;
 }

@@ -11,8 +11,15 @@ idRenderThread *renderThread = &renderThreadInstance;
 
 extern void GLimp_ActivateContext();
 extern void GLimp_DeactivateContext();
+extern void RB_GLSL_HandleShaders(void);
 
-static idCVar harm_r_multithread("harm_r_multithread", "0", CVAR_ARCHIVE | CVAR_INIT | CVAR_BOOL | CVAR_RENDERER, "Multithread backend");
+static idCVar harm_r_multithread("harm_r_multithread",
+#ifdef __ANDROID__
+                                 "0"
+#else
+        "1"
+#endif
+                                 , CVAR_ARCHIVE | CVAR_INIT | CVAR_BOOL | CVAR_RENDERER, "Multithread backend");
 
 static void * BackendThread(void *data)
 {
@@ -78,8 +85,8 @@ void idRenderThread::BackendThreadTask(void) // BackendThread ->
     Sys_WaitForEvent(TRIGGER_EVENT_RUN_BACKEND);
     // Purge all images,  Load all images
     globalImages->HandlePendingImage();
-    // Load custom GLSL shader
-    shaderManager->ActuallyLoad();
+    // Load custom GLSL shader or reload GLSL shaders
+    RB_GLSL_HandleShaders();
     // debug tools
     RB_SetupRenderTools();
     // image process finished
@@ -112,6 +119,11 @@ void idRenderThread::BackendThreadWait(void)
         Sys_WaitForEvent(TRIGGER_EVENT_BACKEND_FINISHED);
         //usleep(500);
     }
+}
+
+bool idRenderThread::IsActive(void) const
+{
+    return multithreadActive && Sys_ThreadIsRunning(&render_thread);
 }
 
 bool Sys_InRenderThread(void)

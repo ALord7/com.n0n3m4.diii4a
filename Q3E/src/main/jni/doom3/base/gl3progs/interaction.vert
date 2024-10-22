@@ -17,17 +17,15 @@
 /*
 	macros:
 		BLINN_PHONG: using blinn-phong instead phong.
+		_PBR: using PBR.
 */
 #version 300 es
 //#pragma optimize(off)
 
 precision highp float;
 
-/*
- * Pixel values between vertices are interpolated by Gouraud shading by default,
- * rather than the more computationally-expensive Phong shading.
- */
 //#define BLINN_PHONG
+//#define _PBR
 
 out vec2 var_TexDiffuse;
 out vec2 var_TexNormal;
@@ -35,9 +33,14 @@ out vec2 var_TexSpecular;
 out vec4 var_TexLight;
 out lowp vec4 var_Color;
 out vec3 var_L;
-out vec3 var_V;
-#if defined(BLINN_PHONG)
+#if defined(BLINN_PHONG) || defined(_PBR)
 out vec3 var_H;
+#endif
+#if !defined(BLINN_PHONG) || defined(_PBR)
+out vec3 var_V;
+#endif
+#ifdef _PBR
+out vec3 var_Normal;
 #endif
 
 in vec4 attr_TexCoord;
@@ -69,35 +72,40 @@ uniform highp mat4 u_modelViewProjectionMatrix;
 
 void main(void)
 {
-	mat3 M = mat3(attr_Tangent, attr_Bitangent, attr_Normal);
+    mat3 M = mat3(attr_Tangent, attr_Bitangent, attr_Normal);
 
-	var_TexNormal.x = dot(u_bumpMatrixS, attr_TexCoord);
-	var_TexNormal.y = dot(u_bumpMatrixT, attr_TexCoord);
+    var_TexNormal.x = dot(u_bumpMatrixS, attr_TexCoord);
+    var_TexNormal.y = dot(u_bumpMatrixT, attr_TexCoord);
 
-	var_TexDiffuse.x = dot(u_diffuseMatrixS, attr_TexCoord);
-	var_TexDiffuse.y = dot(u_diffuseMatrixT, attr_TexCoord);
+    var_TexDiffuse.x = dot(u_diffuseMatrixS, attr_TexCoord);
+    var_TexDiffuse.y = dot(u_diffuseMatrixT, attr_TexCoord);
 
-	var_TexSpecular.x = dot(u_specularMatrixS, attr_TexCoord);
-	var_TexSpecular.y = dot(u_specularMatrixT, attr_TexCoord);
+    var_TexSpecular.x = dot(u_specularMatrixS, attr_TexCoord);
+    var_TexSpecular.y = dot(u_specularMatrixT, attr_TexCoord);
 
-	var_TexLight.x = dot(u_lightProjectionS, attr_Vertex);
-	var_TexLight.y = dot(u_lightProjectionT, attr_Vertex);
-	var_TexLight.z = dot(u_lightFalloff, attr_Vertex);
-	var_TexLight.w = dot(u_lightProjectionQ, attr_Vertex);
+    var_TexLight.x = dot(u_lightProjectionS, attr_Vertex);
+    var_TexLight.y = dot(u_lightProjectionT, attr_Vertex);
+    var_TexLight.z = dot(u_lightFalloff, attr_Vertex);
+    var_TexLight.w = dot(u_lightProjectionQ, attr_Vertex);
 
-	vec3 L = u_lightOrigin.xyz - attr_Vertex.xyz;
-	vec3 V = u_viewOrigin.xyz - attr_Vertex.xyz;
-#if defined(BLINN_PHONG)
-	vec3 H = normalize(L) + normalize(V);
-#endif
+    vec3 L = u_lightOrigin.xyz - attr_Vertex.xyz;
+    vec3 V = u_viewOrigin.xyz - attr_Vertex.xyz;
+    #if defined(BLINN_PHONG) || defined(_PBR)
+    vec3 H = normalize(L) + normalize(V);
+    #endif
 
-	var_L = L * M;
-	var_V = V * M;
-#if defined(BLINN_PHONG)
-	var_H = H * M;
-#endif
+    var_L = L * M;
+    #if defined(BLINN_PHONG) || defined(_PBR)
+    var_H = H * M;
+    #endif
+#if !defined(BLINN_PHONG) || defined(_PBR)
+    var_V = V * M;
+    #endif
+#ifdef _PBR
+    var_Normal = attr_Normal * M;
+    #endif
 
-	var_Color = (attr_Color / 255.0) * u_colorModulate + u_colorAdd;
+    var_Color = (attr_Color / 255.0) * u_colorModulate + u_colorAdd;
 
-	gl_Position = u_modelViewProjectionMatrix * attr_Vertex;
+    gl_Position = u_modelViewProjectionMatrix * attr_Vertex;
 }

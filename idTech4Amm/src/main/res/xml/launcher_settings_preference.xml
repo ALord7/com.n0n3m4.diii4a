@@ -51,9 +51,13 @@
                 android:title="@string/standalone_game_data_directory"
                 android:key="harm_game_standalone_directory"
                 android:persistent="true"
-                android:defaultValue="false"
-                android:summary="@string/game_data_directories_are_standalone"
+                android:defaultValue="true"
+                android:summary="@string/make_game_use_standalone_data_directory"
                 />
+            <Preference
+                android:key="standalone_game_data_directories"
+                android:title="@string/show_game_datas_standalone_directories"
+                android:persistent="false"/>
             <CheckBoxPreference
                 android:title="@string/redirect_output_to_file"
                 android:key="harm_redirect_output_to_file"
@@ -80,8 +84,8 @@
         </PreferenceCategory>
         
         <PreferenceCategory
-            android:key="general"
-            android:title="@string/general"
+            android:key="launcher"
+            android:title="@string/launcher"
             >
             <CheckBoxPreference
                 android:title="@string/launcher_orientation"
@@ -104,6 +108,13 @@
                 android:defaultValue="true"
                 android:summary="@string/hide_ad_bar_in_launcher"
             />
+            <CheckBoxPreference
+                android:title="@string/auto_save_button_settings"
+                android:key="harm_autosave_button_settings"
+                android:persistent="true"
+                android:defaultValue="true"
+                android:summary="@string/auto_save_buttons_settings_immediately_if_changed"
+                />
             <ListPreference
                 android:title="@string/language"
                 android:key="harm_lang"
@@ -112,6 +123,15 @@
                 android:summary="@string/setup_launcher_language"
                 android:entryValues="@array/lang_values"
                 android:entries="@array/lang_labels"
+                />
+            <ListPreference
+                android:title="@string/theme"
+                android:key="harm_theme"
+                android:persistent="true"
+                android:defaultValue="system"
+                android:summary="@string/setup_launcher_theme"
+                android:entryValues="@array/theme_values"
+                android:entries="@array/theme_labels"
                 />
         </PreferenceCategory>
     </PreferenceScreen>

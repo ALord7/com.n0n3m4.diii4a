@@ -10,7 +10,7 @@ static idCVar harm_r_stencilShadowCombine( "harm_r_stencilShadowCombine", "0", C
 static bool r_stencilShadowCombine = false;
 
 static bool r_stencilShadowTranslucent = false;
-static float r_stencilShadowAlpha = 0.5f;
+static float r_stencilShadowAlpha = 1.0f;
 
 static void RB_GLSL_CreateDrawInteractions_translucentStencilShadow(const drawSurf_t *surf, bool noStencilTest);
 
@@ -28,10 +28,20 @@ void RB_GLSL_CreateDrawInteractions_translucentStencilShadow(const drawSurf_t *s
 			 backEnd.depthFunc);
 
 	// bind the vertex and fragment shader
-	if(r_usePhong)
-		GL_UseProgram(&interactionTranslucentShader);
-	else
-		GL_UseProgram(&interactionBlinnPhongTranslucentShader);
+    if(backEnd.vLight->lightShader->IsAmbientLight())
+        GL_UseProgram(&ambientLightingTranslucentShader);
+    else
+    {
+		if(r_interactionLightingModel == HARM_INTERACTION_SHADER_BLINNPHONG)
+			GL_UseProgram(&interactionBlinnPhongTranslucentShader);
+		else if(r_interactionLightingModel == HARM_INTERACTION_SHADER_PBR)
+			GL_UseProgram(&interactionPBRTranslucentShader);
+        else if (r_interactionLightingModel == HARM_INTERACTION_SHADER_AMBIENT )
+            GL_UseProgram(&ambientLightingTranslucentShader);
+		else
+			GL_UseProgram(&interactionTranslucentShader);
+    }
+
 
 	// enable the vertex arrays
 	GL_EnableVertexAttribArray(offsetof(shaderProgram_t, attr_TexCoord));
@@ -41,7 +51,7 @@ void RB_GLSL_CreateDrawInteractions_translucentStencilShadow(const drawSurf_t *s
 	GL_EnableVertexAttribArray(offsetof(shaderProgram_t, attr_Vertex));	// gl_Vertex
 	GL_EnableVertexAttribArray(offsetof(shaderProgram_t, attr_Color));	// gl_Color
 
-	GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[0]), noStencilTest ? r_stencilShadowAlpha : 1.0f - r_stencilShadowAlpha);
+	GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[0]), noStencilTest ? 1.0f - r_stencilShadowAlpha : r_stencilShadowAlpha);
 
 	// texture 5 is the specular lookup table
 	GL_SelectTextureNoClient(5);
@@ -133,7 +143,7 @@ ID_INLINE static float RB_StencilShadowSoft_calcBIAS(void)
     {
 		float w = stencilTexture.Width(), h = stencilTexture.Height();
 		f = w > h ? w : h;
-#if 0
+#if 1
 		f = f * 0.001 /* / 1024.0 */ + STENCIL_SHADOW_SOFT_MIN_BIAS;
 #else
 		f = idMath::Ceil(f * 0.001 /* / 1024.0 */);
@@ -206,10 +216,19 @@ void RB_GLSL_CreateDrawInteractions_softStencilShadow(const drawSurf_t *surf, in
 			 backEnd.depthFunc);
 
 	// bind the vertex and fragment shader
-	if(r_usePhong)
-		GL_UseProgram(&interactionSoftShader);
-	else
-		GL_UseProgram(&interactionBlinnPhongSoftShader);
+    if(backEnd.vLight->lightShader->IsAmbientLight())
+        GL_UseProgram(&ambientLightingSoftShader);
+    else
+    {
+		if(r_interactionLightingModel == HARM_INTERACTION_SHADER_BLINNPHONG)
+			GL_UseProgram(&interactionBlinnPhongSoftShader);
+		else if(r_interactionLightingModel == HARM_INTERACTION_SHADER_PBR)
+			GL_UseProgram(&interactionPBRSoftShader);
+        else if (r_interactionLightingModel == HARM_INTERACTION_SHADER_AMBIENT )
+            GL_UseProgram(&ambientLightingSoftShader);
+		else
+			GL_UseProgram(&interactionSoftShader);
+    }
 
 	// enable the vertex arrays
 	GL_EnableVertexAttribArray(offsetof(shaderProgram_t, attr_TexCoord));
@@ -261,6 +280,9 @@ void RB_GLSL_CreateDrawInteractions_softStencilShadow(const drawSurf_t *surf, in
 	GL_DisableVertexAttribArray(offsetof(shaderProgram_t, attr_Color));	// gl_Color
 
 	// disable features
+//	GL_SelectTextureNoClient(7);
+//	globalImages->BindNull();
+
 	GL_SelectTextureNoClient(6);
 	globalImages->BindNull();
 
@@ -291,29 +313,30 @@ void RB_GLSL_CreateDrawInteractions_softStencilShadow(const drawSurf_t *surf, in
 ID_INLINE static void RB_StencilShadowSoft_copyStencilBuffer(void)
 {
 	stencilTexture.BlitStencil(); // copy stencil buffer
-	qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+	Framebuffer::Default();
 }
 
 ID_INLINE static void RB_StencilShadowSoft_copyDepthBuffer(void)
 {
 	stencilTexture.BlitDepth(); // copy stencil buffer
-	stencilTexture.Bind();
+	stencilTexture.Begin();
 	qglClear(GL_STENCIL_BUFFER_BIT);
 }
 
 ID_INLINE static void RB_StencilShadowSoft_bindFramebuffer(void)
 {
-	stencilTexture.Bind();
-	//qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+	stencilTexture.Begin();
 }
 
 ID_INLINE static void RB_StencilShadowSoft_unbindFramebuffer(void)
 {
-	stencilTexture.Unbind();
+	stencilTexture.End();
 }
 
 ID_INLINE static void RB_StencilShadowSoftInteraction_bindTexture(void)
 {
-	stencilTexture.Select();
+	stencilTexture.Bind();
 }
+
 #endif

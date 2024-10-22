@@ -1,7 +1,5 @@
 package com.n0n3m4.q3e.karin;
 
-import com.n0n3m4.q3e.Q3EGlobals;
-
 /**
  * idTech4 command line utility
  */
@@ -17,9 +15,9 @@ public final class KidTech4Command extends KidTechCommand
         return KidTechCommand.GetProp(ARG_PREFIX_IDTECH, str, name, def);
     }
 
-    public static String RemoveProp(String str, String name, boolean[]...b)
+    public static String RemoveProp(String str, String name)
     {
-        return KidTechCommand.RemoveProp(ARG_PREFIX_IDTECH, str, name, b);
+        return KidTechCommand.RemoveProp(ARG_PREFIX_IDTECH, str, name);
     }
 
     public static boolean IsProp(String str, String name)
@@ -37,9 +35,9 @@ public final class KidTech4Command extends KidTechCommand
         return KidTech4Command.SetProp(str, name, btostr(val));
     }
 
-    public static String RemoveParam(String str, String name, boolean[]...b)
+    public static String RemoveParam(String str, String name)
     {
-        return KidTechCommand.RemoveParam(ARG_PREFIX_IDTECH, str, name, b);
+        return KidTechCommand.RemoveParam(ARG_PREFIX_IDTECH, str, name);
     }
 
     public static String SetParam(String str, String name, Object val)
@@ -52,9 +50,9 @@ public final class KidTech4Command extends KidTechCommand
         return KidTechCommand.SetCommand(ARG_PREFIX_IDTECH, str, name, prepend);
     }
 
-    public static String RemoveCommand(String str, String name, boolean[]...b)
+    public static String RemoveCommand(String str, String name)
     {
-        return KidTechCommand.RemoveCommand(ARG_PREFIX_IDTECH, str, name, b);
+        return KidTechCommand.RemoveCommand(ARG_PREFIX_IDTECH, str, name);
     }
 
     public static String GetParam(String str, String name, String...def)

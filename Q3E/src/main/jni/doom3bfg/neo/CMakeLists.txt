@@ -2,17 +2,18 @@ cmake_minimum_required(VERSION 3.2)
 
 project(RBDoom3BFG)
 
+# build type
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE "Release")
+endif()
 if(ANDROID)
-	# build type
-	if(NOT CMAKE_BUILD_TYPE)
-		set(CMAKE_BUILD_TYPE "Release")
-	endif()
 
 	add_definitions(-D_DIII4A) # for DIII4A touchscreen
-	add_definitions(-D_GLES -DGLEW_EGL) # Using OpenGLES3.2
 	add_compile_options(-Wno-non-c-typedef-for-linkage)
-	add_definitions(-D_SIZEOFPTR=${CMAKE_SIZEOF_VOID_P})
+	add_definitions(-DGLEW_EGL) # Using OpenGLES3.2
 endif()
+add_definitions(-D_SIZEOFPTR=${CMAKE_SIZEOF_VOID_P})
+add_definitions(-D_GLES) # Using OpenGLES3.2
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -1910,7 +1911,7 @@ else()
 		if(ANDROID)
 			target_include_directories(RBDoom3BFG PRIVATE ../../common)
 			set(OPENGL_LIBRARIES GLESv3 EGL)
-			set(RBDoom3BFG_sys_libs openal android z log) # ${FFmpeg_LIBRARIES}
+			set(RBDoom3BFG_sys_libs openal android z log) #  ${FFmpeg_LIBRARIES}
 		else()
 			if(NOT "${CMAKE_SYSTEM}" MATCHES "Darwin")
 				set(RT_LIBRARY rt)

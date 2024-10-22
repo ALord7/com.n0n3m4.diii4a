@@ -42,8 +42,6 @@
  * r_shadowMapFrustumFOV: float, 90, point light view FOV
  * harm_r_shadowMapLod: int, -1, force using shadow map LOD(0 - 4), -1 is auto
  * harm_r_shadowMapAlpha: float, 0.5, shadow alpha(0 - 1)
- * harm_r_shadowMapSampleFactor: float, -1.0, 0 multiple, 0 is disable, < 0 is auto, > 0 multi with fixed value
- * harm_r_shadowMapFrustumFar: float, -2.5, shadow map render frustum far(0: 2 x light's radius, < 0: light's radius x multiple, > 0: using fixed value)
  *
  */
 
@@ -52,11 +50,13 @@
 
 #include "../tr_local.h"
 
+#if 0
 #define POINT_LIGHT_FRUSTUM_FAR 7996.0f
 #define POINT_LIGHT_FRUSTUM_FAR_FACTOR 2.5 // 2
 
 #define POINT_LIGHT_RENDER_METHOD_Z_AS_DEPTH 0
 #define POINT_LIGHT_RENDER_METHOD_USING_FRUSTUM_FAR 1
+#endif
 
 #define SHADOW_MAPPING_VOLUME 1 // render shadow volume
 #define SHADOW_MAPPING_SURFACE 2 // render model surface
@@ -87,8 +87,8 @@ static int r_shadowMappingScheme = SHADOW_MAPPING_PURE;
 static idCVar harm_r_shadowMappingScheme( "harm_r_shadowMappingScheme", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shadow mapping rendering scheme. 0 = always using shadow mapping; 1 = prelight shadow using shadow mapping, others using stencil shadow; 2 = non-prelight shadow using shadow mapping, others using stencil shadow", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 #endif
 
-static idCVar harm_r_shadowMapLightType("harm_r_shadowMapLightType", "0", CVAR_INTEGER|CVAR_RENDERER, "[Harmattan]: debug light type mask. 1: parallel, 2: point, 4: spot");
-static idCVar harm_r_shadowMapDebug("harm_r_shadowMapDebug", "0", CVAR_INTEGER|CVAR_RENDERER, "[Harmattan]: debug shadow map frame buffer.");
+static idCVar harm_r_shadowMapLightType("harm_r_shadowMapLightType", "0", CVAR_INTEGER|CVAR_RENDERER, "debug light type mask in shadow mapping. 1 = parallel; 2 = point; 4 = spot");
+static idCVar harm_r_shadowMapDebug("harm_r_shadowMapDebug", "0", CVAR_INTEGER|CVAR_RENDERER, "debug shadow map frame buffer.");
 
 char RB_ShadowMapPass_T = 'G'; // G - global shadow, L - local shadow
 
@@ -211,6 +211,7 @@ ID_INLINE static void RB_ShadowMapping_clearBuffer(void)
 // Setup shadow map sample in interaction pass
 ID_INLINE static void RB_ShadowMapping_setupSample(void)
 {
+#if 0
     float sampleScale = 1.0;
     float sampleFactor = harm_r_shadowMapSampleFactor.GetFloat();
     float lod = sampleFactor != 0 ? SampleFactors[backEnd.vLight->shadowLOD] : 0.0;
@@ -252,9 +253,22 @@ ID_INLINE static void RB_ShadowMapping_setupSample(void)
     if(sampleFactor > 0.0)
         sampleScale *= sampleFactor;
 
-    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[2]), lod * sampleScale);
-    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[5]), SampleFactors[backEnd.vLight->shadowLOD]); // 1.0 / size
-    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[6]), shadowMapResolutions[backEnd.vLight->shadowLOD]); // textureSize()
+    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[4]), lod * sampleScale);
+#endif
+    const float ShadowMapTexelSize[] = {
+            (float)shadowMapResolutions[backEnd.vLight->shadowLOD], // textureSize()
+            SampleFactors[backEnd.vLight->shadowLOD], // 1.0 / textureSize()
+            harm_r_shadowMapJitterScale.GetFloat(), // sampler offset scale
+            0
+    };
+    GL_Uniform4fv(offsetof(shaderProgram_t, u_uniformParm[1]), ShadowMapTexelSize);
+    const float ScreenSize[] = {
+            1.0f / tr.GetScreenWidth(), // 1.0 / screen_width
+            1.0f / tr.GetScreenHeight(), // 1.0 / screen_height
+            (float)globalImages->blueNoiseImage256->uploadWidth, // jitter.textureSize()
+            1.0f / globalImages->blueNoiseImage256->uploadWidth, // 1.0 / jitter.textureSize()
+    };
+    GL_Uniform4fv(offsetof(shaderProgram_t, u_uniformParm[2]), ScreenSize);
 }
 
 // Setup polygon offset in shadow map pass
@@ -314,6 +328,7 @@ ID_INLINE static bool RB_ShadowMapping_filterLightType(void)
     return false;
 }
 
+#if 0
 // Get frustum far value for point light in shadow map/interaction pass
 ID_INLINE static float RB_GetPointLightFrustumFar(const viewLight_t* vLight)
 {
@@ -331,6 +346,7 @@ ID_INLINE static float RB_GetPointLightFrustumFar(const viewLight_t* vLight)
     }
     return _far;
 }
+#endif
 
 // Choose shader by light in shadow map pass
 ID_INLINE static shaderProgram_t * RB_SelectShadowMapShader(const viewLight_t* vLight, int side)
@@ -384,34 +400,82 @@ ID_INLINE static shaderProgram_t * RB_SelectPerforatedShadowMapShader(const view
 ID_INLINE static shaderProgram_t * RB_SelectShadowMappingInteractionShader(const viewLight_t* vLight)
 {
     shaderProgram_t *shadowInteractionShader;
-    if(r_usePhong)
+    if(vLight->lightShader->IsAmbientLight())
     {
         if( vLight->parallel )
         {
-            shadowInteractionShader = &interactionShadowMappingShader_parallelLight;
+            shadowInteractionShader = &ambientLightingShadowMappingShader_parallelLight;
         }
         else if( vLight->pointLight )
         {
-            shadowInteractionShader = &interactionShadowMappingShader_pointLight;
+            shadowInteractionShader = &ambientLightingShadowMappingShader_pointLight;
         }
         else
         {
-            shadowInteractionShader = &interactionShadowMappingShader_spotLight;
+            shadowInteractionShader = &ambientLightingShadowMappingShader_spotLight;
         }
     }
     else
     {
-        if( vLight->parallel )
+        if(r_interactionLightingModel == HARM_INTERACTION_SHADER_BLINNPHONG)
         {
-            shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_parallelLight;
+            if( vLight->parallel )
+            {
+                shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_parallelLight;
+            }
+            else if( vLight->pointLight )
+            {
+                shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_pointLight;
+            }
+            else
+            {
+                shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_spotLight;
+            }
         }
-        else if( vLight->pointLight )
+        else if(r_interactionLightingModel == HARM_INTERACTION_SHADER_PBR)
         {
-            shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_pointLight;
+            if( vLight->parallel )
+            {
+                shadowInteractionShader = &interactionShadowMappingPBRShader_parallelLight;
+            }
+            else if( vLight->pointLight )
+            {
+                shadowInteractionShader = &interactionShadowMappingPBRShader_pointLight;
+            }
+            else
+            {
+                shadowInteractionShader = &interactionShadowMappingPBRShader_spotLight;
+            }
+        }
+        else if(r_interactionLightingModel == HARM_INTERACTION_SHADER_AMBIENT)
+        {
+            if( vLight->parallel )
+            {
+                shadowInteractionShader = &ambientLightingShadowMappingShader_parallelLight;
+            }
+            else if( vLight->pointLight )
+            {
+                shadowInteractionShader = &ambientLightingShadowMappingShader_pointLight;
+            }
+            else
+            {
+                shadowInteractionShader = &ambientLightingShadowMappingShader_spotLight;
+            }
         }
         else
         {
-            shadowInteractionShader = &interactionShadowMappingBlinnPhongShader_spotLight;
+            if( vLight->parallel )
+            {
+                shadowInteractionShader = &interactionShadowMappingShader_parallelLight;
+            }
+            else if( vLight->pointLight )
+            {
+                shadowInteractionShader = &interactionShadowMappingShader_pointLight;
+            }
+            else
+            {
+                shadowInteractionShader = &interactionShadowMappingShader_spotLight;
+            }
         }
     }
     return shadowInteractionShader;
@@ -606,7 +670,7 @@ static void RB_DrawShadowElementsWithCounters_shadowMapping(const srfTriangles_t
         qglDrawElements(GL_TRIANGLES,
                        r_singleTriangle.GetBool() ? 3 : numIndexes,
                        GL_INDEX_TYPE,
-                       (int *)vertexCache.Position(tri->indexCache) + start);
+                       (glIndex_t *)vertexCache.Position(tri->indexCache) + start);
         backEnd.pc.c_vboIndexes += numIndexes;
     } else {
         vertexCache.UnbindIndex();
@@ -1109,8 +1173,8 @@ void RB_ShadowMapPass( const drawSurf_t* drawSurfs, int side, int type, bool cle
             GL_Uniform4fv(offsetof(shaderProgram_t, globalLightOrigin), globalLightOrigin);
             GL_Uniform4fv(offsetof(shaderProgram_t, localLightOrigin), localLight.ToFloatPtr());
 
-            // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[1]), harm_r_shadowMapFrustumNear.GetFloat());
-            // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm), RB_GetPointLightFrustumFar(vLight));
+            // const float Frustum[] = {harm_r_shadowMapFrustumNear.GetFloat(), RB_GetPointLightFrustumFar(backEnd.vLight), 0, 0};
+            // GL_Unifor4fv(offsetof(shaderProgram_t, u_uniformParm[1]), Frustum);
 
             GL_VertexAttribPointer(offsetof(shaderProgram_t, attr_Vertex), 4, GL_FLOAT, false, sizeof(shadowCache_t), vertexCache.Position(drawSurf->geo->shadowCache));
 
@@ -1418,8 +1482,8 @@ void RB_ShadowMapPasses( const drawSurf_t *globalShadowDrawSurf, const drawSurf_
                 GL_Uniform4fv(offsetof(shaderProgram_t, globalLightOrigin), globalLightOrigin);
                 GL_Uniform4fv(offsetof(shaderProgram_t, localLightOrigin), localLight.ToFloatPtr());
 
-                // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[1]), harm_r_shadowMapFrustumNear.GetFloat());
-                // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm), RB_GetPointLightFrustumFar(vLight));
+                // const float Frustum[] = {harm_r_shadowMapFrustumNear.GetFloat(), RB_GetPointLightFrustumFar(backEnd.vLight), 0, 0};
+                // GL_Unifor4fv(offsetof(shaderProgram_t, u_uniformParm[1]), Frustum);
 
                 GL_VertexAttribPointer(offsetof(shaderProgram_t, attr_Vertex), 4, GL_FLOAT, false, sizeof(shadowCache_t), vertexCache.Position(drawSurf->geo->shadowCache));
 
@@ -1563,11 +1627,11 @@ void RB_GLSL_CreateDrawInteractions_shadowMapping(const drawSurf_t *surf)
     shaderProgram_t *shadowInteractionShader = RB_SelectShadowMappingInteractionShader(backEnd.vLight);
     GL_UseProgram(shadowInteractionShader);
 
-    // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[1]), harm_r_shadowMapFrustumNear.GetFloat());
-    // GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm), RB_GetPointLightFrustumFar(backEnd.vLight));
+    // const float Frustum[] = {harm_r_shadowMapFrustumNear.GetFloat(), RB_GetPointLightFrustumFar(backEnd.vLight), 0, 0};
+    // GL_Unifor4fv(offsetof(shaderProgram_t, u_uniformParm[4]), Frustum);
 
 //#ifdef SHADOW_MAPPING_DEBUG
-    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[4]), harm_r_shadowMapBias.GetFloat());
+    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[3]), harm_r_shadowMapBias.GetFloat());
 //#endif
 
             // perform setup here that will be constant for all interactions
@@ -1584,7 +1648,7 @@ void RB_GLSL_CreateDrawInteractions_shadowMapping(const drawSurf_t *surf)
     GL_EnableVertexAttribArray(offsetof(shaderProgram_t, attr_Color));	// gl_Color
 
     //GL_Uniform1f(offsetof(shaderProgram_t, bias), harm_r_shadowMapBias.GetFloat());
-    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[3]), harm_r_shadowMapAlpha.GetFloat());
+    GL_Uniform1f(offsetof(shaderProgram_t, u_uniformParm[0]), harm_r_shadowMapAlpha.GetFloat());
     float globalLightOrigin[4] = {
             backEnd.vLight->globalLightOrigin[0],
             backEnd.vLight->globalLightOrigin[1],
@@ -1637,6 +1701,9 @@ void RB_GLSL_CreateDrawInteractions_shadowMapping(const drawSurf_t *surf)
     GL_DisableVertexAttribArray(offsetof(shaderProgram_t, attr_Color));	// gl_Color
 
     // disable features
+    GL_SelectTextureNoClient(7);
+    globalImages->BindNull();
+
     GL_SelectTextureNoClient(6);
     globalImages->BindNull();
 
@@ -1778,6 +1845,12 @@ ID_INLINE static void RB_ShadowMappingInteraction_bindTexture(void)
 			    globalImages->shadowImage_2DRGBA[backEnd.vLight->shadowLOD]->Bind();
 		}
 	}
+}
+
+// Bind shadow map texture in interaction pass
+ID_INLINE static void RB_ShadowMappingInteraction_bindJitterTexture(void)
+{
+    globalImages->blueNoiseImage256->Bind();
 }
 
 // Get clear color in interaction pass

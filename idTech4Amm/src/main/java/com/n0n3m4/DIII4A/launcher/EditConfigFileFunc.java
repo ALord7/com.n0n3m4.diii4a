@@ -41,7 +41,7 @@ public final class EditConfigFileFunc extends GameLauncherFunc
 
         int res = ContextUtility.CheckFilePermission(m_gameLauncher, m_code);
         if(res == ContextUtility.CHECK_PERMISSION_RESULT_REJECT)
-            Toast_long(Q3ELang.tr(m_gameLauncher, R.string.can_t_s_read_write_external_storage_permission_is_not_granted, Q3ELang.tr(m_gameLauncher, R.string.access_file)));
+            Toast_long(Tr(R.string.can_t_s_read_write_external_storage_permission_is_not_granted, Tr(R.string.access_file)));
         if(res != ContextUtility.CHECK_PERMISSION_RESULT_GRANTED)
             return;
         run();
@@ -49,11 +49,23 @@ public final class EditConfigFileFunc extends GameLauncherFunc
 
     public void run()
     {
-        String basePath = KStr.AppendPath(m_path, m_game, m_file);
+        String basePath = m_path;
+        if(!Q3EUtils.q3ei.IsStandaloneGame())
+        {
+            String innerDir = Q3EUtils.q3ei.GetGameModSubDirectory();
+            if(KStr.NotEmpty(innerDir))
+            {
+                if(!m_game.startsWith(innerDir))
+                    basePath = KStr.AppendPath(basePath, innerDir);
+            }
+            if(!Q3EUtils.q3ei.isETW)
+            basePath = KStr.AppendPath(basePath, m_game);
+        }
+        basePath = KStr.AppendPath(basePath, m_file);
         File f = new File(basePath);
         if(!f.isFile() || !f.canWrite() || !f.canRead())
         {
-            Toast_long(Q3ELang.tr(m_gameLauncher, R.string.file_can_not_access) + basePath);
+            Toast_long(Tr(R.string.file_can_not_access) + basePath);
             return;
         }
 

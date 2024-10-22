@@ -38,7 +38,7 @@ public:
 	idFramebuffer( const char* name, int width, int height );
 	
 	// deletes OpenGL object but leaves structure intact for reloading
-	void					PurgeFramebuffer();
+	void					Purge();
 	
 	void					Bind();
 	void					Unbind();
@@ -103,6 +103,7 @@ public:
 	static void				Init();
 	static void				Shutdown();
 	static void				BindNull();
+	static void				Default();
 	static void				Append(idFramebuffer *fb);
 	static idFramebuffer *	Alloc(const char *name, int width, int height);
 	static idFramebuffer *	Find(const char *name);

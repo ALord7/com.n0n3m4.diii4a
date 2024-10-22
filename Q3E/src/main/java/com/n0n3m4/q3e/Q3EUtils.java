@@ -47,8 +47,9 @@ import android.view.inputmethod.InputMethodManager;
 import com.n0n3m4.q3e.device.Q3EMouseDevice;
 import com.n0n3m4.q3e.device.Q3EOuya;
 import com.n0n3m4.q3e.karin.KFDManager;
-import com.n0n3m4.q3e.karin.KFileDescriptor;
+import com.n0n3m4.q3e.karin.KStr;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -58,6 +59,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -303,6 +307,16 @@ public class Q3EUtils
         return is;
     }
 
+    public static String GetDataPath(String filename)
+    {
+        String path = "";
+        if(null != q3ei.datadir)
+            path += q3ei.datadir;
+        if(KStr.NotEmpty(filename))
+            path += filename;
+        return path;
+    }
+
     public static String GetAppStoragePath(Context context)
     {
         String path = Q3EUtils.GetAppStoragePath(context, null);
@@ -329,7 +343,7 @@ public class Q3EUtils
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
             path = context.getDataDir().getAbsolutePath();
         else
-            path = context.getCacheDir().getAbsolutePath();
+            path = context.getCacheDir().getAbsolutePath() + "/..";
         if(null != filename && !filename.isEmpty())
             path += filename;
         return path;
@@ -494,6 +508,28 @@ public class Q3EUtils
         return size;
     }
 
+    public static String Read(InputStream in) throws RuntimeException
+    {
+        if(null == in)
+            return "";
+
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        try
+        {
+            Copy(os, in);
+            byte[] bytes = os.toByteArray();
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+        finally
+        {
+            Q3EUtils.Close(os);
+        }
+    }
+
     public static long cp(String src, String dst)
     {
         FileInputStream is = null;
@@ -585,20 +621,22 @@ public class Q3EUtils
         return pasteData;
     }
 
-    public static int[] CalcSizeByScaleScreenArea(int width, int height, float scale)
+    public static int[] CalcSizeByScaleScreenArea(int width, int height, BigDecimal scale)
     {
-        double p = Math.sqrt(scale);
-        int w = (int)Math.floor((double)width * p);
-        int h = (int)Math.floor((double)w * ((double)height / (double)width));
+        double p = Math.sqrt(scale.doubleValue());
+        BigDecimal bp = BigDecimal.valueOf(p);
+        BigDecimal bw = new BigDecimal(width);
+        BigDecimal bh = new BigDecimal(height);
+        BigDecimal ww = bw.multiply(bp);
+        int w = ww.intValue();
+        int h = ww.multiply(bh).divide(bw, 2, RoundingMode.HALF_UP).intValue();
         return new int[]{w, h};
     }
 
-    public static int[] CalcSizeByScaleWidthHeight(int width, int height, float scale)
+    public static int[] CalcSizeByScaleWidthHeight(int width, int height, BigDecimal scale)
     {
-        int w = (int)Math.floor((double)width * scale);
-        int h = (int)Math.floor((double)w * ((double)height / (double)width));
-        /*int w = width * scale;
-        int h = width * scale;*/
+        int w = new BigDecimal(width).multiply(scale).intValue();
+        int h = new BigDecimal(height).multiply(scale).intValue();
         return new int[]{w, h};
     }
 
@@ -752,5 +790,82 @@ public class Q3EUtils
         Intent intent = activity.getPackageManager().getLaunchIntentForPackage(activity.getApplicationContext().getPackageName());
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         activity.startActivity(intent);
+    }
+
+    public static int[] GetSurfaceViewSize(Context context, int screenWidth, int screenHeight)
+    {
+        SharedPreferences mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        int scheme = mPrefs.getInt(Q3EPreference.pref_scrres_scheme, 0);
+        int scale = mPrefs.getInt(Q3EPreference.pref_scrres_scale, 100);
+        BigDecimal scalef = new BigDecimal(scale).divide(new BigDecimal("100"), 2, RoundingMode.UP);
+        if(scalef.compareTo(BigDecimal.ZERO) <= 0)
+            scalef = BigDecimal.ONE;
+        int width, height;
+        switch (scheme)
+        {
+            case 1: {
+                int[] size = CalcSizeByScaleWidthHeight(screenWidth, screenHeight, scalef);
+                width = size[0];
+                height = size[1];
+            }
+                break;
+            case 2: {
+                int[] size = CalcSizeByScaleScreenArea(screenWidth, screenHeight, scalef);
+                width = size[0];
+                height = size[1];
+            }
+                break;
+            case 3: {
+                try
+                {
+                    String str = mPrefs.getString(Q3EPreference.pref_resx, "0");
+                    if(null == str)
+                        str = "0";
+                    width = Integer.parseInt(str);
+                }
+                catch (Exception e)
+                {
+                    width = 0;
+                }
+                try
+                {
+                    String str = mPrefs.getString(Q3EPreference.pref_resy, "0");
+                    if(null == str)
+                        str = "0";
+                    height = Integer.parseInt(str);
+                }
+                catch (Exception e)
+                {
+                    height = 0;
+                }
+                if (width <= 0 && height <= 0)
+                {
+                    width = screenWidth;
+                    height = screenHeight;
+                }
+                if (width <= 0)
+                {
+                    width = (int)((float)height * (float)screenWidth / (float)screenHeight);
+                }
+                else if (height <= 0)
+                {
+                    height = (int)((float)width * (float)screenHeight / (float)screenWidth);
+                }
+            }
+                break;
+            case 0:
+            default:
+                width = screenWidth;
+                height = screenHeight;
+                break;
+        }
+        return new int[]{width, height};
+    }
+
+    public static String GetAppInternalSearchPath(Context context, String path)
+    {
+        if(null == path)
+            path = "";
+        return Q3EUtils.GetAppStoragePath(context, "/diii4a" + path);
     }
 }

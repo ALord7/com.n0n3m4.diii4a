@@ -11,6 +11,7 @@ import android.view.View;
 import com.karin.idTech4Amm.R;
 import com.karin.idTech4Amm.lib.ContextUtility;
 import com.karin.idTech4Amm.lib.FileUtility;
+import com.karin.idTech4Amm.misc.FileBrowser;
 import com.karin.idTech4Amm.ui.FileBrowserDialog;
 import com.n0n3m4.DIII4A.GameLauncher;
 import com.n0n3m4.q3e.Q3ELang;
@@ -43,7 +44,7 @@ public final class ChooseGameFolderFunc extends GameLauncherFunc
 
         int res = ContextUtility.CheckFilePermission(m_gameLauncher, m_code);
         if(res == ContextUtility.CHECK_PERMISSION_RESULT_REJECT)
-            Toast_long(Q3ELang.tr(m_gameLauncher, R.string.can_t_s_read_write_external_storage_permission_is_not_granted, Q3ELang.tr(m_gameLauncher, R.string.access_file)));
+            Toast_long(Tr(R.string.can_t_s_read_write_external_storage_permission_is_not_granted, Tr(R.string.access_file)));
         if(res != ContextUtility.CHECK_PERMISSION_RESULT_GRANTED)
             return;
         run();
@@ -51,73 +52,45 @@ public final class ChooseGameFolderFunc extends GameLauncherFunc
 
     public void run()
     {
+        FileBrowserDialog dialog = new FileBrowserDialog(m_gameLauncher);
+        dialog.SetupUI(Tr(R.string.choose_data_folder));
+        FileBrowserDialog.FileBrowserCallback callback = new FileBrowserDialog.FileBrowserCallback()
+        {
+            @Override
+            public void Check(String path)
+            {
+                ContextUtility.GrantUriPermission(m_gameLauncher, path, m_uriCode);
+            }
+        };
+
+        dialog.SetCallback(callback);
+
         String gamePath = m_path;
 
         String defaultPath = Environment.getExternalStorageDirectory().getAbsolutePath(); //System.getProperty("user.home");
         if(null == gamePath || gamePath.isEmpty())
             gamePath = defaultPath;
 
-        boolean checked = false;
-        if(ContextUtility.NeedUsingDocumentFile(m_gameLauncher, gamePath))
+        FileBrowser fileBrowser = dialog.GetFileBrowser();
+        int checked = fileBrowser.GetFileType(gamePath);
+        switch (checked)
         {
-            DocumentFile documentFile = ContextUtility.DirectoryDocument(m_gameLauncher, gamePath);
-            if(null == documentFile || !documentFile.exists())
-            {
+            case FileBrowser.FileModel.ID_FILE_TYPE_FILE:
+                gamePath = FileUtility.ParentPath(gamePath);
+                break;
+            case FileBrowser.FileModel.ID_FILE_TYPE_NOT_EXISTS:
                 gamePath = defaultPath;
-            }
-            else
-            {
-                if(!documentFile.isDirectory())
-                {
-                    gamePath = FileUtility.ParentPath(gamePath);
-                }
-                checked = true;
-            }
+                break;
         }
 
-        if(!checked)
-        {
-            File f = new File(gamePath);
-            if(!f.exists())
-            {
-                gamePath = defaultPath;
-                f = new File(gamePath);
-            }
-            if(!f.isDirectory())
-            {
-                gamePath = f.getParent();
-                // f = f.getParentFile();
-            }
-            /*if(!f.canRead())
-            {
-                gamePath = defaultPath;
-            }*/
-        }
-
-        FileBrowserDialog.FileBrowserCallback callback = new FileBrowserDialog.FileBrowserCallback()
-        {
-            @Override
-            public boolean Check(String path)
-            {
-                if(!ContextUtility.NeedGrantUriPermission(m_gameLauncher, path))
-                    return true;
-                if(ContextUtility.IsUriPermissionGrant(m_gameLauncher, path))
-                    return true;
-                ContextUtility.GrantUriPermission(m_gameLauncher, path, m_uriCode);
-                return false;
-            }
-        };
-
-        FileBrowserDialog dialog = new FileBrowserDialog(m_gameLauncher);
-        dialog.SetCallback(callback);
-        dialog.SetupUI(Q3ELang.tr(m_gameLauncher, R.string.choose_data_folder), gamePath);
-        dialog.setButton(AlertDialog.BUTTON_NEGATIVE, Q3ELang.tr(m_gameLauncher, R.string.cancel), new AlertDialog.OnClickListener() {
+        dialog.SetPath(gamePath);
+        dialog.setButton(AlertDialog.BUTTON_NEGATIVE, Tr(R.string.cancel), new AlertDialog.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.dismiss();
             }
         });
-        dialog.setButton(AlertDialog.BUTTON_POSITIVE, Q3ELang.tr(m_gameLauncher, R.string.choose_current_directory), new AlertDialog.OnClickListener() {
+        dialog.setButton(AlertDialog.BUTTON_POSITIVE, Tr(R.string.choose_current_directory), new AlertDialog.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 String result = ((FileBrowserDialog) dialog).Path();
@@ -129,7 +102,7 @@ public final class ChooseGameFolderFunc extends GameLauncherFunc
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
         {
-            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, Q3ELang.tr(m_gameLauncher, R.string._default), (AlertDialog.OnClickListener)null);
+            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, Tr(R.string._default), (AlertDialog.OnClickListener)null);
             dialog.create();
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -140,7 +113,7 @@ public final class ChooseGameFolderFunc extends GameLauncherFunc
         }
         else
         {
-            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, Q3ELang.tr(m_gameLauncher, R.string.reset), new AlertDialog.OnClickListener() {
+            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, Tr(R.string.reset), new AlertDialog.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     SetResult(m_gameLauncher.GetDefaultGameDirectory());

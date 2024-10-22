@@ -264,32 +264,50 @@ const float MAX_BOUND_SIZE = 65536.0f;
         #include "../mod/doom3/sabot/Game.h"
     #elif defined(_FRAGGINGFREE)
         #include "../framework/Game.h"
+    #elif defined(_LIBRECOOPXP)
+        #include "../framework/Game.h"
+    #elif defined(_PERFECTEDROE)
+        #include "../framework/Game.h"
     #else
         #include "../d3xp/Game.h"
     #endif
 
 #elif defined(_RAVEN)
 
+#ifdef _SDK
+    #include "../game/Game.h"
+#else
+    #ifdef _HARDQORE
+        #include "../mod/quake4/hardqore/Game.h"
+    #else
     #include "../quake4/Game.h"
+#endif
+#endif
 
 #elif defined(_HUMANHEAD)
 
+#ifdef _SDK
+    #include "../game/Game.h"
+#else
     #include "../prey/Game.h"
+#endif
 
 #else
 
     #if defined(_CDOOM)
         #include "../mod/doom3/cdoom/Game.h"
     #elif defined(_RIVENSIN)
-        #include "../game/Game.h"
+        #include "../framework/Game.h"
     #elif defined(_HARDCORPS)
-        #include "../game/Game.h"
+        #include "../framework/Game.h"
     #elif defined(_OVERTHINKED)
         #include "../mod/doom3/overthinked/Game.h"
     #elif defined(_HEXENEOC)
         #include "../framework/Game.h"
     #elif defined(_LIBRECOOP)
-        #include "../game/Game.h"
+        #include "../framework/Game.h"
+    #elif defined(_PERFECTED)
+        #include "../framework/Game.h"
     #else
         #include "../game/Game.h"
     #endif
@@ -308,17 +326,33 @@ const float MAX_BOUND_SIZE = 65536.0f;
         #include "../mod/doom3/sabot/Game_local.h"
     #elif defined(_FRAGGINGFREE)
         #include "../mod/doom3/fraggingfree/Game_local.h"
+    #elif defined(_LIBRECOOPXP)
+        #include "../mod/doom3/librecoopxp/Game_local.h"
+    #elif defined(_PERFECTEDROE)
+        #include "../mod/doom3/perfectedroe/Game_local.h"
     #else
         #include "../d3xp/Game_local.h"
     #endif
 
 #elif defined(_RAVEN)
 
+#ifdef _SDK
+    #include "../game/Game_local.h"
+#else
+    #ifdef _HARDQORE
+        #include "../mod/quake4/hardqore/Game_local.h"
+    #else
     #include "../quake4/Game_local.h"
+    #endif
+#endif
 
 #elif defined(_HUMANHEAD)
 
+#ifdef _SDK
+    #include "../game/Game_local.h"
+#else
     #include "../prey/Game_local.h"
+#endif
 
 #else
 
@@ -334,6 +368,8 @@ const float MAX_BOUND_SIZE = 65536.0f;
         #include "../mod/doom3/hexeneoc/Game_local.h"
     #elif defined(_LIBRECOOP)
         #include "../mod/doom3/librecoop/Game_local.h"
+    #elif defined(_PERFECTED)
+        #include "../mod/doom3/perfected/Game_local.h"
     #else
         #include "../game/Game_local.h"
     #endif
@@ -342,6 +378,7 @@ const float MAX_BOUND_SIZE = 65536.0f;
 
 #else
 
+#if !defined(_SDK)
 #include "../framework/DemoChecksum.h"
 
 // framework
@@ -362,6 +399,7 @@ const float MAX_BOUND_SIZE = 65536.0f;
 
 // Compilers for map, model, video etc. processing.
 #include "../tools/compilers/compiler_public.h"
+#endif // _SDK
 
 #endif /* !GAME_DLL */
 
