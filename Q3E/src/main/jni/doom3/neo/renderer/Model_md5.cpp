@@ -252,8 +252,7 @@ void idMD5Mesh::ParseMesh(idLexer &parser, int numJoints, const idJointMat *join
 	//
 
 #ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-	const size_t alloc_size = texCoords.Num() * sizeof(idDrawVert);
-	_DROID_ALLOC16_DEF(idDrawVert, alloc_size, verts, 0)
+	_DROID_ALLOC16_DEF(idDrawVert, verts, (texCoords.Num() * sizeof(idDrawVert)));
 #else
 	idDrawVert *verts = (idDrawVert *) _alloca16(texCoords.Num() * sizeof(idDrawVert));
 #endif
@@ -267,7 +266,7 @@ void idMD5Mesh::ParseMesh(idLexer &parser, int numJoints, const idJointMat *join
 	deformInfo = R_BuildDeformInfo(texCoords.Num(), verts, tris.Num(), tris.Ptr(), shader->UseUnsmoothedTangents());
 
 #ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-	_DROID_FREE(verts, 0)
+	_DROID_FREE(verts);
 #endif
 }
 
@@ -386,8 +385,7 @@ idBounds idMD5Mesh::CalcBounds(const idJointMat *entJoints)
 {
 	idBounds	bounds;
 #ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-	const int alloc_size = texCoords.Num() * sizeof(idDrawVert);
-	_DROID_ALLOC16_DEF(idDrawVert, alloc_size, verts, 0)
+	_DROID_ALLOC16_DEF(idDrawVert, verts, (texCoords.Num() * sizeof(idDrawVert)));
 #else
 	idDrawVert *verts = (idDrawVert *) _alloca16(texCoords.Num() * sizeof(idDrawVert));
 #endif
@@ -397,7 +395,7 @@ idBounds idMD5Mesh::CalcBounds(const idJointMat *entJoints)
 	SIMDProcessor->MinMax(bounds[0], bounds[1], verts, texCoords.Num());
 
 #ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-	_DROID_FREE(verts, 0)
+	_DROID_FREE(verts);
 #endif
 
 	return bounds;
@@ -1096,8 +1094,9 @@ int idRenderModelMD5::GetSurfaceMask(const char *name) const
 #endif
 
 #ifdef _EXTRAS_TOOLS
+#include "model/Model_def.cpp"
 #include "model/Model_md5anim.cpp"
-#endif
-#ifdef _ENGINE_MODEL_VIEWER
+
 #include "model/Model_test.cpp"
+#include "model/Model_light.cpp"
 #endif

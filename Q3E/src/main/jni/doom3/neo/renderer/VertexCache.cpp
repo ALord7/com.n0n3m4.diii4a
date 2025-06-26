@@ -39,17 +39,19 @@ If you have questions concerning this license or the applicable additional terms
 #define _VBO_IS_VALID
 #endif
 
-static volatile int current_frame = 0;
+//static volatile int current_frame = 0;
 //static volatile int render_frame = 0;
 //volatile int renderFrame = 0;
 #ifdef _MULTITHREAD
-#define deferredFreeList deferredFreeLists[current_frame]
-#define dynamicHeaders dynamicHeaderss[current_frame]
-#define dynamicAllocThisFrame dynamicAllocThisFrames[current_frame]
+#define deferredFreeList deferredFreeLists[usingFrame]
+#define dynamicHeaders dynamicHeaderss[usingFrame]
+#define dynamicAllocThisFrame dynamicAllocThisFrames[usingFrame]
 
+// vertex buffer
 #define _freeStaticHeaders freeStaticHeaderss[0]
-#define _freeStaticIndexHeaders freeStaticHeaderss[1]
 #define _staticHeaders staticHeaderss[0]
+// index buffer
+#define _freeStaticIndexHeaders freeStaticHeaderss[1]
 #define _staticIndexHeaders staticHeaderss[1]
 
 #define BI(x) ((x) ? 1 : 0)
@@ -61,7 +63,7 @@ static const int	EXPAND_HEADERS = 1024;
 idCVar idVertexCache::r_showVertexCache("r_showVertexCache", "0", CVAR_INTEGER|CVAR_RENDERER, "");
 idCVar idVertexCache::r_vertexBufferMegs("r_vertexBufferMegs", "32", CVAR_INTEGER|CVAR_RENDERER, "");
 
-static idCVar harm_r_clearVertexBuffer("harm_r_clearVertexBuffer", "2", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "[Harmattan]: Clear vertex buffer on every frame. (0 = not clear(original); 1 = only free memory; 2 = free memory and delete VBO handle(only without multi-threading, else same as 1))");
+static idCVar harm_r_clearVertexBuffer("harm_r_clearVertexBuffer", "2", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "[Harmattan]: Clear vertex buffer on every frame. (0 = no clear(original); 1 = only free memory; 2 = free memory and delete VBO handle(only without multi-threading, else same as 1))");
 
 idVertexCache		vertexCache;
 
@@ -659,7 +661,7 @@ void idVertexCache::EndFrame()
 	listNum = currentFrame % NUM_VERTEX_FRAMES;
 #ifdef _MULTITHREAD
 	if(multithreadActive)
-		current_frame = listNum;
+        usingFrame = listNum;
 #endif
 	staticAllocThisFrame = 0;
 	staticCountThisFrame = 0;

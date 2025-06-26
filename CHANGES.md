@@ -2,6 +2,109 @@
 
 ----------------------------------------------------------------------------------
 
+> 1.1.0harmattan66 (2025-06-25)
+
+* Add global illumination rendering for make scene brighter(cvar harm_r_globalIllumination and harm_r_globalIlluminationBrightness) at launcher on DOOM 3/Quake 4/Prey(2006).
+* Add built-in bot assets if external assets missing(so only require external aas files, defs/scripts files not required any longer, also extract aas files patch by launcher), add `+set harm_g_botEnableBuiltinAssets 1` to command or setup at launcher for enable on DOOM 3/Quake 4.
+* Add retro postprocess rendering from RBDOOM-3-BFG 1.6.0(cvar r_renderMode) at launcher on DOOM 3/Quake 4/Prey(2006).
+* Fix incorrect shadow rendering on perforated surfaces(cvar r_forceShadowMapsOnAlphaTestedSurfaces) with shadow mapping on DOOM 3.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan65 (2025-05-05)
+
+* Add cascaded shadow mapping with parallel lights(cvar `r_shadowMapSplits`) in OpenGL ES3 on DOOM 3/Quake 4/Prey(2006).
+* Fix makron remote render at screen for texfure/cameraView1 in map game/core1 on Quake 4.
+* Add spiritview and deathview GLSL shaders on Prey(2006).
+* Update GZDOOM version to 4.14.1.
+* Add multiplayer game bot support(need extract `d3_sabot_a7.pk4` patch resource first) on DOOM 3.
+* Add player view flashlight with cvar `harm_ui_showViewLight`(include cvar: harm_ui_viewLightShader, harm_ui_viewLightRadius, harm_ui_viewLightOffset, harm_ui_viewLightType, harm_ui_viewLightOnWeapon), support bind to key for toggle(e.g. bind "g" "_impulse52") on DOOM 3.
+* Support vsync setting on all OpenGL game.
+* Improve multiplayer game bot system on Quake 4.
+* Add skip player hit effect support with cvar `harm_g_skipHitEffect` and command `skipHitEffect` on DOOM 3/Quake 4/Prey(2006).
+* Add enviroSuit player view vision GLSL shader on DOOM 3: RoE.
+* Custom GLSL shaders using high precision(for fix blood pool in map game/waste) on Quake 4.
+* Allow fire when focus NPC with cvar `harm_g_allowFireWhenFocusNPC` on Quake 4.
+* Add custom GLSL shader program of new stage material support(keyword is `programGLSL`, e.g. programGLSL yourShaderInglProgs) on DOOM 3/Quake 4/Prey(2006).
+* Fix save game path on FTEQW.
+* On-screen buttons using OpenGL buffer.
+* RealRTCW(ver 5.0) and The Dark Mod(2.12) have removed on this release!
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan63 (2025-04-01)
+
+* The Dark Mod update to version 2.13. More view in [The Dark Mod(2.13)](https://www.thedarkmod.com/posts/the-dark-mod-2-13-has-been-released/).
+* Add wide-character language support and DOOM3-BFG new fonts support on DOOM 3/Quake 4/Prey(2006). Only support UTF-8(BOM) encoding translation file.
+* Add Chinese translation patch on DOOM3. First extract `DOOM3 Chinese translation(by 3DM DOOM3-BFG Chinese patch)`, then ckecked `Use DOOM3-BFG fonts instead of old fonts and enable wide-character language support` on launcher, finally add ` +set sys_lang chinese` to command line.
+* Fix some errors and light gem(so reset cvar `tdm_lg_weak` value to 0) on The Dark Mod(2.12 and 2.13).
+* Add DOOM3-BFG occlusion culling with cvar `harm_r_occlusionCulling` on DOOM 3/Quake 4/Prey(2006).
+* Add combine shadow mapping option with cvar `harm_r_shadowMapCombine`(default 1, like now) on DOOM 3/Quake 4/Prey(2006).
+* Fix some lights missing on ceil in map game/airdefense1 on Quake 4.
+* Add game portal support on Prey(2006).
+* Fix wrong resurrection position from deathwalk state when load game after restart application on Prey(2006).
+* Fix key binding tips UI on Prey(2006).
+* Using libogg/libvorbis instead of stb-vorbis of version 62 again on DOOM 3/Quake 4/Prey(2006).
+* Support game data folder creation with `Game path tips` button on launcher `General` tab.
+* [Warning]: RealRTCW(ver 5.0) and The Dark Mod(2.12) will be removed on next release in the future!
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan62 (2025-03-11)
+
+* Add `OpenJK` support, [STAR WARS™ Jedi Knight - Jedi Academy™](https://store.steampowered.com/app/6020/STAR_WARS_Jedi_Knight__Jedi_Academy/) game standalone directory named `openja`, [STAR WARS™ Jedi Knight II - Jedi Outcast™](https://store.steampowered.com/app/6030/STAR_WARS_Jedi_Knight_II__Jedi_Outcast/) game standalone directory named `openjo`. More view in [OpenJK](https://github.com/JACoders/OpenJK).
+* Update version to 5.1 on RealRTCW, support Survival mode. And version 5.0 is keeping until version 5.1 is stable.
+* Fix audio playing when disable OpenAL on Quake3/ETW/RTCW/RealRTCW.
+* Add Vulkan renderer backend on Quake2.
+* Fix create render context on GZDOOM, it will use OpenGL ES if Vulkan initialization fail.
+* Add `Open menu` button at end of `General` tab on launcher.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan61 (2025-02-27)
+
+* Add `FTEQW` support, game standalone directory named `fteqw`, support HeXen II, Half-Life [FreeHL](https://github.com/eukara/freehl), Counter Striker 1.5 [FreeCS](https://github.com/eukara/freecs). More view in [FTEQW](https://www.fteqw.org).
+* DOOM 3 BFG add Vulkan renderer backend.
+* Don't package source code to apk since version 61.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan60 (2025-01-16)
+
+* Support setup max game console height percentage(0 or 100 means not limit) on launcher `General` tab.
+* Update GZDOOM version to 4.14.0.
+* GZDOOM add Vulkan and OpenGL renderer backend.
+* Update Wolfenstein: Enemy Territory(ET: Legacy) version to 2.83.1.
+* Update Quake 1(Darkplaces) version.
+* Update Quake 2(yquake2) version.
+* Add use multisamples config in game.
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan59 (2024-11-20)
+
+* Support `Omni-Bot` in Wolfenstein: Enemy Territory.
+* Fix rendering on Mali GPU in DOOM 3-BFG.
+* Fix rendering on Mali GPU in The Dark Mod.
+* Fix stencil shadow with `cg_shadows` = 2 in Wolfenstein: Enemy Territory.
+* Support choose a mod directory in GZDOOM.
+* Add some new features options on launcher in Wolfenstein: Enemy Territory, RealRTCW, DOOM3-BFG, Quake 2, GZDOOM, The Dark Mod.
+* Add use high precision float on GLSL shaders(cvar `harm_r_useHighPrecision`) in DOOM 3/Quake 4/Prey.
+* Add 5 onscreen buttons.
+* Add `Phobos(for Dhewm3)` mod of DOOM3 support, game data directory named `tfphobos`(d3xp and dhewm3 compatibility patch required). More view in [Doom 3: Phobos](https://www.moddb.com/mods/phobos) and [Doom 3: Phobos - dhewm3 compatibility patch](https://www.moddb.com/games/doom-iii/addons/doom-3-phobos-dhewm3-compatibility-patch).
+
+----------------------------------------------------------------------------------
+
+> 1.1.0harmattan58 (2024-10-29)
+
+* Add `RealRTCW`(ver 5.0) support, game standalone directory named `realrtcw`, game data directory named `Main`. More view in [RealRTCW](https://github.com/wolfetplayer/RealRTCW).
+* Fix light bar indicator of player's HUD by `darkness257` on The Dark Mod, now setup `tdm_lg_weak` to 1 automatically. More view in [The Darkmod light bar indicator bug](https://github.com/glKarin/com.n0n3m4.diii4a/issues/244).
+* Support create desktop shortcut for games or current command on `Option` menu of launcher.
+* Fix stencil shadow with `cg_shadows` = 2 on Quake 3.
+* Improve stencil shadow with `cg_shadows` = 2 on RealRTCW.
+
+----------------------------------------------------------------------------------
+
 > 1.1.0harmattan57 (2024-10-01)
 
 * Add `Wolfenstein: Enemy Territory` support, game standalone directory named `etw`, game data directory named `etmain` and `legacy`. More view in [ET: Legacy](https://www.etlegacy.com).
@@ -12,7 +115,7 @@
 * Fix weapon model depth hack in player view in Quake4.
 * Add player body view in DOOM3/Quake4.
 * Add cvar `harm_in_smoothJoystick` to control setup smooth joystick in DOOM3/Quake4/Prey.
-* Default enable `Standalone game data directory`.
+* Default enable `Standalone game data directory`.[README.md](README.md)
 
 ----------------------------------------------------------------------------------
 

@@ -41,6 +41,10 @@ void SCR_DrawTextRightAlign(float &y, const char *text, ...) id_attribute((forma
 
 #define	COMMAND_HISTORY			64
 
+#ifdef __ANDROID__ //karin: limit console max height
+extern float Android_GetConsoleMaxHeightFrac(float frac);
+#endif
+
 // the console will query the cvar and command systems for
 // command completion information
 
@@ -60,12 +64,12 @@ class idConsoleLocal : public idConsole
 		void				Dump(const char *toFile);
 		void				Clear();
 
+        virtual void		SaveHistory();
+        virtual void		LoadHistory();
+
 		//============================
 
 		const idMaterial 	*charSetShader;
-
-		virtual void		SaveHistory();
-		virtual void		LoadHistory();
 
 	private:
 		void				KeyDownEvent(int key);
@@ -281,7 +285,7 @@ float SCR_DrawAsyncStats(float y)
 
 		idStr msg;
 		idAsyncNetwork::server.GetAsyncStatsAvgMsg(msg);
-		SCR_DrawTextRightAlign(y, msg.c_str());
+		SCR_DrawTextRightAlign(y, "%s", msg.c_str());
 
 	} else if (idAsyncNetwork::client.IsActive()) {
 
@@ -859,9 +863,17 @@ bool	idConsoleLocal::ProcessEvent(const sysEvent_t *event, bool forceAccept)
 
 			if (idKeyInput::IsDown(K_SHIFT)) {
 				// if the shift key is down, don't open the console as much
+#ifdef __ANDROID__ //karin: limit console max height
+				SetDisplayFraction(Android_GetConsoleMaxHeightFrac(0.2f));
+#else
 				SetDisplayFraction(0.2f);
+#endif
 			} else {
+#ifdef __ANDROID__ //karin: limit console max height
+				SetDisplayFraction(Android_GetConsoleMaxHeightFrac(0.5f));
+#else
 				SetDisplayFraction(0.5f);
+#endif
 			}
 
 			cvarSystem->SetCVarBool("ui_chat", true);

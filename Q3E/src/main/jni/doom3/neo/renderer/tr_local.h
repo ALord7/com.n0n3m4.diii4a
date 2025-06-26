@@ -32,6 +32,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "qgl.h"
 
 #include "matrix/esUtil.h"
+#if defined(_SHADOW_MAPPING) || defined(_D3BFG_CULLING)
+#include "matrix/RenderMatrix.h"
+#endif
+
 #ifdef GL_ES_VERSION_3_0 // GLES3.1
 #define GL_BLIT_FRAMEBUFFER_AVAILABLE() ( GLIMP_PROCISVALID(qglBlitFramebuffer) )
 #define GL_DRAW_BUFFERS_AVAILABLE() ( GLIMP_PROCISVALID(qglDrawBuffers) )
@@ -40,6 +44,9 @@ If you have questions concerning this license or the applicable additional terms
 
 
 extern bool USING_GLES3;
+#if !defined(__ANDROID__)
+extern bool USING_GL;
+#endif
 #ifdef _OPENGLES3
 extern int GLES3_VERSION;
 #define USING_GLES30 (GLES3_VERSION > -1)
@@ -47,7 +54,19 @@ extern int GLES3_VERSION;
 #define USING_GLES32 (GLES3_VERSION > 1)
 #endif
 
-//#define _SHADOW_MAPPING
+#define COLOR_MODULATE_IS_NORMALIZED 1
+
+extern const float zero[];
+extern const float one[];
+extern const float negOne[];
+#ifdef COLOR_MODULATE_IS_NORMALIZED
+extern const float oneModulate[];
+extern const float negOneModulate[];
+#else
+#define oneModulate one
+#define negOneModulate negOne
+#endif
+
 #ifdef _SHADOW_MAPPING
 
 //#define SHADOW_MAPPING_DEBUG
@@ -77,6 +96,8 @@ enum
 	FRUSTUM_CASCADE5,
 	MAX_FRUSTUMS,
 };
+
+typedef idPlane frustum_t[FRUSTUM_PLANES];
 #endif
 
 #include "rb/Framebuffer.h"
@@ -119,6 +140,22 @@ class idScreenRect
 		void		Union(const idScreenRect &rect);
 		bool		Equals(const idScreenRect &rect) const;
 		bool		IsEmpty() const;
+
+#ifdef _D3BFG_CULLING
+        //anon begin
+        int			GetArea() const {
+            return (x2 - x1 + 1) * (y2 - y1 + 1);
+        }
+        //anon end
+		bool		IsEmptyWithZ() const {
+			return IsEmpty() || zmin > zmax;
+		}
+		void		IntersectWithZ( const idScreenRect &rect ) {
+			Intersect( rect );
+			zmin = zmin > rect.zmin ? zmin : rect.zmin;
+			zmax = zmax < rect.zmax ? zmax : rect.zmax;
+		}
+#endif
 };
 
 idScreenRect R_ScreenRectFromViewFrustumBounds(const idBounds &bounds);
@@ -294,9 +331,14 @@ class idRenderLightLocal : public idRenderLight
 		idInteraction 			*lastInteraction;
 
 		struct doublePortal_s 	*foggedPortals;
-#ifdef _SHADOW_MAPPING
-	float			baseLightProject[16];		// global xyz1 to projected light strq
-    float			inverseBaseLightProject[16];// transforms the zero-to-one cube to exactly cover the light in world space
+#if defined(_SHADOW_MAPPING) || defined(_D3BFG_CULLING)
+        RenderMatrix			baseLightProject;		// global xyz1 to projected light strq
+        RenderMatrix			inverseBaseLightProject;// transforms the zero-to-one cube to exactly cover the light in world space
+#endif
+#ifdef _D3BFG_CULLING
+        //anon begin
+        idBounds				globalLightBounds;
+        //anon end
 #endif
 };
 
@@ -355,6 +397,14 @@ class idRenderEntityLocal : public idRenderEntity
 		idInteraction 			*lastInteraction;
 
 		bool					needsPortalSky;
+
+#ifdef _D3BFG_CULLING
+        RenderMatrix			modelRenderMatrix;
+        // axis aligned bounding box in world space, derived from refernceBounds and
+        // modelMatrix in R_CreateEntityRefs()
+        idBounds		globalReferenceBounds;
+        RenderMatrix			inverseBaseModelProject;	// transforms the unit cube to exactly cover the model in world space
+#endif
 };
 
 
@@ -406,8 +456,8 @@ typedef struct viewLight_s {
     bool					parallel;					// lightCenter gives the direction to the light at infinity
     idVec3					lightCenter;				// offset the lighting direction for shading and
     int						shadowLOD;					// level of detail for shadowmap selection
-    float			baseLightProject[16];			// global xyz1 to projected light strq
-	float			inverseBaseLightProject[16];// transforms the zero-to-one cube to exactly cover the light in world space
+    RenderMatrix			baseLightProject;			// global xyz1 to projected light strq
+	RenderMatrix			inverseBaseLightProject;// transforms the zero-to-one cube to exactly cover the light in world space
     idVec3					lightRadius;		// xyz radius for point lights
 	const struct drawSurf_s	*perforatedShadows;	//karin: perforated surface for shadow mapping
 #endif
@@ -439,7 +489,7 @@ typedef struct viewEntity_s {
 	float				modelMatrix[16];		// local coords to global coords
 	float				modelViewMatrix[16];	// local coords to eye coords
 #ifdef _SHADOW_MAPPING
-	float mvp[16];
+	RenderMatrix		mvp;
 #endif
 } viewEntity_t;
 
@@ -509,6 +559,13 @@ typedef struct viewDef_s {
 	// crossing a closed door.  This is used to avoid drawing interactions
 	// when the light is behind a closed door.
 
+#ifdef _SHADOW_MAPPING
+	// RB parallel light split frustums
+    frustum_t			frustums[MAX_FRUSTUMS];					// positive sides face outward, [4] is the front clip plane
+    float				frustumSplitDistances[MAX_FRUSTUMS];
+    idRenderMatrix		frustumMVPs[MAX_FRUSTUMS];
+	// RB
+#endif
 } viewDef_t;
 
 
@@ -752,8 +809,8 @@ typedef struct {
 
 	int					c_copyFrameBuffer;
 #ifdef _SHADOW_MAPPING
-    float		shadowV[6][16];				// shadow depth view matrix
-    float		shadowP[6][16];				// shadow depth projection matrix
+    RenderMatrix		shadowV[6];				// shadow depth view matrix
+    RenderMatrix		shadowP[6];				// shadow depth projection matrix
 #endif
 } backEndState_t;
 
@@ -827,38 +884,38 @@ class idRenderSystemLocal : public idRenderSystem
 		virtual void			UnCrop();
 		virtual bool			UploadImage(const char *imageName, const byte *data, int width, int height);
 #ifdef _HUMANHEAD
-    virtual void			SetEntireSceneMaterial(idMaterial* material) { (void)material; }; // HUMANHEAD CJR
-    virtual bool			IsScopeView() {
-        return scopeView;
-    };// HUMANHEAD CJR
-    virtual void			SetScopeView(bool view) {
-		scopeView = view; 
-	} // HUMANHEAD CJR
-    virtual bool			IsShuttleView() {
-        return shuttleView;
-    };// HUMANHEAD CJR
-    virtual void			SetShuttleView(bool view) {
-		shuttleView = view;
-	}
-    virtual bool			SupportsFragmentPrograms(void) {
-        return false;
-    };// HUMANHEAD CJR
-    virtual int				VideoCardNumber(void) {
-        return 0;
-    }
+        virtual void			SetEntireSceneMaterial(idMaterial* material) { (void)material; }; // HUMANHEAD CJR
+        virtual bool			IsScopeView() {
+            return scopeView;
+        };// HUMANHEAD CJR
+        virtual void			SetScopeView(bool view) {
+            scopeView = view;
+        } // HUMANHEAD CJR
+        virtual bool			IsShuttleView() {
+            return shuttleView;
+        };// HUMANHEAD CJR
+        virtual void			SetShuttleView(bool view) {
+            shuttleView = view;
+        }
+        virtual bool			SupportsFragmentPrograms(void) {
+            return false;
+        };// HUMANHEAD CJR
+        virtual int				VideoCardNumber(void) {
+            return 0;
+        }
 #if _HH_RENDERDEMO_HACKS //HUMANHEAD rww
-	virtual void			LogViewRender(const struct renderView_s *view) { (void)view; }
+	    virtual void			LogViewRender(const struct renderView_s *view) { (void)view; }
 #endif //HUMANHEAD END
 
-	bool scopeView;
-	bool shuttleView;
-	int lastRenderSkybox;
-	ID_INLINE bool SkyboxRenderedInFrame() const {
-		return frameCount == lastRenderSkybox;
-	}
-	ID_INLINE void RenderSkyboxInFrame() {
-		lastRenderSkybox = frameCount;
-	}
+        bool scopeView;
+        bool shuttleView;
+        int lastRenderSkybox;
+        ID_INLINE bool SkyboxRenderedInFrame() const {
+            return frameCount == lastRenderSkybox;
+        }
+        ID_INLINE void RenderSkyboxInFrame() {
+            lastRenderSkybox = frameCount;
+        }
 #endif
 #ifdef _MULTITHREAD
 	virtual void EndFrame(byte *data, int *frontEndMsec, int *backEndMsec);
@@ -874,16 +931,16 @@ class idRenderSystemLocal : public idRenderSystem
 		void					RenderViewToViewport(const renderView_t *renderView, idScreenRect *viewport);
 #ifdef _RAVEN
 #ifndef _CONSOLE
-	virtual void			TrackTextureUsage( TextureTrackCommand command, int frametime = 0, const char *name=NULL ) { (void)command; (void)frametime; (void)name; }
+	    virtual void			TrackTextureUsage( TextureTrackCommand command, int frametime = 0, const char *name=NULL ) { (void)command; (void)frametime; (void)name; }
 #endif
-// RAVEN END
-	virtual void			SetSpecialEffect( ESpecialEffectType Which, bool Enabled ) { (void)Which; (void)Enabled; }
-	virtual void			SetSpecialEffectParm( ESpecialEffectType Which, int Parm, float Value ) { (void)Which; (void)Parm; (void)Value; }
-	virtual void			ShutdownSpecialEffects( void ) { }
-		virtual void			DrawStretchCopy( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material ) {
-			DrawStretchPic(x, y, w, h, s1, t1, s2, t2, material);
-		}
-	virtual void			DebugGraph( float cur, float min, float max, const idVec4 &color ) { (void)cur, (void)min; (void)max; (void)color; }
+        // RAVEN END
+        virtual void			SetSpecialEffect( ESpecialEffectType Which, bool Enabled ) { (void)Which; (void)Enabled; }
+        virtual void			SetSpecialEffectParm( ESpecialEffectType Which, int Parm, float Value ) { (void)Which; (void)Parm; (void)Value; }
+        virtual void			ShutdownSpecialEffects( void ) { }
+            virtual void			DrawStretchCopy( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *material ) {
+                DrawStretchPic(x, y, w, h, s1, t1, s2, t2, material);
+            }
+        virtual void			DebugGraph( float cur, float min, float max, const idVec4 &color ) { (void)cur, (void)min; (void)max; (void)color; }
 #endif
 
 	public:
@@ -1135,10 +1192,15 @@ extern idCVar r_debugRenderToTexture;
 extern idCVar harm_r_maxFps;
 extern idCVar harm_r_shadowCarmackInverse;
 
-#ifdef _USING_STB
 extern idCVar r_screenshotFormat;
 extern idCVar r_screenshotJpgQuality;
 extern idCVar r_screenshotPngCompression;
+
+#ifdef _D3BFG_CULLING
+extern idCVar harm_r_occlusionCulling;
+extern idCVar r_useLightPortalCulling;		// 0 = none, 1 = box, 2 = exact clip of polyhedron faces, 3 MVP to plane culling
+extern idCVar r_useLightAreaCulling;		// 0 = off, 1 = on
+extern idCVar r_useEntityPortalCulling;		// 0 = none, 1 = box
 #endif
 
 #ifdef _RAVEN
@@ -1295,6 +1357,9 @@ void		GLimp_DeactivateContext(void);
 // being spent inside OpenGL.
 
 void		GLimp_EnableLogging(bool enable);
+#ifdef _IMGUI
+#include "imgui/r_imgui.h"
+#endif
 
 
 /*
@@ -1406,6 +1471,9 @@ void R_FreeEntityDefOverlay(idRenderEntityLocal *def);
 void R_FreeEntityDefFadedDecals(idRenderEntityLocal *def, int time);
 
 void R_CreateLightDefFogPortals(idRenderLightLocal *ldef);
+#ifdef _D3BFG_CULLING
+void R_DeriveEntityData( idRenderEntityLocal *def );
+#endif
 
 /*
 ============================================================
@@ -1515,13 +1583,27 @@ typedef enum {
 	SHADER_INTERACTION_PBR,
 	SHADER_INTERACTION_BLINNPHONG,
     SHADER_AMBIENT_LIGHTING,
+#ifdef _GLOBAL_ILLUMINATION
+    SHADER_GLOBAL_ILLUMINATION,
+#endif
 	SHADER_DIFFUSECUBEMAP,
+	// SHADER_GLASSWARP,
 	SHADER_TEXGEN,
 	// new stage
 	SHADER_HEATHAZE,
 	SHADER_HEATHAZE_WITH_MASK,
 	SHADER_HEATHAZE_WITH_MASK_AND_VERTEX,
 	SHADER_COLORPROCESS,
+	// D3XP
+    SHADER_ENVIROSUIT,
+#ifdef _HUMANHEAD
+	SHADER_SCREENEFFECT, // spiritview
+	SHADER_RADIALBLUR, // deathview
+	SHADER_LIQUID, // liquid
+    SHADER_MEMBRANE, // membrane
+	SHADER_SCREENPROCESS, // unused
+#endif
+    SHADER_MEGATEXTURE,
 	// shadow mapping
 #ifdef _SHADOW_MAPPING
 	SHADER_DEPTH,
@@ -1554,6 +1636,14 @@ typedef enum {
     SHADER_AMBIENT_LIGHTING_SOFT,
 #endif
 #endif
+    // post process
+#ifdef _POSTPROCESS
+    SHADER_RETRO_2BIT,
+    SHADER_RETRO_C64,
+    SHADER_RETRO_CPC,
+    SHADER_RETRO_GENESIS,
+    SHADER_RETRO_PSX,
+#endif
     // costum
 	SHADER_CUSTOM,
 } glsl_program_t;
@@ -1562,7 +1652,7 @@ typedef enum {
 #define SHADER_BASE_END SHADER_TEXGEN
 
 #define SHADER_NEW_STAGE_BEGIN SHADER_HEATHAZE
-#define SHADER_NEW_STAGE_END SHADER_COLORPROCESS
+#define SHADER_NEW_STAGE_END SHADER_MEGATEXTURE
 
 #ifdef _SHADOW_MAPPING
 #define SHADER_SHADOW_MAPPING_BEGIN SHADER_DEPTH
@@ -1577,6 +1667,11 @@ typedef enum {
 #define SHADER_STENCIL_SHADOW_BEGIN SHADER_INTERACTION_TRANSLUCENT
 #define SHADER_STENCIL_SHADOW_END SHADER_INTERACTION_BLINNPHONG_TRANSLUCENT
 #endif
+#endif
+
+#ifdef _POSTPROCESS
+#define SHADER_POSTPROCESS_BEGIN SHADER_RETRO_2BIT
+#define SHADER_POSTPROCESS_END SHADER_RETRO_PSX
 #endif
 
 /*
@@ -1638,6 +1733,7 @@ DRAW_GLSL
 */
 
 #define MAX_UNIFORM_PARMS 8
+#define MAX_MEGATEXTURE_PARMS 9
 #define HARM_SHADER_NAME_LENGTH 64
 //#define _HARM_SHADER_NAME
 typedef struct shaderProgram_s {
@@ -1697,10 +1793,15 @@ typedef struct shaderProgram_s {
 	//k: cubemap texture units
 	GLint		u_fragmentCubeMap[MAX_FRAGMENT_IMAGES];
 	GLint		u_vertexParm[MAX_VERTEX_PARMS];
+#if defined(_GLSL_PROGRAM) || defined(_RAVEN) || defined(_HUMANHEAD) //karin: fragment shader parms
+	GLint		u_fragmentParm[MAX_FRAGMENT_PARMS];
+#endif
 	GLint		texgenS;
 	GLint		texgenT;
 	GLint		texgenQ;
 	GLint		u_uniformParm[MAX_UNIFORM_PARMS];
+
+    GLint       u_megaTextureLevel[MAX_MEGATEXTURE_PARMS];
 
 #ifdef _SHADOW_MAPPING
 	GLint		shadowMVPMatrix;
@@ -1759,6 +1860,10 @@ struct GLSLShaderProp
 typedef int shaderHandle_t; // > 0 is internal shader(index = handle - 1), < 0 is custom shader(index = -handle - 1), = 0 is invalid
 #define SHADER_HANDLE_IS_VALID(x) ( (x) != idGLSLShaderManager::INVALID_SHADER_HANDLE )
 #define SHADER_HANDLE_IS_INVALID(x) ( (x) == idGLSLShaderManager::INVALID_SHADER_HANDLE )
+#define SHADER_HANDLE_INVALID (idGLSLShaderManager::INVALID_SHADER_HANDLE )
+#define SHADER_HANDLE_IS_BUILTIN(x) ( (x) > idGLSLShaderManager::INVALID_SHADER_HANDLE )
+#define SHADER_HANDLE_IS_CUSTOM(x) ( (x) < idGLSLShaderManager::INVALID_SHADER_HANDLE )
+#define SHADER_MAX_CUSTOM 32
 class idGLSLShaderManager
 {
 public:
@@ -1780,7 +1885,7 @@ private:
 	int FindIndex(const char *name) const; // return raw index
 	int FindIndex(GLuint handle) const; // return raw index
     int FindCustomIndex(const char *name) const; // return raw index
-    GLSLShaderProp * FindCustom(const char *name);
+    GLSLShaderProp * FindCustom(const char *name, int *index = NULL);
 
 private:
 	idList<shaderProgram_t *> shaders; // available shaders, include internal shaders and loaded custom shaders
@@ -1801,6 +1906,7 @@ void R_GLSL_Shutdown(void);
 void RB_GLSL_DrawInteractions(void);
 void RB_GLSL_CreateDrawInteractions(const drawSurf_t *surf);
 void RB_GLSL_DrawInteraction(const drawInteraction_t *din);
+bool RB_GLSL_FindGLSLShaderSource(const char *name, int type, idStr *source, idStr *realPath);
 
 void R_CheckBackEndCvars(void);
 
@@ -2036,12 +2142,27 @@ void RB_SetDefaultGLState(void);
 void RB_SetGL2D(void);
 
 // write a comment to the r_logFile if it is enabled
+#ifdef _RENDERER_LOG_COMMENT
 void RB_LogComment(const char *comment, ...) id_attribute((format(printf,1,2)));
+#else
+#define RB_LogComment(...)
+#endif
 
 void RB_ShowImages(void);
 
 void RB_ExecuteBackEndCommands(const emptyCommand_t *cmds);
 
+void LoadJPG_stb(const char *filename, unsigned char **pic, int *width, int *height, ID_TIME_T *timestamp);
+void LoadPNG(const char *filename, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
+void LoadDDS(const char *filename, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
+void LoadBimage(const char *filename, byte **pic, int *width, int *height, ID_TIME_T *timestamp);
+
+void R_WritePNG(const char *filename, const byte *data, int width, int height, int comp, bool flipVertical = false, int quality = 100, const char *basePath = NULL);
+void R_WriteJPG(const char *filename, const byte *data, int width, int height, int comp, bool flipVertical = false, int compression = 0, const char *basePath = NULL);
+void R_WriteBMP(const char *filename, const byte *data, int width, int height, int comp, bool flipVertical = false, const char *basePath = NULL);
+void R_WriteDDS(const char *filename, const byte *data, int width, int height, int comp, bool flipVertical, const char *basePath = NULL);
+
+void R_WriteScreenshotImage(const char *filename, const byte *data, int width, int height, int comp, bool flipVertical = false, const char *basePath = NULL);
 
 /*
 =============================================================
@@ -2110,112 +2231,32 @@ idScreenRect R_CalcIntersectionScissor(const idRenderLightLocal *lightDef,
 #include "GuiModel.h"
 #include "VertexCache.h"
 
-//k for Android large stack memory allocate limit
-#define _DYNAMIC_ALLOC_STACK_OR_HEAP
-
-#if 0
-#define _ALLOC_DEBUG(x) x
-#else
-#define _ALLOC_DEBUG(x)
-#endif
-
-#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-#if 1
-extern idCVar harm_r_maxAllocStackMemory;
-	#define HARM_MAX_STACK_ALLOC_SIZE (harm_r_maxAllocStackMemory.GetInteger())
-#else
-	#define HARM_MAX_STACK_ALLOC_SIZE (1024 * 512)
-#endif
-
-struct idAllocAutoHeap {
-	public:
-
-		idAllocAutoHeap() 
-			: data(NULL)
-		{ }
-
-		~idAllocAutoHeap() {
-			Free();
-		}
-
-		void * Alloc(size_t size) {
-			Free();
-			data = calloc(size, 1);
-			_ALLOC_DEBUG(common->Printf("[Harmattan]: %p alloca on heap memory %p(%zu bytes)\n", this, data, size));
-			return data;
-		}
-
-		void * Alloc16(size_t size) {
-			Free();
-			data = calloc(size + 15, 1);
-			void *ptr = ((void *)(((intptr_t)data + 15) & ~15));
-			_ALLOC_DEBUG(common->Printf("[Harmattan]: %p alloca16 on heap memory %p(%zu bytes) <- %p(%zu bytes)\n", this, ptr, size, data, size + 15));
-			return ptr;
-		}
-
-		bool IsAlloc(void) const {
-			return data != NULL;
-		}
-
-	private:
-		void *data;
-
-		void Free(void) {
-			if(data) {
-				_ALLOC_DEBUG(common->Printf("[Harmattan]: %p free alloca16 heap memory %p\n", this, data));
-				free(data);
-				data = NULL;
-			}
-		}
-		void * operator new(size_t);
-		void * operator new[](size_t);
-		void operator delete(void *);
-		void operator delete[](void *);
-		idAllocAutoHeap(const idAllocAutoHeap &);
-		idAllocAutoHeap & operator=(const idAllocAutoHeap &);
-};
-
-// alloc in heap memory
-#define _alloca16_heap( x )					((void *)((((intptr_t)calloc( (x)+15 ,1 )) + 15) & ~15))
-
-	// Using heap memory. Also reset RLIMIT_STACK by call `setrlimit`.
-#define _DROID_ALLOC16_DEF(T, alloc_size, varname, x) \
-	idAllocAutoHeap _allocAutoHeap##x; \
-	T *varname = (T *) (HARM_MAX_STACK_ALLOC_SIZE == 0 || (HARM_MAX_STACK_ALLOC_SIZE > 0 && (alloc_size) >= HARM_MAX_STACK_ALLOC_SIZE) ? _allocAutoHeap##x.Alloc16(alloc_size) : _alloca16(alloc_size)); \
-	if(_allocAutoHeap##x.IsAlloc()) { \
-		_ALLOC_DEBUG(common->Printf("[Harmattan]: Alloca on heap memory %s %p(%zu bytes)\n", #varname, varname, (size_t)alloc_size)); \
-	}
-
-#define _DROID_ALLOC16(T, alloc_size, varname, x) \
-	idAllocAutoHeap _allocAutoHeap##x; \
-	varname = (T *) (HARM_MAX_STACK_ALLOC_SIZE == 0 || (HARM_MAX_STACK_ALLOC_SIZE > 0 && (alloc_size) >= HARM_MAX_STACK_ALLOC_SIZE) ? _allocAutoHeap##x.Alloc16(alloc_size) : _alloca16(alloc_size)); \
-	if(_allocAutoHeap##x.IsAlloc()) { \
-		_ALLOC_DEBUG(common->Printf("[Harmattan]: Alloca on heap memory %s %p(%zu bytes)\n", #varname, varname, (size_t)alloc_size)); \
-	}
-
-	// free memory when not call alloca()
-#define _DROID_FREE(varname, x)/* \
-	{ \
-		common->Printf("[Harmattan]: Free alloca heap memory %p\n", varname); \
-	}*/
-
-#endif
-
 #ifdef _RAVEN //k: macros for renderEffect_s::suppressSurfaceMask
 #define SUPPRESS_SURFACE_MASK(x) (1 << (x))
 #define SUPPRESS_SURFACE_MASK_CHECK(t, x) ((t) & SUPPRESS_SURFACE_MASK(x))
 #include "../raven/renderer/NewShaderStage.h"
 #endif
 
-extern void GLimp_CheckGLInitialized(void); // Check GL context initialized, only for Android
+extern bool GLimp_CheckGLInitialized(void); // Check GL context initialized, only for Android
 //extern volatile bool has_gl_context;
 extern unsigned int lastRenderTime;
 extern int r_maxFps;
 
+#if defined(_SHADOW_MAPPING) || defined(_D3BFG_CULLING)
+float R_ComputePointLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+float R_ComputeSpotLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+float R_ComputeParallelLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
+
+void R_SetupFrontEndViewDefMVP(void);
+void R_SetupFrontEndFrustums(void);
+void R_ShadowBounds( const idBounds& modelBounds, const idBounds& lightBounds, const idVec3& lightOrigin, idBounds& shadowBounds );
+#endif
+
 #ifdef _SHADOW_MAPPING
 
+#define ALLOW_SHADOW_MAPPING_ON_ALPHATEST_MTR(x) ( ( (shader->GetContentFlags() & CONTENTS_SOLID) != 0 || ( (shader->GetCullType() == CT_TWO_SIDED) || shader->ShouldCreateBackSides() ) ) && (shader->GetSort() != SS_DECAL) )
+
 #include "matrix/GLMatrix.h"
-#include "matrix/RenderMatrix.h"
 
 extern idCVar r_useShadowMapping;			// use shadow mapping instead of stencil shadows
 extern idCVar r_useHalfLambertLighting;		// use Half-Lambert lighting instead of classic Lambert
@@ -2242,6 +2283,7 @@ extern idCVar r_forceShadowMapsOnAlphaTestedSurfaces;
 extern idCVar harm_r_shadowMapLod;
 extern idCVar harm_r_shadowMapBias;
 extern idCVar harm_r_shadowMapAlpha;
+extern idCVar harm_r_shadowMapCombine;
 #if 0
 extern idCVar harm_r_shadowMapSampleFactor;
 extern idCVar harm_r_shadowMapFrustumNear;
@@ -2250,18 +2292,12 @@ extern idCVar harm_r_shadowMapFrustumFar;
 extern idCVar harm_r_useLightScissors;
 extern idCVar harm_r_shadowMapDepthBuffer;
 extern idCVar harm_r_shadowMapNonParallelLightUltra;
-extern idCVar harm_r_shadowMapJitterScale;
 
 extern idBounds bounds_zeroOneCube;
 extern idBounds bounds_unitCube;
 
-float R_ComputePointLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
-float R_ComputeSpotLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
-float R_ComputeParallelLightProjectionMatrix( idRenderLightLocal* light, idRenderMatrix& localProject );
 void R_SetupShadowMappingLOD(const idRenderLightLocal *light, viewLight_t *vLight);
 void R_SetupShadowMappingProjectionMatrix(idRenderLightLocal *light);
-void R_SetupFrontEndViewDefMVP(void);
-
 #endif
 
 #ifdef _STENCIL_SHADOW_IMPROVE
@@ -2313,11 +2349,8 @@ extern float RB_overbright;
 #endif
 
 #ifdef _EXTRAS_TOOLS
-void MD5Anim_AddCommand(void);
-#endif
-#ifdef _ENGINE_MODEL_VIEWER
-void ModelTest_TestModel(int time);
-void ModelTest_AddCommand(void);
+void ModelTest_RenderFrame(int time);
+void ModelLight_RenderFrame(int time);
 #endif
 
 extern idCVar harm_r_lightingModel;
@@ -2327,5 +2360,39 @@ extern idCVar harm_r_lightingModel;
 #define HARM_INTERACTION_SHADER_BLINNPHONG 2
 #define HARM_INTERACTION_SHADER_PBR 3
 #define HARM_INTERACTION_SHADER_AMBIENT 4
+
+extern idCVar harm_r_useHighPrecision;
+
+#define GL_VERSION_GL_ES2 0x00020000
+#define GL_VERSION_GL_ES3 0x00030000
+#define GL_VERSION_GL_ES31 0x00030001
+#define GL_VERSION_GL_ES32 0x00030002
+#if !defined(__ANDROID__)
+#define GL_VERSION_GL_CORE 0x10000000
+#define GL_VERSION_GL_COMPATIBILITY 0x20000000
+#endif
+
+#define GL_VERSION_NAME_GL_ES2 "GLES2"
+#define GL_VERSION_NAME_GL_ES3 "GLES3.0"
+#if !defined(__ANDROID__)
+#define GL_VERSION_NAME_GL_CORE "OpenGL_core"
+#define GL_VERSION_NAME_GL_COMPATIBILITY "OpenGL_compatibility"
+#endif
+
+#ifdef _GLOBAL_ILLUMINATION
+extern idCVar harm_r_globalIllumination;
+extern idCVar harm_r_globalIlluminationBrightness;
+#define HARM_RENDER_GLOBAL_ILLUMINATION() (harm_r_globalIllumination.GetBool() && harm_r_globalIlluminationBrightness.GetFloat() > 0.0f)
+
+void RB_DrawGlobalIlluminations( drawSurf_t **drawSurfs, int numDrawSurfs );
+#endif
+
+#ifdef _POSTPROCESS
+extern idCVar r_renderMode;
+void RB_PP_Render(void);
+#endif
+
+extern idCVar harm_r_debugOpenGL;
+void RB_DebugOpenGL(void);
 
 #endif /* !__TR_LOCAL_H__ */

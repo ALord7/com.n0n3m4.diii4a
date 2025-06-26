@@ -38,7 +38,12 @@ public final class Q3EGlobals
     public static final int UI_7            = 22;
     public static final int UI_8            = 23;
     public static final int UI_9            = 24;
-    public static final int UI_SIZE         = UI_9 + 1;
+    public static final int UI_NUM_PANEL    = 25;
+    public static final int UI_Y            = 26;
+    public static final int UI_N            = 27;
+    public static final int UI_PLUS         = 28;
+    public static final int UI_MINUS        = 29;
+    public static final int UI_SIZE         = UI_MINUS + 1;
     /*public static final int UI_A            = 25;
     public static final int UI_B            = 26;
     public static final int UI_C            = 27;
@@ -103,6 +108,15 @@ public final class Q3EGlobals
     public static final int ONSCRREN_JOYSTICK_VISIBLE_HIDDEN       = 1;
     public static final int ONSCRREN_JOYSTICK_VISIBLE_ONLY_PRESSED = 2;
 
+    // button swipe release delay
+    public static final int BUTTON_SWIPE_RELEASE_DELAY_AUTO        = -1;
+    public static final int BUTTON_SWIPE_RELEASE_DELAY_NONE        = 0;
+    public static final int SERIOUS_SAM_BUTTON_SWIPE_RELEASE_DELAY = 50;
+
+    // disc button trigger
+    public static final int ONSCRREN_DISC_SWIPE = 0;
+    public static final int ONSCRREN_DISC_CLICK = 1;
+
     // game state
     public static final int STATE_NONE    = 0;
     public static final int STATE_ACT     = 1; // RTCW4A-specific, keep
@@ -118,160 +132,10 @@ public final class Q3EGlobals
     public static final int VIEW_MOTION_CONTROL_GYROSCOPE = 1 << 1;
     public static final int VIEW_MOTION_CONTROL_ALL       = VIEW_MOTION_CONTROL_TOUCH | VIEW_MOTION_CONTROL_GYROSCOPE;
 
-    // game engine library
-    public static final String LIB_ENGINE_ID        = "libidtech4.so"; // DOOM3
-    public static final String LIB_ENGINE_RAVEN     = "libidtech4_raven.so"; // Quake 4
-    public static final String LIB_ENGINE_HUMANHEAD = "libidtech4_humanhead.so"; // Prey 2006
-    public static final String LIB_ENGINE2_ID       = "libyquake2.so"; // Quake 2
-    public static final String LIB_ENGINE3_ID       = "libioquake3.so"; // Quake 3
-    public static final String LIB_ENGINE3_RTCW     = "libiowolfsp.so"; // RTCW
-    public static final String LIB_ENGINE4_TDM      = "libTheDarkMod.so"; // TDM
-    public static final String LIB_ENGINE1_QUAKE    = "libdarkplaces.so"; // Quake 1
-    public static final String LIB_ENGINE4_D3BFG    = "libRBDoom3BFG.so"; // Doom3-BFG
-    public static final String LIB_ENGINE1_DOOM     = "libgzdoom.so"; // GZDOOM
-    public static final String LIB_ENGINE3_ETW      = "libetl.so"; // ETW
-    public static final String LIB_ENGINE3_REALRTCW = "libRealRTCW.so"; // RealRTCW
-
-    // game config file
-    public static final String CONFIG_FILE_DOOM3    = "DoomConfig.cfg"; // DOOM3
-    public static final String CONFIG_FILE_QUAKE4   = "Quake4Config.cfg"; // Quake 4
-    public static final String CONFIG_FILE_PREY     = "preyconfig.cfg"; // Prey 2006
-    public static final String CONFIG_FILE_QUAKE2   = "config.cfg"; // Quake 2
-    public static final String CONFIG_FILE_QUAKE3   = "q3config.cfg"; // Quake 3
-    public static final String CONFIG_FILE_RTCW     = "wolfconfig.cfg"; // RTCW
-    public static final String CONFIG_FILE_TDM      = "Darkmod.cfg"; // TDM
-    public static final String CONFIG_FILE_QUAKE1   = "config.cfg"; // Quake 1
-    public static final String CONFIG_FILE_DOOM3BFG = "D3BFGConfig.cfg"; // DOOM3-BFG
-    public static final String CONFIG_FILE_GZDOOM   = "gzdoom.ini"; // GZDOOM
-    public static final String CONFIG_FILE_ETW      = "etconfig.cfg"; // ETW
-    public static final String CONFIG_FILE_REALRTCW = "realrtcwconfig.cfg"; // RealRTCW
-
-    // game type token
-    public static final String GAME_DOOM3    = "doom3";
-    public static final String GAME_QUAKE4   = "quake4";
-    public static final String GAME_PREY     = "prey2006";
-    public static final String GAME_QUAKE2   = "quake2";
-    public static final String GAME_QUAKE3   = "quake3";
-    public static final String GAME_RTCW     = "rtcw";
-    public static final String GAME_TDM      = "tdm";
-    public static final String GAME_QUAKE1   = "quake1";
-    public static final String GAME_DOOM3BFG = "doom3bfg";
-    public static final String GAME_GZDOOM   = "gzdoom";
-    public static final String GAME_ETW      = "etw";
-    public static final String GAME_REALRTCW = "realrtcw";
-
-    // game name
-    public static final String GAME_NAME_DOOM3    = "DOOM 3";
-    public static final String GAME_NAME_QUAKE4   = "Quake 4";
-    public static final String GAME_NAME_PREY     = "Prey(2006)";
-    public static final String GAME_NAME_QUAKE2   = "Quake 2";
-    public static final String GAME_NAME_QUAKE3   = "Quake 3";
-    public static final String GAME_NAME_RTCW     = "RTCW"; // "Return to Castle Wolfenstein";
-    public static final String GAME_NAME_TDM      = "Dark mod"; // The Dark Mod
-    public static final String GAME_NAME_QUAKE1   = "Quake 1";
-    public static final String GAME_NAME_DOOM3BFG = "DOOM 3 BFG";
-    public static final String GAME_NAME_GZDOOM   = "GZDOOM";
-    public static final String GAME_NAME_ETW      = "ETW"; // "Wolfenstein: Enemy Territory";
-    public static final String GAME_NAME_REALRTCW = "RealRTCW";
-
-    // game base folder
-    public static final String GAME_BASE_DOOM3      = "base";
-    public static final String GAME_BASE_D3XP       = "d3xp";
-    public static final String GAME_BASE_QUAKE4     = "q4base";
-    public static final String GAME_BASE_PREY       = "preybase"; // Other platform is `base`
-    public static final String GAME_BASE_QUAKE2     = "baseq2";
-    public static final String GAME_BASE_QUAKE3     = "baseq3";
-    public static final String GAME_BASE_RTCW       = "main";
-    public static final String GAME_BASE_TDM        = ""; // the dark mod is standalone
-    public static final String GAME_BASE_QUAKE1     = "darkplaces/id1"; // "darkplaces";
-    public static final String GAME_BASE_QUAKE1_DIR = "id1";
-    public static final String GAME_BASE_DOOM3BFG   = "base"; // RBDoom3BFG always in doom3bfg folder
-    public static final String GAME_BASE_GZDOOM     = ""; // GZDOOM is standalone
-    public static final String GAME_BASE_ETW        = "etmain";
-    public static final String GAME_BASE_REALRTCW   = "Main";
-
-    // game sub directory
-    public static final String GAME_SUBDIR_DOOM3    = "doom3";
-    public static final String GAME_SUBDIR_QUAKE4   = "quake4";
-    public static final String GAME_SUBDIR_PREY     = "prey";
-    public static final String GAME_SUBDIR_QUAKE2   = "quake2";
-    public static final String GAME_SUBDIR_QUAKE3   = "quake3";
-    public static final String GAME_SUBDIR_RTCW     = "rtcw";
-    public static final String GAME_SUBDIR_TDM      = "darkmod";
-    public static final String GAME_SUBDIR_QUAKE1   = "quake1";
-    public static final String GAME_SUBDIR_DOOMBFG  = "doom3bfg";
-    public static final String GAME_SUBDIR_GZDOOM   = "gzdoom";
-    public static final String GAME_SUBDIR_ETW      = "etw";
-    public static final String GAME_SUBDIR_REALRTCW = "realrtcw";
-
-/*
-    public static final String[] QUAKE4_MAPS = {
-            "airdefense1",
-            "airdefense2",
-            "hangar1",
-            "hangar2",
-            "mcc_landing",
-            "mcc_1",
-            "convoy1",
-            "building_b",
-            "convoy2",
-            "convoy2b",
-            "hub1",
-            "hub2",
-            "medlabs",
-            "walker",
-            "dispersal",
-            "recomp",
-            "putra",
-            "waste",
-            "mcc_2",
-            "storage1 first",
-            "storage2",
-            "storage1 second",
-            "tram1",
-            "tram1b",
-            "process1 first",
-            "process2",
-            "process1 second",
-            "network1",
-            "network2",
-            "core1",
-            "core2",
-    };
-
-    public static final String[] QUAKE4_LEVELS = {
-            "AIR DEFENSE BUNKER", // Act I
-            "AIR DEFENSE TRENCHES",
-            "HANGAR PERIMETER",
-            "INTERIOR HANGAR",
-            "MCC LANDING SITE",
-            "OPERATION: ADVANTAGE", // Act II
-            "CANYON",
-            "PERIMETER DEFENSE STATION",
-            "AQUEDUCTS",
-            "AQUEDUCTS ANNEX",
-            "NEXUS HUB TUNNELS",
-            "NEXUS HUB",
-            "STROGG MEDICAL FACILITIES", // Act III
-            "CONSTRUCTION ZONE",
-            "DISPERSAL FACILITY",
-            "RECOMPOSITION CENTER",
-            "PUTRIFICATION CENTER",
-            "WASTE PROCESSING FACILITY",
-            "OPERATION: LAST HOPE", // Act IV
-            "DATA STORAGE TERMINAL",
-            "DATA STORAGE SECURITY",
-            "DATA STORAGE TERMINAL",
-            "TRAM HUB STATION",
-            "TRAM RAIL",
-            "DATA PROCESSING TERMINAL",
-            "DATA PROCESSING SECURITY",
-            "DATA PROCESSING TERMINAL",
-            "DATA NETWORKING TERMINAL",
-            "DATA NETWORKING SECURITY",
-            "NEXUS CORE", // Act V
-            "THE NEXUS",
-    };*/
+    // signals handler
+    public static final int SIGNALS_HANDLER_GAME      = 0;
+    public static final int SIGNALS_HANDLER_NO_HANDLE = 1;
+    public static final int SIGNALS_HANDLER_BACKTRACE = 2;
 
     public static final String[] CONTROLS_NAMES = {
             "Joystick",
@@ -299,6 +163,11 @@ public final class Q3EGlobals
             "Extra 7",
             "Extra 8",
             "Extra 9",
+            "Number",
+            "Y",
+            "N",
+            "+",
+            "-",
     };
 
     // OpenGL Surface color format
@@ -314,17 +183,13 @@ public final class Q3EGlobals
     public static final int ENUM_BACK_EXIT   = 2;
     public static final int ENUM_BACK_ALL    = 0xFF;
 
-    public static final int CONST_DOUBLE_PRESS_BACK_TO_EXIT_INTERVAL = 1000;
+    public static final int CONST_DOUBLE_PRESS_BACK_TO_EXIT_INTERVAL = 500; // 1000
     public static final int CONST_DOUBLE_PRESS_BACK_TO_EXIT_COUNT    = 3;
 
-    public static final String GAME_EXECUABLE = "game.arm";
-
-    // extra internal game file version
-    public static final String TDM_GLSL_SHADER_VERSION        = "2.12.3";
-    public static final String RBDOOM3BFG_HLSL_SHADER_VERSION = "1.4.1";
-    public static final String GZDOOM_VERSION                 = "4.12.2.2";
+    public static final int DEFAULT_DEPTH_BITS = 24; // 16 32
 
     public static final String IDTECH4AMM_PAK_SUFFIX = ".zipak";
+
 
 
     public static  boolean IS_NEON      = false; // only armv7-a 32. arm64 always support, but using hard

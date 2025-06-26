@@ -226,19 +226,27 @@ idCVar r_materialOverride("r_materialOverride", "", CVAR_RENDERER, "overrides al
 idCVar r_debugRenderToTexture("r_debugRenderToTexture", "0", CVAR_RENDERER | CVAR_INTEGER, "");
 
 idCVar harm_r_maxFps( "r_maxFps", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "Limit maximum FPS. 0 = unlimited" );
-idCVar harm_r_shadowCarmackInverse("harm_r_shadowCarmackInverse", "0", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "Stencil shadow using Carmack-Inverse.");
-idCVar r_scaleMenusTo43( "r_scaleMenusTo43", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Scale menus, fullscreen videos and PDA to 4:3 aspect ratio" );
-//k: temp memory allocate in stack / heap control on Android
-#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
-// #warning "For fix `DOOM3: The lost mission` mod, when load `game/le_hell` map(loading resource `models/mapobjects/hell/hellintro.lwo` model, a larger scene, alloca() stack out of memory)."
-/*static */idCVar harm_r_maxAllocStackMemory("harm_r_maxAllocStackMemory", "524288", CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "Control allocate temporary memory when load model data, default value is `524288` bytes(Because stack memory is limited on OS:\n 0 = Always heap;\n Negative = Always stack;\n Positive = Max stack memory limit(If less than this `byte` value, call `alloca` in stack memory, else call `malloc`/`calloc` in heap memory)).");
+idCVar harm_r_shadowCarmackInverse("harm_r_shadowCarmackInverse", "0", CVAR_BOOL|CVAR_RENDERER|CVAR_ARCHIVE, "Stencil shadow using Carmack-Inverse.");
+idCVar r_scaleMenusTo43( "r_scaleMenusTo43", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Scale menus, fullscreen videos and PDA to 4:3 aspect ratio" );
+idCVar harm_r_useHighPrecision("harm_r_useHighPrecision",
+#ifdef __ANDROID__
+                               "0"
+#else
+                               "1"
 #endif
+                               , CVAR_RENDERER | CVAR_INTEGER | CVAR_INIT, "Use high precision float on GLSL shader");
 
-#ifdef _USING_STB
 idCVar r_screenshotFormat("r_screenshotFormat", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Screenshot format. 0 = TGA (default), 1 = BMP, 2 = PNG, 3 = JPG, 4 = DDS", 0, 4, idCmdSystem::ArgCompletion_Integer<0, 4>);
 idCVar r_screenshotJpgQuality("r_screenshotJpgQuality", "75", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Screenshot quality for JPG images (0-100)", 0, 100, idCmdSystem::ArgCompletion_Integer<0, 100>);
 idCVar r_screenshotPngCompression("r_screenshotPngCompression", "3", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Compression level when using PNG screenshots (0-9)", 0, 9, idCmdSystem::ArgCompletion_Integer<0, 9>);
+
+#ifdef _D3BFG_CULLING
+idCVar harm_r_occlusionCulling( "harm_r_occlusionCulling", "0", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_INTEGER, "enable DOOM3-BFG occlusion culling" );
+idCVar r_useLightPortalCulling( "r_useLightPortalCulling", "1", CVAR_RENDERER | CVAR_INTEGER, "0 = none, 1 = cull frustum corners to plane, 2 = exact clip the frustum faces", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
+idCVar r_useLightAreaCulling( "r_useLightAreaCulling", "1", CVAR_RENDERER | CVAR_BOOL, "0 = off, 1 = on" );
+idCVar r_useEntityPortalCulling( "r_useEntityPortalCulling", "1", CVAR_RENDERER | CVAR_INTEGER, "0 = none, 1 = cull frustum corners to plane, 2 = exact clip the frustum faces", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 #endif
+
 
 #ifdef _RAVEN
 idCVar r_skipSky("r_skipSky", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Dark sky");
@@ -342,10 +350,14 @@ static void R_CheckPortableExtensions(void)
 	} else
 #endif
 	{
-		if (R_CheckExtension("GL_EXT_texture_compression_s3tc")&&r_useDXT.GetBool())
-		glConfig.textureCompressionAvailable = true;
+		if (R_CheckExtension("GL_EXT_texture_compression_s3tc") && r_useDXT.GetBool()
+#if !defined(__ANDROID__)
+        && USING_GL
+#endif
+        )
+		    glConfig.textureCompressionAvailable = true;
 		else
-		glConfig.textureCompressionAvailable = false;
+		    glConfig.textureCompressionAvailable = false;
 	}
 
 	// GL_EXT_texture_filter_anisotropic
@@ -361,6 +373,7 @@ static void R_CheckPortableExtensions(void)
 	// GL_EXT_texture_lod_bias
 	// The actual extension is broken as specificed, storing the state in the texture unit instead
 	// of the texture object.  The behavior in GL 1.4 is the behavior we use.
+#if !defined(GL_ES_VERSION_2_0)
 	if (glConfig.glVersion >= 1.4 || R_CheckExtension("GL_EXT_texture_lod")) {
 		common->Printf("...using %s\n", "GL_1.4_texture_lod_bias");
 		glConfig.textureLODBiasAvailable = true;
@@ -368,6 +381,9 @@ static void R_CheckPortableExtensions(void)
 		common->Printf("X..%s not found\n", "GL_1.4_texture_lod_bias");
 		glConfig.textureLODBiasAvailable = false;
 	}
+#else
+	glConfig.textureLODBiasAvailable = false;
+#endif
 
 	// GL_EXT_shared_texture_palette
 	glConfig.sharedTexturePaletteAvailable = false; // R_CheckExtension("GL_EXT_shared_texture_palette");
@@ -453,6 +469,7 @@ static void R_CheckPortableExtensions(void)
 		glConfig.depth24Available = R_CheckExtension("GL_OES_depth24");
 		glConfig.gl_FragDepthAvailable = R_CheckExtension("GL_EXT_frag_depth");
 	}
+	glConfig.debugOutput = R_CheckExtension("GL_KHR_debug");
 }
 
 
@@ -497,6 +514,17 @@ vidmode_t r_vidModes[] = {
     { "Mode 21: 4096x2304",		4096,   2304 },
     { "Mode 22: 2880x1800",		2880,   1800 },
     { "Mode 23: 2560x1440",		2560,   1440 },
+    { "Mode 24: 1440x1080",		1440,   1080 },
+    { "Mode 25: 1280x800",		1280,	800 },
+        // 21:9 resolutions
+    { "Mode 26: 2560x1080",		2560,   1080 },
+    { "Mode 27: 3440x1440",		3440,   1440 },
+    { "Mode 28: 3840x1600",		3840,   1600 },
+    { "Mode 29: 5120x2160",		5120,   2160 },
+        // 32:9 resolutions
+    { "Mode 30: 3840x1080",		3840,   1080 },
+    { "Mode 31: 5120x1440",		5120,   1440 },
+    { "Mode 32: 7680x2160",		7680,   2160 },
 };
 static int	s_numVidModes = (sizeof(r_vidModes) / sizeof(r_vidModes[0]));
 
@@ -617,11 +645,17 @@ void R_InitOpenGL(void)
 	if (glConfig.maxTextureSize <= 0) {
 		glConfig.maxTextureSize = 256;
 	}
+    //common->Printf("maxTextureSize: %d\n", glConfig.maxTextureSize);
 
 	glConfig.isInitialized = true;
 
 	// recheck all the extensions (FIXME: this might be dangerous)
 	R_CheckPortableExtensions();
+
+#ifdef _OPENGLES3
+	// OpenGL debug
+	RB_DebugOpenGL();
+#endif
 
 	// parse our vertex and fragment programs, possibly disably support for
 	// one of the paths if there was an error
@@ -1111,12 +1145,46 @@ void R_ShowglConfig_f(const idCmdArgs &args)
 		return;
 	}
 
-#ifdef GL_ES_VERSION_3_0
-	if(USING_GLES3)
-		common->Printf("OpenGLES 3.0\n");
-	else
+    extern int gl_version;
+    idStr glVersionName;
+    switch(gl_version)
+    {
+        case GL_VERSION_GL_ES2:
+            glVersionName = "OpenGL ES2";
+            break;
+#if !defined(__ANDROID__)
+        case GL_VERSION_GL_CORE:
+            glVersionName = "OpenGL Core";
+            break;
+        case GL_VERSION_GL_COMPATIBILITY:
+            glVersionName = "OpenGL Compatibility";
+            break;
 #endif
-		common->Printf("OpenGLES 2.0\n");
+        case GL_VERSION_GL_ES3:
+#ifdef _OPENGLES3
+			if(USING_GLES32)
+				glVersionName = "OpenGL ES3.2";
+			else if(USING_GLES31)
+				glVersionName = "OpenGL ES3.1";
+			else
+#endif
+            glVersionName = "OpenGL ES3";
+            break;
+        default:
+#ifdef GL_ES_VERSION_3_0
+			if(USING_GLES32)
+				glVersionName = "OpenGL ES3.2";
+			else if(USING_GLES31)
+				glVersionName = "OpenGL ES3.1";
+			else if(USING_GLES3)
+				glVersionName = "OpenGL ES3";
+			else
+#endif
+			glVersionName = "OpenGL ES2";
+            break;
+    }
+
+	common->Printf("%s\n", glVersionName.c_str());
 
 	common->Printf("Renderer: %s\n", glConfig.renderer_string);
 	common->Printf("Version: %s\n", glConfig.version_string);
@@ -1170,6 +1238,9 @@ void R_ShowglConfig_f(const idCmdArgs &args)
 	common->Printf("depthTextureCubeMapAvailable: %d\n", glConfig.depthTextureCubeMapAvailable);
 	common->Printf("depth24Available: %d\n", glConfig.depth24Available);
 	common->Printf("gl_FragDepthAvailable: %d\n", glConfig.gl_FragDepthAvailable);
+	common->Printf("multiSamples: %d\n", glConfig.multiSamples);
+	common->Printf("sizeof(glIndex_t): %zd\n", sizeof(glIndex_t));
+	common->Printf("GL_KHR_debug: %d\n", glConfig.debugOutput);
 #ifdef _SHADOW_MAPPING
 	extern bool r_useDepthTexture;
 	extern bool r_useCubeDepthTexture;
@@ -1179,28 +1250,19 @@ void R_ShowglConfig_f(const idCmdArgs &args)
 	common->Printf("r_usePackColorAsDepth: %d\n", r_usePackColorAsDepth);
 #endif
 
-#ifdef GL_ES_VERSION_3_0
-	if(USING_GLES3)
-		common->Printf("OpenGLES 3.0\n");
-	else
-#endif
-		common->Printf("OpenGLES 2.0\n");
-}
-
 #ifdef _MULTITHREAD
-static void R_Multithreading_f(const idCmdArgs &args)
-{
-	extern intptr_t Sys_GetMainThread(void);
-
-	common->Printf("[Harmattan]: Multi-Thread current is %s.\n", multithreadActive ? "enabled" : "disabled");
-	common->Printf("             - Main thread handle is %lu.\n", Sys_GetMainThread());
-	//if(multithreadActive)
-	{
-		const xthreadInfo *thread = &renderThread->render_thread;
-		common->Printf("             - Render thread(%s) handle is %lu.\n", thread ? thread->name : "<NULL>", thread ? thread->threadHandle : 0);
-	}
-}
+    extern intptr_t Sys_GetMainThread(void);
+    common->Printf("Multi-Thread: %s\n", multithreadActive ? "enabled" : "disabled");
+    common->Printf(" - Main thread handle: %lu\n", Sys_GetMainThread());
+    //if(multithreadActive)
+    {
+        const xthreadInfo *thread = &renderThread->render_thread;
+        common->Printf(" - Render thread(%s) handle: %lu\n", thread ? thread->name : "<NULL>", thread ? thread->threadHandle : 0);
+    }
 #endif
+
+	common->Printf("%s\n", glVersionName.c_str());
+}
 
 /*
 ==============================================================================
@@ -1362,7 +1424,6 @@ void idRenderSystemLocal::TakeScreenshot(int width, int height, const char *file
 		r_jitter.SetBool(false);
 	}
 
-#ifdef _USING_STB
 	switch(r_screenshotFormat.GetInteger())
 	{
 		case 1: {// bmp
@@ -1395,35 +1456,32 @@ void idRenderSystemLocal::TakeScreenshot(int width, int height, const char *file
 			break;
 		case 0: // tga
 		default:
-#endif
 
-	// fill in the header (this is vertically flipped, which glReadPixels emits)
-	buffer[2] = 2;		// uncompressed type
-	buffer[12] = width & 255;
-	buffer[13] = width >> 8;
-	buffer[14] = height & 255;
-	buffer[15] = height >> 8;
-	buffer[16] = 32;	// pixel size
+			// fill in the header (this is vertically flipped, which glReadPixels emits)
+			buffer[2] = 2;		// uncompressed type
+			buffer[12] = width & 255;
+			buffer[13] = width >> 8;
+			buffer[14] = height & 255;
+			buffer[15] = height >> 8;
+			buffer[16] = 32;	// pixel size
 
-	// swap rgb to bgr
-	c = 18 + width * height * 4;
+			// swap rgb to bgr
+			c = 18 + width * height * 4;
 
-	for (i=18 ; i<c ; i+=4) {
-		temp = buffer[i];
-		buffer[i] = buffer[i+2];
-		buffer[i+2] = temp;
-	}
+			for (i=18 ; i<c ; i+=4) {
+				temp = buffer[i];
+				buffer[i] = buffer[i+2];
+				buffer[i+2] = temp;
+			}
 
-	// _D3XP adds viewnote screenie save to cdpath
-	if (strstr(fileName, "viewnote")) {
-		fileSystem->WriteFile(fileName, buffer, c, "fs_cdpath");
-	} else {
-		fileSystem->WriteFile(fileName, buffer, c);
-	}
-#ifdef _USING_STB
+			// _D3XP adds viewnote screenie save to cdpath
+			if (strstr(fileName, "viewnote")) {
+				fileSystem->WriteFile(fileName, buffer, c, "fs_cdpath");
+			} else {
+				fileSystem->WriteFile(fileName, buffer, c);
+			}
 			break;
 	}
-#endif
 
 	R_StaticFree(buffer);
 
@@ -1468,7 +1526,24 @@ void R_ScreenshotFilename(int &lastNumber, const char *base, idStr &fileName)
 		frac -= d*10;
 		e = frac;
 
-		sprintf(fileName, "%s%i%i%i%i%i.tga", base, a, b, c, d, e);
+        switch (cvarSystem->GetCVarInteger("r_screenshotFormat"))
+        {
+            case 1:
+                sprintf(fileName, "%s%i%i%i%i%i.bmp", base, a, b, c, d, e);
+                break;
+            case 2:
+                sprintf(fileName, "%s%i%i%i%i%i.png", base, a, b, c, d, e);
+                break;
+            case 3:
+                sprintf(fileName, "%s%i%i%i%i%i.jpg", base, a, b, c, d, e);
+                break;
+            case 4:
+                sprintf(fileName, "%s%i%i%i%i%i.dds", base, a, b, c, d, e);
+                break;
+            default:
+                sprintf(fileName, "%s%i%i%i%i%i.tga", base, a, b, c, d, e);
+                break;
+        }
 
 		if (lastNumber == 99999) {
 			break;
@@ -2083,6 +2158,9 @@ void R_VidRestart_f(const idCmdArgs &args)
         // delete all shaders
         R_GLSL_Shutdown();
 
+#ifdef _IMGUI
+        RB_ImGui_Shutdown();
+#endif
 		// free the context and close the window
 		GLimp_Shutdown();
 		glConfig.isInitialized = false;
@@ -2226,9 +2304,7 @@ R_InitCommands
 */
 void R_InitCommands(void)
 {
-#if !defined(GL_ES_VERSION_2_0)
 	cmdSystem->AddCommand("MakeMegaTexture", idMegaTexture::MakeMegaTexture_f, CMD_FL_RENDERER|CMD_FL_CHEAT, "processes giant images");
-#endif
 	cmdSystem->AddCommand("sizeUp", R_SizeUp_f, CMD_FL_RENDERER, "makes the rendered view larger");
 	cmdSystem->AddCommand("sizeDown", R_SizeDown_f, CMD_FL_RENDERER, "makes the rendered view smaller");
 	cmdSystem->AddCommand("reloadGuis", R_ReloadGuis_f, CMD_FL_RENDERER, "reloads guis");
@@ -2253,29 +2329,28 @@ void R_InitCommands(void)
 	cmdSystem->AddCommand("listModes", R_ListModes_f, CMD_FL_RENDERER, "lists all video modes");
 	cmdSystem->AddCommand("reloadSurface", R_ReloadSurface_f, CMD_FL_RENDERER, "reloads the decl and images for selected surface");
 	cmdSystem->AddCommand("glConfig", R_ShowglConfig_f, CMD_FL_RENDERER, "print OpenGL config");
-#ifdef _MULTITHREAD
-	cmdSystem->AddCommand("r_multithread", R_Multithreading_f, CMD_FL_SYSTEM, "print multi-threading state");
-#endif
 #ifdef _SHADOW_MAPPING
 	extern void R_DumpShadowMap_f(const idCmdArgs &args);
 	cmdSystem->AddCommand("harm_dumpShadowMap", R_DumpShadowMap_f, CMD_FL_RENDERER, "dump shadow map to file in next frame");
 #endif
-#ifdef _USING_STB
-	extern void R_ConvertImage_f(const idCmdArgs &args);
-	cmdSystem->AddCommand("convertImage", R_ConvertImage_f, CMD_FL_RENDERER, "convert image format", idCmdSystem::ArgCompletion_ImageName);
-#endif
-	extern void R_ExportGLSLShaderSource_f(const idCmdArgs &args);
-	extern void R_PrintGLSLShaderSource_f(const idCmdArgs &args);
-	extern void R_ExportDevShaderSource_f(const idCmdArgs &args);
-	common->Printf("[Harmattan]: GLSL command features: \n    exportGLSLShaderSource: export GLSL shader source to filesystem.\n    reloadGLSLprograms: reload external shader source.\n    printGLSLShaderSource: print shader source.\n    exportDevShaderSource: export original C-String GLSL shader source to filesystem.\n");
-	cmdSystem->AddCommand("exportGLSLShaderSource", R_ExportGLSLShaderSource_f, CMD_FL_RENDERER, "export internal GLSL shader source to game data directory\nUsage: COMMAND [name1 name2 ...] [save_path]");
-	cmdSystem->AddCommand("printGLSLShaderSource", R_PrintGLSLShaderSource_f, CMD_FL_RENDERER, "print internal GLSL shader source\nUsage: COMMAND [name1 name2 ...]");
-	cmdSystem->AddCommand("exportDevShaderSource", R_ExportDevShaderSource_f, CMD_FL_RENDERER, "export internal original C-String GLSL shader source for developer");
+
+	extern void R_Image_AddCommand(void);
+	R_Image_AddCommand();
+
+	extern void GLSL_AddCommand(void);
+	GLSL_AddCommand();
 #ifdef _EXTRAS_TOOLS
+    extern void MD5Anim_AddCommand(void);
 	MD5Anim_AddCommand();
+
+    extern void ModelTest_AddCommand(void);
+    extern void ModelLight_AddCommand(void);
+    ModelTest_AddCommand();
+    ModelLight_AddCommand();
 #endif
-#ifdef _ENGINE_MODEL_VIEWER
-	ModelTest_AddCommand();
+#ifdef _NEW_FONT_TOOLS
+    extern void Font_AddCommand(void);
+    Font_AddCommand();
 #endif
 }
 
@@ -2502,6 +2577,9 @@ void idRenderSystemLocal::ShutdownOpenGL(void)
 {
 	// free the context and close the window
 	R_ShutdownFrameData();
+#ifdef _IMGUI
+    RB_ImGui_Shutdown();
+#endif
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 }
@@ -2600,29 +2678,40 @@ bool GL_CheckErrors(const char *name)
 #include "matrix/RenderMatrix.cpp"
 #include "matrix/GLMatrix.cpp"
 
+#if defined(_SHADOW_MAPPING) || defined(_D3BFG_CULLING)
+#include "tr/tr_lightmatrix.cpp"
+#endif
+
 #ifdef _SHADOW_MAPPING
 // RB: shadow mapping parameters
 idCVar r_useShadowMapping( "r_useShadowMapping", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "use shadow mapping instead of stencil shadows" );
 idCVar r_shadowMapFrustumFOV( "r_shadowMapFrustumFOV", "90", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "oversize FOV for point light side matching" );
 idCVar r_shadowMapSingleSide( "r_shadowMapSingleSide", "-1", CVAR_RENDERER | CVAR_INTEGER, "only draw a single side (0-5) of point lights" );
 idCVar r_shadowMapImageSize( "r_shadowMapImageSize", "1024", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "", 128, 2048 );
-idCVar r_shadowMapJitterScale( "r_shadowMapJitterScale", "2.5", CVAR_RENDERER | CVAR_FLOAT/* | CVAR_ARCHIVE reopen in next version*/, "scale factor for jitter offset" );
+idCVar r_shadowMapJitterScale( "r_shadowMapJitterScale", "2.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "scale factor for jitter offset" );
 idCVar r_shadowMapBiasScale( "r_shadowMapBiasScale", "0.0001", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "scale factor for jitter bias" );
 idCVar r_shadowMapRandomizeJitter( "r_shadowMapRandomizeJitter", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "randomly offset jitter texture each draw" );
-idCVar r_shadowMapSamples( "r_shadowMapSamples", "1", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "0, 1, 4, or 16" );
-idCVar r_shadowMapSplits( "r_shadowMapSplits", "3", CVAR_RENDERER | CVAR_INTEGER, "number of splits for cascaded shadow mapping with parallel lights", 0, 4 );
+idCVar r_shadowMapSamples( "r_shadowMapSamples", "16", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "0, 1, 4, or 16", 1, 64 );
+idCVar r_shadowMapSplits( "r_shadowMapSplits", "3", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "number of splits for cascaded shadow mapping with parallel lights(0=disable split cascaded frustum)", 0, 4 );
 idCVar r_shadowMapSplitWeight( "r_shadowMapSplitWeight", "0.9", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "" );
 idCVar r_shadowMapLodScale( "r_shadowMapLodScale", "1.4", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "" );
 idCVar r_shadowMapLodBias( "r_shadowMapLodBias", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "" );
 idCVar r_shadowMapPolygonFactor( "r_shadowMapPolygonFactor", "0" /*"2"*/, CVAR_RENDERER | CVAR_FLOAT, "polygonOffset factor for drawing shadow buffer" );
 idCVar r_shadowMapPolygonOffset( "r_shadowMapPolygonOffset", "0" /*"3000"*/, CVAR_RENDERER | CVAR_FLOAT, "polygonOffset units for drawing shadow buffer" );
 idCVar r_shadowMapOccluderFacing( "r_shadowMapOccluderFacing", "2", CVAR_RENDERER | CVAR_INTEGER, "0 = front faces, 1 = back faces, 2 = twosided" );
-idCVar r_forceShadowMapsOnAlphaTestedSurfaces( "r_forceShadowMapsOnAlphaTestedSurfaces", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "0 = same shadowing as with stencil shadows, 1 = ignore noshadows for alpha tested materials" );
+idCVar r_forceShadowMapsOnAlphaTestedSurfaces( "r_forceShadowMapsOnAlphaTestedSurfaces",
+#if defined(_RAVEN) || defined(_HUMANHEAD)
+                                               "0"
+#else // default enable on DOOM3
+                                               "1"
+#endif
+                                               , CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "0 = same shadowing as with stencil shadows, 1 = ignore noshadows for alpha tested materials" );
 // RB end
 
 idCVar harm_r_shadowMapLod( "harm_r_shadowMapLod", "-1", CVAR_RENDERER | CVAR_INTEGER, "force using shadow map LOD(0 - 4, -1 = auto)" );
 idCVar harm_r_shadowMapBias( "harm_r_shadowMapBias", "0.001", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow's depth compare BIAS in shadow mapping" );
 idCVar harm_r_shadowMapAlpha( "harm_r_shadowMapAlpha", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow's alpha in shadow mapping" );
+idCVar harm_r_shadowMapCombine( "harm_r_shadowMapCombine", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "combine local and global shadow mapping" );
 #if 0
 idCVar harm_r_shadowMapSampleFactor( "harm_r_shadowMapSampleFactor", "-1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "soft shadow's sample factor in shadow mapping(0: disable, -1: auto, > 0: multiple)" );
 idCVar harm_r_shadowMapFrustumNear( "harm_r_shadowMapFrustumNear", "4.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "shadow map render frustum near" );
@@ -2630,8 +2719,7 @@ idCVar harm_r_shadowMapFrustumFar( "harm_r_shadowMapFrustumFar", "-2.5", CVAR_RE
 #endif
 idCVar harm_r_useLightScissors("harm_r_useLightScissors", "3", CVAR_RENDERER | CVAR_INTEGER, "0 = no scissor, 1 = non-clipped scissor, 2 = near-clipped scissor, 3 = fully-clipped scissor", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
 idCVar harm_r_shadowMapDepthBuffer( "harm_r_shadowMapDepthBuffer", "0", CVAR_RENDERER | CVAR_INIT | CVAR_INTEGER, "render depth to color or depth texture in OpenGLES2.0. 0 = Auto; 1 = depth texture; 2 = color texture's red; 3 = color texture's rgba", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
-idCVar harm_r_shadowMapNonParallelLightUltra( "harm_r_shadowMapNonParallelLightUltra", "0", CVAR_RENDERER | CVAR_BOOL/*//k next version open: | CVAR_ARCHIVE*/, "non parallel light allow ultra quality shadow map texture" );
-idCVar harm_r_shadowMapJitterScale( "harm_r_shadowMapJitterScale", "2.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "scale factor for jitter offset" );
+idCVar harm_r_shadowMapNonParallelLightUltra( "harm_r_shadowMapNonParallelLightUltra", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "non parallel light allow ultra quality shadow map texture" );
 
 #include "tr/tr_shadowmapping.cpp"
 #endif
@@ -2646,4 +2734,16 @@ idCVar harm_r_stencilShadowSoftCopyStencilBuffer( "harm_r_stencilShadowSoftCopyS
 #endif
 #endif
 
+#ifdef _POSTPROCESS
+#include "rb/rb_postprocess.cpp"
+#endif
+
 idCVar harm_r_autoAspectRatio("harm_r_autoAspectRatio",			"1",			CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "automatic setup aspect ratio of view:\n0 = manual\n1 = force setup r_aspectRatio to -1\n2 = automatic setup r_aspectRatio to 0,1,2 by screen size", 0, 2);
+
+#include "rb/rb_debug.cpp"
+
+#ifdef _IMGUI
+#include "imgui/r_imgui.cpp"
+#include "imgui/r_imgui_event.cpp"
+#include "imgui/r_imgui_settings.cpp"
+#endif

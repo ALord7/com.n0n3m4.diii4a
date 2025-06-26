@@ -406,12 +406,11 @@ idCVar net_serverDlBaseURL(			"net_serverDlBaseURL",		"",				CVAR_GAME | CVAR_AR
 idCVar net_serverDlTable(			"net_serverDlTable",		"",				CVAR_GAME | CVAR_ARCHIVE, "pak names for which download is provided, seperated by ;" );
 #ifdef _MOD_FULL_BODY_AWARENESS
 idCVar harm_pm_fullBodyAwareness( "harm_pm_fullBodyAwareness", "0", CVAR_GAME | CVAR_NETWORKSYNC | CVAR_BOOL | CVAR_ARCHIVE, "enables full-body awareness" );
-idCVar harm_pm_fullBodyAwarenessOffset("harm_pm_fullBodyAwarenessOffset", "0 0 0", CVAR_ARCHIVE | CVAR_GAME | CVAR_NETWORKSYNC, "full-body awareness offset(<forward-offset> <side-offset> <up-offset>)");
-idCVar harm_pm_fullBodyAwarenessHeadJoint( "harm_pm_fullBodyAwarenessHeadJoint", "neck", CVAR_GAME | CVAR_ARCHIVE, "head joint when without head model in full-body awareness" );
+idCVar harm_pm_fullBodyAwarenessOffset("harm_pm_fullBodyAwarenessOffset", "0 0 0", CVAR_ARCHIVE | CVAR_GAME | CVAR_NETWORKSYNC, "full-body awareness offset, format is \"<forward-offset> <side-offset> <up-offset>\"");
+idCVar harm_pm_fullBodyAwarenessHeadJoint( "harm_pm_fullBodyAwarenessHeadJoint", "neck", CVAR_GAME | CVAR_NETWORKSYNC | CVAR_ARCHIVE, "head joint when without head model in full-body awareness" );
 idCVar harm_pm_fullBodyAwarenessFixed( "harm_pm_fullBodyAwarenessFixed", "0", CVAR_GAME | CVAR_NETWORKSYNC | CVAR_BOOL | CVAR_ARCHIVE, "do not attach view position to head in full-body awareness" );
 idCVar harm_pm_fullBodyAwarenessHeadVisible( "harm_pm_fullBodyAwarenessHeadVisible", "0", CVAR_GAME | CVAR_NETWORKSYNC | CVAR_BOOL | CVAR_ARCHIVE, "do not suppress head in full-body awareness" );
 #endif
 #ifdef __ANDROID__ //karin: re-normalize player movement direction. only for DIII4A smooth onscreen joystick control
-idCVar harm_in_smoothJoystick("harm_in_smoothJoystick", "0", CVAR_SYSTEM | CVAR_BOOL, "Enable smooth joystick(Automatic setup by Android layer)"); // created on engine
-idCVar harm_g_normalizeMovementDirection("harm_g_normalizeMovementDirection", "-1", CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "Re-normalize player/walker movement direction. 0 = disable; -1 = automcatic; >0 = max degree");
+idCVar harm_g_normalizeMovementDirection("harm_g_normalizeMovementDirection", "0", CVAR_GAME | CVAR_BOOL, "Re-normalize player/walker movement direction");
 #endif

@@ -109,19 +109,25 @@ static SDL_Surface *window = NULL;
 
 #ifdef _OPENGLES3
 const char	*r_openglesArgs[]	= {
-        "GLES2",
-        "GLES3.0",
+        GL_VERSION_NAME_GL_ES3,
+        GL_VERSION_NAME_GL_ES2,
+        GL_VERSION_NAME_GL_CORE,
+        GL_VERSION_NAME_GL_COMPATIBILITY,
         NULL };
 idCVar harm_r_openglVersion("harm_r_openglVersion",
-                              r_openglesArgs[1]
+                              r_openglesArgs[2]
         , CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INIT,
                               "OpenGL version", r_openglesArgs, idCmdSystem::ArgCompletion_String<r_openglesArgs>);
-#define DEFAULT_GLES_VERSION 0x00030000
+#define DEFAULT_GLES_VERSION GL_VERSION_GL_ES3
 #else
-#define DEFAULT_GLES_VERSION 0x00020000
+#define DEFAULT_GLES_VERSION GL_VERSION_GL_ES2
 #endif
-bool USING_GLES3 = false;
+bool USING_GLES3 = true;
+bool USING_GL = false;
 int gl_version = DEFAULT_GLES_VERSION;
+#ifdef _OPENGLES3
+int GLES3_VERSION = USING_GLES3 ? 2 : -1;
+#endif
 
 static idCVar r_fullscreenDesktop( "r_fullscreenDesktop", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "0: 'real' fullscreen mode 1: keep resolution 'desktop' fullscreen mode" );
 static idCVar win_xpos( "win_xpos", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "horizontal position of window" );
@@ -130,6 +136,10 @@ static idCVar win_ypos( "win_ypos", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_IN
 const int GRAB_GRABMOUSE	= (1 << 0);
 const int GRAB_HIDECURSOR	= (1 << 1);
 const int GRAB_RELATIVEMOUSE = (1 << 2);
+
+#ifdef _IMGUI
+#include "imgui.cpp"
+#endif
 
 static void SetSDLIcon()
 {
@@ -315,19 +325,35 @@ bool GLimp_Init(glimpParms_t parms) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, (multisamples > 1) ? 1 : 0);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, multisamples);
 
-        // Get GLES2 context
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-        int glMajorVersion = 2;
-        int glMinorVersion = 0;
-#ifdef _OPENGLES3
-        if(USING_GLES3)
+        // Get OpenGL context profile
+        if(gl_version == GL_VERSION_GL_CORE)
         {
-            glMajorVersion = 3;
-            glMinorVersion = 0;
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
         }
+        else if(gl_version == GL_VERSION_GL_COMPATIBILITY)
+        {
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+        }
+        else
+        {
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+            int glMajorVersion = 2;
+            int glMinorVersion = 0;
+#ifdef _OPENGLES3
+            if(USING_GLES3)
+            {
+                glMajorVersion = 3;
+                glMinorVersion = 0;
+            }
 #endif
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, glMajorVersion);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, glMinorVersion);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, glMajorVersion);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, glMinorVersion);
+        }
+
+		if (harm_r_debugOpenGL.GetBool())
+		{
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+		}
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 
@@ -673,6 +699,7 @@ bool GLimp_Init(glimpParms_t parms) {
     }
 
     R_LoadOpenGLFunc();
+
     return true;
 }
 
@@ -714,6 +741,13 @@ GLimp_SwapBuffers
 ===================
 */
 void GLimp_SwapBuffers() {
+    if(r_swapInterval.IsModified())
+    {
+        r_swapInterval.ClearModified();
+        if (SDL_GL_SetSwapInterval(r_swapInterval.GetInteger()) < 0)
+            common->Warning("SDL_GL_SWAP_CONTROL not supported");
+    }
+
 #if SDL_VERSION_ATLEAST(2, 0, 0)
     SDL_GL_SwapWindow(window);
 #else
@@ -801,6 +835,13 @@ void GLimp_DeactivateContext() {
     SDL_GL_MakeCurrent(window, NULL);
 }
 
+static void StubFunction(void) { }
+
+bool GLimp_ProcIsValid(const void *func)
+{
+    return func && (intptr_t)func != (intptr_t)StubFunction;
+}
+
 /*
 ===================
 GLimp_ExtensionPointer
@@ -832,4 +873,59 @@ void GLimp_GrabInput(int flags) {
 
 void GLimp_EnableLogging(bool enable) { }
 
-void GLimp_CheckGLInitialized(void) { }
+bool GLimp_CheckGLInitialized(void) {
+    // Not need do anything
+    return true;
+}
+
+void GLimp_Startup(void)
+{
+#ifdef _MULTITHREAD
+#if !defined(__ANDROID__) //karin: enable multithreading-rendering from command cvar
+    multithreadActive = cvarSystem->GetCVarBool("r_multithread");
+    if(multithreadActive)
+        Sys_Printf("[Harmattan]: Enable multi-threading rendering\n");
+    else
+        Sys_Printf("[Harmattan]: Disable multi-threading rendering\n");
+#endif
+#endif
+#ifdef _OPENGLES3
+#if !defined(__ANDROID__) //karin: check OpenGL version from command cvar
+    const char *openglVersion = cvarSystem->GetCVarString("harm_r_openglVersion");
+    if(openglVersion && openglVersion[0])
+    {
+//        extern int gl_version;
+//        extern bool USING_GLES3;
+        Sys_Printf("[Harmattan]: harm_r_openglVersion = %s\n", openglVersion);
+        if(!idStr::Icmp(GL_VERSION_NAME_GL_ES2, openglVersion))
+        {
+            gl_version = GL_VERSION_GL_ES2;
+            USING_GLES3 = false;
+            USING_GL = false;
+            Sys_Printf("[Harmattan]: Using OpenGL ES2\n");
+        }
+        else if(!idStr::Icmp(GL_VERSION_NAME_GL_CORE, openglVersion))
+        {
+            gl_version = GL_VERSION_GL_CORE;
+            USING_GLES3 = true;
+            USING_GL = true;
+            Sys_Printf("[Harmattan]: Using OpenGL Core\n");
+        }
+        else if(!idStr::Icmp(GL_VERSION_NAME_GL_COMPATIBILITY, openglVersion))
+        {
+            gl_version = GL_VERSION_GL_COMPATIBILITY;
+            USING_GLES3 = true;
+            USING_GL = true;
+            Sys_Printf("[Harmattan]: Using OpenGL Compatibility\n");
+        }
+        else // GL_VERSION_NAME_GL_ES3
+        {
+            gl_version = GL_VERSION_GL_ES3;
+            USING_GLES3 = true;
+            USING_GL = false;
+            Sys_Printf("[Harmattan]: Using OpenGL ES3\n");
+        }
+    }
+#endif
+#endif
+}

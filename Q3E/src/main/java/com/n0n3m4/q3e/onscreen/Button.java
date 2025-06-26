@@ -2,9 +2,11 @@ package com.n0n3m4.q3e.onscreen;
 
 import android.view.View;
 
+import com.n0n3m4.q3e.Q3EGlobals;
 import com.n0n3m4.q3e.Q3EKeyCodes;
 import com.n0n3m4.q3e.Q3EUtils;
 import com.n0n3m4.q3e.gl.Q3EGL;
+import com.n0n3m4.q3e.gl.Q3EGLVertexBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -32,7 +34,10 @@ public class Button extends Paintable implements TouchListener
     private final int style;
     private final float initalpha;
     private final boolean canbeheld;
-    private final int m_width_2;
+    private int m_width_2;
+
+    private int vertexBuffer = 0;
+    private int indexBuffer = 0;
 
     public Button(View vw, GL10 gl, int center_x, int center_y, int w, int h, String texid, int keyc, int stl, boolean canbheld, float a)
     {
@@ -79,10 +84,41 @@ public class Button extends Paintable implements TouchListener
     }
 
     @Override
+    public void AsBuffer(GL11 gl)
+    {
+        vertexBuffer = Q3EGL.glBufferData(gl, vertexBuffer, gl.GL_ARRAY_BUFFER, new Q3EGLVertexBuffer()
+                .Set(new FloatBuffer[]{ verts_p, tex_p }, 4)
+                        .Buffer(),
+                gl.GL_STATIC_DRAW);
+        indexBuffer = Q3EGL.glBufferData(gl, indexBuffer, gl.GL_ELEMENT_ARRAY_BUFFER, inds_p, gl.GL_STATIC_DRAW);
+    }
+
+    @Override
+    public void Release(GL11 gl)
+    {
+        if(tex_ind > 0)
+        {
+            Q3EGL.glDeleteTexture(gl, tex_ind);
+            tex_ind = 0;
+        }
+        if(vertexBuffer > 0)
+        {
+            Q3EGL.glDeleteBuffer(gl, vertexBuffer);
+            vertexBuffer = 0;
+        }
+        if(indexBuffer > 0)
+        {
+            Q3EGL.glDeleteBuffer(gl, indexBuffer);
+            indexBuffer = 0;
+        }
+    }
+
+    @Override
     public void Paint(GL11 gl)
     {
         super.Paint(gl);
-        Q3EGL.DrawVerts_GL1(gl, tex_ind, 6, tex_p, verts_p, inds_p, cx, cy, red, green, blue, alpha);
+        //Q3EGL.DrawVerts_GL1(gl, tex_ind, 6, tex_p, verts_p, inds_p, cx, cy, red, green, blue, alpha);
+        Q3EGL.DrawVerts_GL1(gl, tex_ind, 6, vertexBuffer, indexBuffer, cx, cy, red, green, blue, alpha);
     }
 
     private int lx;
@@ -127,7 +163,7 @@ public class Button extends Paintable implements TouchListener
         else if (act == -1)
             Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, keycode, 0);
 
-        if (keycode == Q3EKeyCodes.KeyCodes.K_MOUSE1)
+        if (keycode == Q3EKeyCodes.KeyCodes.K_MOUSE1 || keycode == Q3EKeyCodes.KeyCodes.K_MOUSE2)
         {
             if (Q3EUtils.q3ei.callbackObj.notinmenu)
             {
@@ -177,6 +213,8 @@ public class Button extends Paintable implements TouchListener
     {
         Button newb = new Button(tmp.view, gl, tmp.cx, tmp.cy, tmp.width, tmp.height, tmp.tex_androidid, tmp.keycode, tmp.style, tmp.canbeheld, tmp.alpha);
         newb.tex_ind = tmp.tex_ind;
+        newb.vertexBuffer = tmp.vertexBuffer;
+        newb.indexBuffer = tmp.indexBuffer;
         return newb;
     }
 
@@ -190,5 +228,53 @@ public class Button extends Paintable implements TouchListener
     {
         cx = x;
         cy = y;
+    }
+
+    // run on GL thread
+    public void Resize(int w, int h)
+    {
+        width = w;
+        height = h;
+
+        float[] verts = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f};
+        for (int i = 0; i < verts.length; i += 2)
+        {
+            verts[i] = verts[i] * w;
+            verts[i + 1] = verts[i + 1] * h;
+        }
+
+        verts_p.put(verts);
+        verts_p.position(0);
+
+        m_width_2 = width * width;
+    }
+
+    public int Style()
+    {
+        return style;
+    }
+
+    public static int HeightForWidth(int width, int type)
+    {
+        int bh = width;
+        if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_FULL)
+            bh = width;
+        else if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_RIGHT_BOTTOM)
+            bh = width;
+        else if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_CENTER)
+            bh = width / 2;
+        return bh;
+    }
+
+    // height / width
+    public static float CalcAspect(int type)
+    {
+        if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_FULL)
+            return 1.0f;
+        else if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_RIGHT_BOTTOM)
+            return 1.0f;
+        else if (type == Q3EGlobals.ONSCREEN_BUTTON_TYPE_CENTER)
+            return 0.5f;
+        return 1.0f;
     }
 }

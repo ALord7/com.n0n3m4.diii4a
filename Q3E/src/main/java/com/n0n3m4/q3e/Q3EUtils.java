@@ -33,12 +33,14 @@ import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.Process;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.DisplayCutout;
+import android.view.Surface;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -47,12 +49,14 @@ import android.view.inputmethod.InputMethodManager;
 import com.n0n3m4.q3e.device.Q3EMouseDevice;
 import com.n0n3m4.q3e.device.Q3EOuya;
 import com.n0n3m4.q3e.karin.KFDManager;
+import com.n0n3m4.q3e.karin.KLog;
 import com.n0n3m4.q3e.karin.KStr;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -62,8 +66,15 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 public class Q3EUtils
 {
@@ -223,6 +234,48 @@ public class Q3EUtils
         return safeInsetBottom;
     }
 
+    public static boolean ActiveIsInvert(Activity activity)
+    {
+        int rotation;
+        if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+        {
+            rotation = activity.getDisplay().getRotation();
+        }
+        else
+        {
+            rotation = ((WindowManager) (activity.getSystemService(Context.WINDOW_SERVICE))).getDefaultDisplay().getRotation();
+        }
+        return (rotation == Surface.ROTATION_270 || rotation == Surface.ROTATION_180);
+    }
+
+    public static boolean ActiveIsPortrait(Activity activity)
+    {
+        int rotation;
+        if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+        {
+            rotation = activity.getDisplay().getRotation();
+        }
+        else
+        {
+            rotation = ((WindowManager) (activity.getSystemService(Context.WINDOW_SERVICE))).getDefaultDisplay().getRotation();
+        }
+        return (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180);
+    }
+
+    public static boolean ActiveIsLandscape(Activity activity)
+    {
+        int rotation;
+        if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+        {
+            rotation = activity.getDisplay().getRotation();
+        }
+        else
+        {
+            rotation = ((WindowManager) (activity.getSystemService(Context.WINDOW_SERVICE))).getDefaultDisplay().getRotation();
+        }
+        return (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270);
+    }
+
     public static int GetStatusBarHeight(Activity activity)
     {
         int result = 0;
@@ -331,10 +384,26 @@ public class Q3EUtils
         if(null != externalFilesDir)
             path = externalFilesDir.getAbsolutePath();
         else
-            path = Environment.getExternalStorageDirectory() + "/Android/data/" + Q3EGlobals.CONST_PACKAGE_NAME + "/files";
+            path = Environment.getExternalStorageDirectory() + "/" + Q3EGlobals.CONST_PACKAGE_NAME + "/files";
         if(null != filename && !filename.isEmpty())
             path += filename;
         return path;
+    }
+
+    public static String GetDefaultGameDirectory(Context context)
+    {
+        String path = null;
+/*        if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P)
+        {
+            File externalFilesDir = context.getExternalFilesDir(null);
+            if(null != externalFilesDir)
+                path = externalFilesDir.getAbsolutePath();
+            else
+                path = Environment.getExternalStorageDirectory() + "/" + context.getApplicationContext().getPackageName() + "/files";
+        }
+        if(KStr.IsEmpty(path))*/
+            path = Environment.getExternalStorageDirectory().getAbsolutePath();
+        return path + "/diii4a";
     }
 
     public static String GetAppInternalPath(Context context, String filename)
@@ -867,5 +936,408 @@ public class Q3EUtils
         if(null == path)
             path = "";
         return Q3EUtils.GetAppStoragePath(context, "/diii4a" + path);
+    }
+
+    public static String date_format(String format, Date...date)
+    {
+        Date d = null != date && date.length > 0 && null != date[0] ? date[0] : new Date();
+        return new SimpleDateFormat(format).format(d);
+    }
+
+    public static long Write(String filePath, byte[] in) throws RuntimeException
+    {
+        FileOutputStream fileoutputstream = null;
+
+        try
+        {
+            fileoutputstream = new FileOutputStream(filePath);
+            fileoutputstream.write(in);
+            fileoutputstream.flush();
+            return in.length;
+        }
+        catch(IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+        finally
+        {
+            Q3EUtils.Close(fileoutputstream);
+        }
+    }
+
+    public static long Write(String filePath, InputStream in, int...bufferSizeArg) throws RuntimeException
+    {
+        FileOutputStream fileoutputstream = null;
+
+        try
+        {
+            fileoutputstream = new FileOutputStream(filePath);
+            return Q3EUtils.Copy(fileoutputstream, in, bufferSizeArg);
+        }
+        catch(FileNotFoundException e)
+        {
+            throw new RuntimeException(e);
+        }
+        finally
+        {
+            Q3EUtils.Close(fileoutputstream);
+        }
+    }
+
+    public static boolean ExtractCopyFile(Context context, String assetFilePath, String systemFilePath, boolean overwrite)
+    {
+        InputStream bis = null;
+
+        try
+        {
+            File srcFile = new File(assetFilePath);
+            String systemFolderPath;
+            String toFilePath;
+            if(systemFilePath.endsWith("/"))
+            {
+                systemFolderPath = systemFilePath.substring(0, systemFilePath.length() - 1);
+                toFilePath = systemFilePath + srcFile.getName();
+            }
+            else
+            {
+                File f = new File(systemFilePath);
+                systemFolderPath = f.getParent();
+                toFilePath = systemFilePath;
+            }
+
+            Q3EUtils.mkdir(systemFolderPath, true);
+
+            bis = context.getAssets().open(assetFilePath);
+
+            File file = new File(toFilePath);
+            if(!overwrite && file.exists())
+                return true;
+
+            Q3EUtils.mkdir(file.getParent(), true);
+
+            Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Copying " + assetFilePath + " to " + toFilePath);
+            Q3EUtils.Write(toFilePath, bis, 4096);
+            bis.close();
+            bis = null;
+            return true;
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Q3EUtils.Close(bis);
+        }
+    }
+
+    public static boolean ExtractCopyDirFiles(Context context, String assetFolderPath, String systemFolderPath, boolean overwrite, String...assetPaths)
+    {
+        InputStream bis = null;
+
+        try
+        {
+            Q3EUtils.mkdir(systemFolderPath, true);
+
+            List<String> fileList;
+            if(null == assetPaths)
+            {
+                String[] list = context.getAssets().list(assetFolderPath);
+                if(null == list)
+                    fileList = new ArrayList<>();
+                else
+                    fileList = Arrays.asList(list);
+            }
+            else
+                fileList = Arrays.asList(assetPaths);
+
+            for (String assetPath : fileList)
+            {
+                String sourcePath = assetFolderPath + "/" + assetPath;
+                String entryName = systemFolderPath + "/" + assetPath;
+                ExtractCopyFile(context, sourcePath, entryName, overwrite);
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Q3EUtils.Close(bis);
+        }
+    }
+
+    public static boolean ExtractZip(Context context, String assetPath, String systemFolderPath, boolean overwrite)
+    {
+        InputStream bis = null;
+        ZipInputStream zipinputstream = null;
+
+        try
+        {
+            bis = context.getAssets().open(assetPath);
+            zipinputstream = new ZipInputStream(bis);
+
+            ZipEntry zipentry;
+            Q3EUtils.mkdir(systemFolderPath, true);
+            while ((zipentry = zipinputstream.getNextEntry()) != null)
+            {
+                String tmpname = zipentry.getName();
+
+                String toFilePath = systemFolderPath + "/" + tmpname;
+                toFilePath = toFilePath.replace('/', File.separatorChar);
+                toFilePath = toFilePath.replace('\\', File.separatorChar);
+                File file = new File(toFilePath);
+
+                if (zipentry.isDirectory())
+                {
+                    if(!file.exists())
+                        Q3EUtils.mkdir(toFilePath, true);
+                    continue;
+                }
+
+                if(!overwrite && file.exists())
+                    continue;
+
+                Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Extracting " + tmpname + " to " + systemFolderPath);
+                Q3EUtils.Write(toFilePath, zipinputstream, 4096);
+                zipinputstream.closeEntry();
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Q3EUtils.Close(zipinputstream);
+            Q3EUtils.Close(bis);
+        }
+    }
+
+    public static boolean ExtractCopyDir(Context context, String assetFolderPath, String systemFolderPath, boolean overwrite)
+    {
+        InputStream bis = null;
+
+        try
+        {
+            List<String> fileList = LsAssets(context, assetFolderPath);
+            if(null == fileList)
+                return false;
+
+            Q3EUtils.mkdir(systemFolderPath, true);
+
+            for (String assetPath : fileList)
+            {
+                String sourcePath = assetFolderPath + "/" + assetPath;
+                String entryName = systemFolderPath + "/" + assetPath;
+                ExtractCopyFile(context, sourcePath, entryName, overwrite);
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Q3EUtils.Close(bis);
+        }
+    }
+
+    public static boolean ExtractZipToZip(Context context, String assetPath, String systemFolderPath, boolean overwrite, String...files)
+    {
+        InputStream bis = null;
+        ZipInputStream zipinputstream = null;
+        ZipOutputStream outStream = null;
+        ByteArrayOutputStream bos = null;
+
+        File file = new File(systemFolderPath);
+
+        if(!overwrite && file.exists())
+            return false;
+
+        try
+        {
+            Q3EUtils.mkdir(file.getParent(), true);
+
+            bis = context.getAssets().open(assetPath);
+            zipinputstream = new ZipInputStream(bis);
+            bos = new ByteArrayOutputStream();
+            outStream = new ZipOutputStream(bos);
+
+            ZipEntry zipentry;
+            while ((zipentry = zipinputstream.getNextEntry()) != null)
+            {
+                String tmpname = zipentry.getName();
+                if(zipentry.isDirectory())
+                {
+                    // System.out.println("Skip dir" + tmpname);
+                    zipinputstream.closeEntry();
+                    continue;
+                }
+
+                boolean found = false;
+                if(null != files)
+                {
+                    for(String rule : files)
+                    {
+                        if(rule.endsWith("/"))
+                        {
+                            if(tmpname.startsWith(rule))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            if(tmpname.equals(rule))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if(!found)
+                {
+                    //System.out.println("Skip " + tmpname);
+                    zipinputstream.closeEntry();
+                    continue;
+                }
+
+                Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Extracting " + tmpname + " to " + systemFolderPath);
+
+                outStream.putNextEntry(new ZipEntry(tmpname));
+                Q3EUtils.Copy(outStream, zipinputstream, 4096);
+                outStream.closeEntry();
+                zipinputstream.closeEntry();
+            }
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            return false;
+        }
+        finally
+        {
+            Q3EUtils.Close(zipinputstream);
+            Q3EUtils.Close(bis);
+            Q3EUtils.Close(outStream);
+            Q3EUtils.Close(bos);
+        }
+
+        Q3EUtils.Write(systemFolderPath, bos.toByteArray());
+        return true;
+    }
+
+    public static boolean InMainThread(Context context)
+    {
+        return context.getMainLooper().getThread() == Thread.currentThread();
+    }
+
+    public static void RunOnUiThread(Context context, Runnable runnable)
+    {
+        if(context instanceof Activity)
+        {
+            ((Activity)context).runOnUiThread(runnable);
+        }
+        else
+        {
+            if(InMainThread(context))
+                runnable.run();
+            else
+                Post(context, runnable);
+        }
+    }
+
+    public static void Post(Context context, Runnable runnable)
+    {
+        new Handler(context.getMainLooper()).post(runnable);
+    }
+
+    public static List<String> LsAssets(Context context, String assetFolderPath)
+    {
+        List<String> subList = new ArrayList<>();
+        if(LsAssets_r(context, assetFolderPath, "", subList))
+            return subList;
+        else
+            return null;
+    }
+
+    private static boolean LsAssets_r(Context context, String assetFolderPath, String prefix, List<String> res)
+    {
+        try
+        {
+            String[] list = context.getAssets().list(assetFolderPath);
+            if(null == list || list.length == 0)
+            {
+                return false;
+            }
+            for(String str : list)
+            {
+                String path = KStr.AppendPath(assetFolderPath, str);
+                String subPrefix = KStr.IsBlank(prefix) ? str : KStr.AppendPath(prefix, str);
+                List<String> subList = new ArrayList<>();
+                if(LsAssets_r(context, path, subPrefix, subList))
+                {
+                    res.addAll(subList);
+                }
+                else
+                {
+                    res.add(subPrefix);
+                }
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
+    }
+
+    public static int[] GetGeometry(Activity context, boolean currentIsLandscape, boolean hideNav, boolean coverEdges)
+    {
+        int safeInsetTop = Q3EUtils.GetEdgeHeight(context, currentIsLandscape);
+        int safeInsetBottom = Q3EUtils.GetEndEdgeHeight(context, currentIsLandscape);
+        // if invert
+        if(Q3EUtils.ActiveIsInvert(context))
+        {
+            int tmp = safeInsetTop;
+            safeInsetTop = safeInsetBottom;
+            safeInsetBottom = tmp;
+        }
+        int[] fullSize = Q3EUtils.GetFullScreenSize(context);
+        int[] size = Q3EUtils.GetNormalScreenSize(context);
+        if(currentIsLandscape)
+        {
+            int tmp = fullSize[0];
+            fullSize[0] = fullSize[1];
+            fullSize[1] = tmp;
+
+            tmp = size[0];
+            size[0] = size[1];
+            size[1] = tmp;
+        }
+        int navBarHeight = fullSize[1] - size[1] - safeInsetTop - safeInsetBottom;
+        int start = safeInsetTop;
+        int w = fullSize[0];
+        int h = fullSize[1];
+        if (!hideNav)
+            h -= navBarHeight;
+        if (!coverEdges)
+            h -= (safeInsetTop + safeInsetBottom);
+
+        final int Width = Math.max(w, h);
+        final int Height = Math.min(w, h);
+
+        return currentIsLandscape ? new int[] { start, 0, Width, Height, } : new int[] { 0, start, Height, Width, };
     }
 }

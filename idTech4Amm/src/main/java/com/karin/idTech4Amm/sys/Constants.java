@@ -4,16 +4,13 @@ import com.karin.idTech4Amm.BuildConfig;
 import com.karin.idTech4Amm.lib.DateTimeUtility;
 import com.karin.idTech4Amm.misc.TextHelper;
 
-import java.util.Arrays;
-import java.util.Date;
-
 /**
  * Constants define
  */
 public final class Constants
 {
-    public static final int    CONST_UPDATE_RELEASE = 58;
-    public static final String CONST_RELEASE = "2024-10-18";
+    public static final int    CONST_UPDATE_RELEASE = 66;
+    public static final String CONST_RELEASE = "2025-06-25"; // 02-12
     public static final String CONST_EMAIL = "beyondk2000@gmail.com";
     public static final String CONST_DEV = "Karin";
     public static final String CONST_CODE = "Harmattan";
@@ -27,12 +24,13 @@ public final class Constants
     public static final String CONST_FDROID = "https://f-droid.org/packages/com.karin.idTech4Amm/";
 	public static final String CONST_CHECK_FOR_UPDATE_URL = "https://raw.githubusercontent.com/glKarin/com.n0n3m4.diii4a/master/CHECK_FOR_UPDATE.json";
     public static final String CONST_LICENSE_URL = "https://raw.githubusercontent.com/glKarin/com.n0n3m4.diii4a/master/LICENSE";
+    public static final String CONST_CODE_ALIAS = "Lin Daiyu"; // Natasha; Verena; Caitlyn
 	public static String[] CONST_CHANGES()
     {
         return new String[] {
-            "Add `RealRTCW` support, game standalone directory named `realrtcw`, game data directory named `Main`. More view in `" + TextHelper.GenLinkText("https://github.com/wolfetplayer/RealRTCW", "RealRTCW") + "`.",
-            "Fix light bar indicator of player's HUD by `darkness257` on The Dark Mod, now setup `tdm_lg_weak` to 1 automatically. More view in `" + TextHelper.GenLinkText("https://github.com/glKarin/com.n0n3m4.diii4a/issues/244", "The Darkmod light bar indicator bug") + "`.",
-            "Support create desktop shortcut for games on `Option` menu of launcher.",
+            "Add Serious Sam Classic The First Encounter support, game standalone directory named `serioussamtfe`, more view in `" + TextHelper.GenLinkText("https://github.com/tx00100xt/SeriousSamClassic", "SeriousSamClassic") + "`.",
+            "Add Serious Sam Classic The Second Encounter support, game standalone directory named `serioussamtse`, more view in `" + TextHelper.GenLinkText("https://github.com/tx00100xt/SeriousSamClassic", "SeriousSamClassic") + "`.",
+            "Add Xash3D and Counter-Strike 1.6 support, game standalone directory named `xash3d`, more view in `" + TextHelper.GenLinkText("https://github.com/FWGS/xash3d-fwgs", "xash3d") + "` and `" + TextHelper.GenLinkText("https://github.com/Velaron/cs16-client", "cs16-client") + "`.",
         };
 	};
 
@@ -55,6 +53,6 @@ public final class Constants
     {
         return DateTimeUtility.Format(GetBuildTimestamp(), format);
     }
-    
+
 	private Constants() {}
 }

@@ -258,13 +258,22 @@ extern idCVar harm_pm_fullBodyAwarenessOffset;
 extern idCVar harm_pm_fullBodyAwarenessHeadJoint;
 extern idCVar harm_pm_fullBodyAwarenessFixed;
 extern idCVar harm_pm_fullBodyAwarenessHeadVisible;
-extern idCVar harm_pm_fullBodyAwarenessFirstPerson;
 #endif
 #ifdef _MOD_VIEW_BODY
 extern idCVar harm_ui_showViewBody;
 #endif
+#ifdef _MOD_VIEW_LIGHT
+extern idCVar harm_ui_showViewLight;
+extern idCVar harm_ui_viewLightShader;
+extern idCVar harm_ui_viewLightRadius;
+extern idCVar harm_ui_viewLightOffset;
+extern idCVar harm_ui_viewLightType;
+extern idCVar harm_ui_viewLightOnWeapon;
+#endif
+#ifdef MOD_BOTS
+extern idCVar harm_si_useCombatBboxInMPGame;
+#endif
 #ifdef __ANDROID__ //karin: re-normalize player movement direction. only for DIII4A smooth onscreen joystick control
-extern idCVar harm_in_smoothJoystick;
 extern idCVar harm_g_normalizeMovementDirection;
 #endif
 #endif /* !__SYS_CVAR_H__ */

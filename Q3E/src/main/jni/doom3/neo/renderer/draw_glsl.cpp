@@ -41,7 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 #define DISABLE_STENCIL_TEST() qglStencilFunc(GL_ALWAYS, 128, 255);
 #endif
 
-idCVar harm_r_lightingModel("harm_r_lightingModel", "1", CVAR_RENDERER|CVAR_ARCHIVE|CVAR_INTEGER, "Lighting model when draw interactions(1 = Phong(default); 2 = Blinn-Phong; 3 = PBR; 4 = Ambient; 0 = No lighting.)", HARM_INTERACTION_SHADER_NOLIGHTING, HARM_INTERACTION_SHADER_AMBIENT);
+idCVar harm_r_lightingModel("harm_r_lightingModel", "1", CVAR_RENDERER|CVAR_ARCHIVE|CVAR_INTEGER, "Lighting model when draw interactions(1 = Phong(default); 2 = Blinn-Phong; 3 = PBR; 4 = Ambient; 0 = No lighting.)", HARM_INTERACTION_SHADER_NOLIGHTING, HARM_INTERACTION_SHADER_AMBIENT, idCmdSystem::ArgCompletion_Integer<HARM_INTERACTION_SHADER_NOLIGHTING, HARM_INTERACTION_SHADER_AMBIENT>);
 static idCVar harm_r_specularExponent("harm_r_specularExponent", "3.0"/* "4.0"*/, CVAR_FLOAT|CVAR_RENDERER|CVAR_ARCHIVE, "Specular exponent in Phong interaction lighting model");
 static idCVar harm_r_specularExponentBlinnPhong("harm_r_specularExponentBlinnPhong", "12.0", CVAR_FLOAT|CVAR_RENDERER|CVAR_ARCHIVE, "Specular exponent in Blinn-Phong interaction lighting model");
 static idCVar harm_r_specularExponentPBR("harm_r_specularExponentPBR", "5.0", CVAR_FLOAT|CVAR_RENDERER|CVAR_ARCHIVE, "Specular exponent in PBR interaction lighting model");
@@ -53,8 +53,11 @@ static idCVar harm_r_ambientLightingBrightness("harm_r_ambientLightingBrightness
 #ifdef _SHADOW_MAPPING
 #include "glsl/draw_glsl_shadowmapping.cpp"
 #endif
-#if defined(_STENCIL_SHADOW_IMPROVE)
+#ifdef _STENCIL_SHADOW_IMPROVE
 #include "glsl/draw_glsl_stencilshadow.cpp"
+#endif
+#ifdef _GLOBAL_ILLUMINATION
+#include "glsl/draw_glsl_globalIllumination.cpp"
 #endif
 
 #include "glsl/draw_glsl_interaction.cpp"
@@ -71,12 +74,8 @@ static void R_InitGLSLCvars(void)
 #ifdef _SHADOW_MAPPING
 	r_shadowMapping = r_useShadowMapping.GetBool();
 	r_shadowMapPerforated = r_forceShadowMapsOnAlphaTestedSurfaces.GetBool();
-#ifdef _CONTROL_SHADOW_MAPPING_RENDERING
-	int i = harm_r_shadowMappingScheme.GetInteger();
-    if(i < 0 || i > SHADOW_MAPPING_NON_PRELIGHT)
-        i = SHADOW_MAPPING_PURE;
-    r_shadowMappingScheme = i;
-#endif
+    r_shadowMapCombine = harm_r_shadowMapCombine.GetBool();
+    r_shadowMapParallelSplitFrustums = r_shadowMapSplits.GetInteger();
 #ifdef GL_ES_VERSION_3_0
 	if(!USING_GLES3) {
 #endif
@@ -163,7 +162,7 @@ static void R_InitGLSLCvars(void)
 		r_stencilShadowSoft = false;
 		harm_r_stencilShadowSoft.SetBool(false);
 		harm_r_stencilShadowSoft.ClearModified();
-		harm_r_stencilShadowSoft.SetReadonly();
+		CVAR_READONLY(harm_r_stencilShadowSoft);
 	}
 #endif
 #endif
@@ -182,16 +181,16 @@ void R_CheckBackEndCvars(void)
 		r_shadowMapPerforated = r_forceShadowMapsOnAlphaTestedSurfaces.GetBool();
 		r_forceShadowMapsOnAlphaTestedSurfaces.ClearModified();
 	}
-#ifdef _CONTROL_SHADOW_MAPPING_RENDERING
-	if(harm_r_shadowMappingScheme.IsModified())
+    if(harm_r_shadowMapCombine.IsModified())
+    {
+        r_shadowMapCombine = harm_r_shadowMapCombine.GetBool();
+        harm_r_shadowMapCombine.ClearModified();
+    }
+	if(r_shadowMapSplits.IsModified())
 	{
-        int i = harm_r_shadowMappingScheme.GetInteger();
-        if(i < 0 || i > SHADOW_MAPPING_NON_PRELIGHT)
-            i = SHADOW_MAPPING_PURE;
-        r_shadowMappingScheme = i;
-		harm_r_shadowMappingScheme.ClearModified();
+		r_shadowMapParallelSplitFrustums = r_shadowMapSplits.GetInteger();
+		r_shadowMapSplits.ClearModified();
 	}
-#endif
 #endif
 
 #ifdef _STENCIL_SHADOW_IMPROVE
@@ -248,7 +247,7 @@ void R_CheckBackEndCvars(void)
 			r_stencilShadowSoft = false;
 			harm_r_stencilShadowSoft.SetBool(false);
 			harm_r_stencilShadowSoft.ClearModified();
-			harm_r_stencilShadowSoft.SetReadonly();
+			CVAR_READONLY(harm_r_stencilShadowSoft);
 		}
 	}
 #endif

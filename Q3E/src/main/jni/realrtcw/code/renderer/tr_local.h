@@ -60,11 +60,11 @@ typedef unsigned short glIndex_t;
 typedef unsigned int glIndex_t;
 #endif
 
-// 11 bits
+// 14 bits
 // can't be increased without changing bit packing for drawsurfs
 // see QSORT_SHADERNUM_SHIFT
 
-#define SHADERNUM_BITS	11
+#define SHADERNUM_BITS	14
 #define MAX_SHADERS		(1<<SHADERNUM_BITS)
 
 // a trRefEntity_t has all the information passed in by
@@ -1036,7 +1036,7 @@ removed	: used to be clipped flag
 #define	QSORT_FOGNUM_SHIFT	2
 #define	QSORT_REFENTITYNUM_SHIFT	11
 #define	QSORT_SHADERNUM_SHIFT	(QSORT_REFENTITYNUM_SHIFT+REFENTITYNUM_BITS)
-#if (QSORT_SHADERNUM_SHIFT+SHADERNUM_BITS) > 32
+#if (QSORT_SHADERNUM_SHIFT+SHADERNUM_BITS) > 64
 	#error "Need to update sorting, too many bits."
 #endif
 
@@ -2097,5 +2097,25 @@ extern int drawskyboxportal;
 // Ridah, virtual memory
 void *R_Hunk_Begin( void );
 void R_Hunk_End( void );
+
+#ifdef USE_OPENGLES //karin: stencil shadow
+#define STENCIL_SHADOW_IMPROVE //karin: improve stencil shadow
+
+#if !defined(GL_INCR_WRAP)
+#define GL_INCR_WRAP                      0x8507
+#endif
+#if !defined(GL_DECR_WRAP)
+#define GL_DECR_WRAP                      0x8508
+#endif
+
+extern cvar_t *harm_r_stencilShadowModel;
+extern cvar_t *harm_r_stencilShadowPersonal;
+extern cvar_t  *harm_r_stencilShadowInfinite;
+
+#define STENCIL_SHADOW_MODEL(x) (harm_r_stencilShadowModel->integer == 0 || (harm_r_stencilShadowModel->integer & x))
+#define STENCIL_SHADOW_INFINITE() (r_shadows->integer == 2 && (harm_r_stencilShadowPersonal->integer || harm_r_stencilShadowInfinite->integer < 0))
+
+qboolean R_HasAlphaTest(const shader_t *shader);
+#endif
 
 #endif //TR_LOCAL_H (THIS MUST BE LAST!!)

@@ -436,25 +436,26 @@ GL3_SetMode(void)
 	int err;
 	int fullscreen;
 
-#ifdef __ANDROID__
+#ifdef __ANDROID__ //karin: force screen size and mode
 	extern int screen_width;
 	extern int screen_height;
-	vid_fullscreen->value = 1;
-	fullscreen = 1;
-
-	/* a bit hackish approach to enable custom resolutions:
-	   Glimp_SetMode needs these values set for mode -1 */
-	vid.width = screen_width;
-	vid.height = screen_height;
-	r_mode->value = -1;
-#else
+	ri.Cvar_Set("vid_fullscreen", "1");
+	vid_fullscreen->modified = false;
+	ri.Cvar_Set("r_mode", "-2");
+	r_mode->modified = false;
+	int width, height;
+	GL3_GetDrawableSize(&width, &height);
+	ri.Cvar_SetValue("r_customwidth", width);
+	ri.Cvar_SetValue("r_customheight", height);
+	r_customwidth->modified = false;
+	r_customheight->modified = false;
+#endif
 	fullscreen = (int)vid_fullscreen->value;
 
 	/* a bit hackish approach to enable custom resolutions:
 	   Glimp_SetMode needs these values set for mode -1 */
 	vid.width = r_customwidth->value;
 	vid.height = r_customheight->value;
-#endif
 
 	if ((err = SetMode_impl(&vid.width, &vid.height, r_mode->value, fullscreen)) == rserr_ok)
 	{
@@ -1144,7 +1145,7 @@ GL3_DrawEntitiesOnList(void)
 	/* draw transparent entities
 	   we could sort these if it ever
 	   becomes a problem... */
-	glDepthMask(0);
+	glDepthMask(GL_FALSE);
 
 	for (i = 0; i < gl3_newrefdef.num_entities; i++)
 	{
@@ -1189,7 +1190,7 @@ GL3_DrawEntitiesOnList(void)
 
 	GL3_DrawAliasShadows();
 
-	glDepthMask(1); /* back to writing */
+	glDepthMask(GL_TRUE); /* back to writing */
 
 }
 

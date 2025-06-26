@@ -23,6 +23,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
+import android.view.View;
+
+import com.n0n3m4.q3e.karin.KBacktraceHandler;
 
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
@@ -239,19 +242,49 @@ public class Q3ECallbackObj
         eventEngine.SendMotionEvent(deltax, deltay);
     }
 
+    public void sendAnalogDelayed(final boolean down, final float x, final float y, View view, final int delay)
+    {
+        view.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                eventEngine.SendAnalogEvent(down, x, y);
+            }
+        }, delay);
+    }
+
+    public void sendKeyEventDelayed(final boolean down, final int keycode, final int charcode, View view, final int delay)
+    {
+        view.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                eventEngine.SendKeyEvent(down, keycode, charcode);
+            }
+        }, delay);
+    }
+
+    public void sendMotionEventDelayed(final float deltax, final float deltay, View view, final int delay)
+    {
+        view.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                eventEngine.SendMotionEvent(deltax, deltay);
+            }
+        }, delay);
+    }
+
     public void InitGUIInterface(Activity context)
     {
         gui = new Q3EGUI(context);
         int eventQueue = Q3EPreference.GetIntFromString(context, Q3EPreference.EVENT_QUEUE, 0);
         if(eventQueue == 1)
         {
-            Log.i(TAG, "Using native event queue");
-            eventEngine = new Q3EEventEngineNative();
+            Log.i(TAG, "Using java event queue");
+            eventEngine = new Q3EEventEngineJava();
         }
         else
         {
-            Log.i(TAG, "Using java event queue");
-            eventEngine = new Q3EEventEngineJava();
+            Log.i(TAG, "Using native event queue");
+            eventEngine = new Q3EEventEngineNative();
         }
     }
 
@@ -313,6 +346,7 @@ public class Q3ECallbackObj
     {
         if(null == Q3E.activity || Q3E.activity.isFinishing())
             return;
+        Q3E.running = false;
         Q3E.activity.runOnUiThread(new Runnable() {
             @Override
             public void run()
@@ -322,9 +356,27 @@ public class Q3ECallbackObj
         });
     }
 
+    public boolean Backtrace(int signnum, int pid, int tid, int mask, String[] strs)
+    {
+        KBacktraceHandler.HandleBacktrace(Q3E.activity);
+        String text = KBacktraceHandler.Instance().Backtrace(signnum, pid, tid, mask, strs);
+        String title = "Backtrace: ";
+        return gui.BacktraceDialog(title, text);
+    }
+
     public void SetupSmoothJoystick(boolean enable)
     {
         Q3EUtils.q3ei.joystick_smooth = enable;
+    }
+
+    public void SetMouseCursorVisible(boolean on)
+    {
+        gui.SetMouseCursorVisible(on);
+    }
+
+    public void SetMouseCursorPosition(int x, int y)
+    {
+        gui.SetMouseCursorPosition(x, y);
     }
 }
 

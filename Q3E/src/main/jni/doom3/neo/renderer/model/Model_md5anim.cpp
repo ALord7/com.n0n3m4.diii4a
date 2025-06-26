@@ -1000,7 +1000,7 @@ namespace md5anim
 
         md5anim = new idMD5AnimFile;
         md5anim->LoadAnim(animFile);
-        common->Printf("[idAnimEditor]: Input animation %d frames)\n", md5anim->NumFrames());
+        common->Printf("[idAnimEditor]: Input animation (%d frames)\n", md5anim->NumFrames());
         currentIndex = 0;
 
         for(int i = 0; i < cmds.Num(); i++)
@@ -1066,7 +1066,7 @@ namespace md5anim
     {
         if(!md5anim->LoopAnim(edit.startFrame, edit.endFrame))
         {
-            common->Warning("%2d. Loop md5anim error: %s(%d - %d)", currentIndex, edit.startFrame, edit.endFrame);
+            common->Warning("%2d. Loop md5anim error: (%d - %d)", currentIndex, edit.startFrame, edit.endFrame);
             return false;
         }
 
@@ -1132,7 +1132,7 @@ namespace md5anim
     {
         if(args.Argc() < 5)
         {
-            common->Printf("[Useage]: %s <output animation file path> <input animation file> <start frame> <end frame>", args.Argv(0));
+            common->Printf("[Usage]: %s <output animation file path> <input animation file> <start frame> <end frame>", args.Argv(0));
             return;
         }
         idStr cmd;
@@ -1145,7 +1145,9 @@ namespace md5anim
             cmd.Append(" ");
         }
         cmd.Append("-o ");
-        cmd.Append(args.Argv(1));
+        idStr toPath = args.Argv(1);
+        toPath.SetFileExtension(".md5anim");
+        cmd.Append(toPath);
         common->Printf("cutAnim -> %s\n", cmd.c_str());
         cmdSystem->BufferCommandText(CMD_EXEC_NOW, cmd.c_str());
     }
@@ -1154,7 +1156,7 @@ namespace md5anim
     {
         if(args.Argc() < 3)
         {
-            common->Printf("[Useage]: %s <output animation file path> <input animation file> [<start frame> [<end frame>]]", args.Argv(0));
+            common->Printf("[Usage]: %s <output animation file path> <input animation file> [<start frame> [<end frame>]]", args.Argv(0));
             return;
         }
         idStr cmd;
@@ -1167,7 +1169,9 @@ namespace md5anim
             cmd.Append(" ");
         }
         cmd.Append("-o ");
-        cmd.Append(args.Argv(1));
+        idStr toPath = args.Argv(1);
+        toPath.SetFileExtension(".md5anim");
+        cmd.Append(toPath);
         common->Printf("reverseAnim -> %s\n", cmd.c_str());
         cmdSystem->BufferCommandText(CMD_EXEC_NOW, cmd.c_str());
     }
@@ -1176,7 +1180,7 @@ namespace md5anim
     {
         if(args.Argc() < 3)
         {
-            common->Printf("[Useage]: %s <output animation file path> <input animation file> [<start frame> [<end frame>]]", args.Argv(0));
+            common->Printf("[Usage]: %s <output animation file path> <input animation file> [<start frame> [<end frame>]]", args.Argv(0));
             return;
         }
         idStr cmd;
@@ -1189,7 +1193,9 @@ namespace md5anim
             cmd.Append(" ");
         }
         cmd.Append("-o ");
-        cmd.Append(args.Argv(1));
+        idStr toPath = args.Argv(1);
+        toPath.SetFileExtension(".md5anim");
+        cmd.Append(toPath);
         common->Printf("loopAnim -> %s\n", cmd.c_str());
         cmdSystem->BufferCommandText(CMD_EXEC_NOW, cmd.c_str());
     }
@@ -1198,7 +1204,7 @@ namespace md5anim
     {
         if(args.Argc() < 4)
         {
-            common->Printf("[Useage]: %s <output animation file path> <input animation file> <append animation file> [<start frame> [<end frame>]]", args.Argv(0));
+            common->Printf("[Usage]: %s <output animation file path> <input animation file> <append animation file> [<start frame> [<end frame>]]", args.Argv(0));
             return;
         }
         idStr cmd;
@@ -1211,7 +1217,9 @@ namespace md5anim
             cmd.Append(" ");
         }
         cmd.Append("-o ");
-        cmd.Append(args.Argv(1));
+        idStr toPath = args.Argv(1);
+        toPath.SetFileExtension(".md5anim");
+        cmd.Append(toPath);
         common->Printf("linkAnim -> %s\n", cmd.c_str());
         cmdSystem->BufferCommandText(CMD_EXEC_NOW, cmd.c_str());
     }

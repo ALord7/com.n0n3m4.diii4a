@@ -84,7 +84,7 @@ public final class ContextUtility
         AlertDialog dialog = builder.create();
         dialog.show();
 
-        TextView messageText = (TextView)(dialog.findViewById(android.R.id.message));
+        TextView messageText = UIUtility.GetDialogMessageView(dialog);
         if(messageText != null) // never
         {
             if(!TextHelper.USING_HTML)
@@ -206,15 +206,15 @@ public final class ContextUtility
         builder.create().show();
     }
 
-    public static AlertDialog Input(Context context, CharSequence title, CharSequence message, String val, String[] args, final Runnable yes, final Runnable no, String otherName, Runnable other, Function editTextConfig)
+    public static AlertDialog Input(Context context, CharSequence title, CharSequence message, String[] args, final Runnable yes, final Runnable no, String otherName, Runnable other, Function editTextConfig)
     {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(title);
         EditText editText = new EditText(context);
         if(null != message)
             editText.setHint(message);
-        if(null != val)
-            editText.setText(val);
+        if(null != args && args.length > 0 && null != args[0])
+            editText.setText(args[0]);
         if(null != editTextConfig)
             editTextConfig.Invoke(editText);
         builder.setView(editText);
@@ -422,7 +422,7 @@ public final class ContextUtility
         AlertDialog dialog = builder.create();
         dialog.show();
 
-        TextView messageText = (TextView)(dialog.findViewById(android.R.id.message));
+        TextView messageText = UIUtility.GetDialogMessageView(dialog);
         if(messageText != null) // never
         {
             if(!TextHelper.USING_HTML)
@@ -620,7 +620,7 @@ public final class ContextUtility
         {
             Uri uri = FileUtility.PathUri(path);
             //Log.e("TAG", "IsUriPermissionGrantPrefix: " +uri + "|" + persistedUriPermission.getUri()+"="+persistedUriPermission.getUri().equals(uri));
-            if(uri.toString().startsWith(persistedUriPermission.getUri().toString()))
+            if((uri.toString() + "%2F").startsWith(persistedUriPermission.getUri().toString() + "%2F"))
                 return true;
         }
         return false;
@@ -636,7 +636,7 @@ public final class ContextUtility
             Uri uri = FileUtility.PathUri(path);
             //Log.e("TAG", "IsUriPermissionGrantPrefix: " +uri + "|" + persistedUriPermission.getUri()+"="+persistedUriPermission.getUri().equals(uri));
             Uri grantedUri = persistedUriPermission.getUri();
-            if(uri.toString().startsWith(grantedUri.toString()))
+            if((uri.toString() + "%2F").startsWith(grantedUri.toString() + "%2F"))
                 return grantedUri;
         }
         return null;

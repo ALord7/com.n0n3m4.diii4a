@@ -9,14 +9,20 @@ cmake_minimum_required(VERSION 3.10.3 FATAL_ERROR)
 
 project(ETLEGACY C CXX)
 
+#karin: make it static, forbid build everytime when run cmake
+set(ETL_BUILD_DATE "2024-11-12")
+set(ETL_BUILD_TIME "00:00:00")
+
+if(NOT ANDROID)
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.21")
-    cmake_policy(SET CMP0121 NEW)
+    cmake_policy(SET CMP0121 NEW) # NEW OLD
 endif()
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.22")
 	cmake_policy(SET CMP0127 NEW)
 endif()
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
-	cmake_policy(SET CMP0135 NEW)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 endif()
 
 if(ANDROID)
@@ -49,7 +55,7 @@ set(MODURL "www.etlegacy.com" CACHE STRING "Default mod URL")
 # Options
 #-----------------------------------------------------------------
 
-option(BUILD_SERVER				"Build the dedicated server executable"							OFF)
+option(BUILD_SERVER				"Build the dedicated server executable"							OFF) #k ON
 option(BUILD_CLIENT				"Build the client executable"									ON)
 option(BUILD_MOD				"Build the mod libraries"										ON)
 
@@ -65,7 +71,9 @@ cmake_dependent_option(ZONE_DEBUG				"Enable zone debug mode"										OFF "BUIL
 cmake_dependent_option(HUNK_DEBUG				"Enable hunk debug mode"										OFF "BUILD_CLIENT OR BUILD_SERVER" OFF)
 
 # no support for 32 bit binaries on OpenBSD/amd64 or Apple OSX anymore
+if(NOT ANDROID) #karin: forbid build everytime when run cmake
 cmake_dependent_option(CROSS_COMPILE32 "Compile 32-bit x86 version of ET:L (64bit is incompatible with 2.60b)" ON "NOT APPLE; NOT ANDROID;NOT CMAKE_SYSTEM MATCHES OpenBSD*;CMAKE_SYSTEM_PROCESSOR MATCHES x86|X86|amd64|AMD64" OFF)
+endif()
 
 # Optional features
 option(FEATURE_CURL				"Enable auto-download support using cURL (client)"		ON)
@@ -81,8 +89,8 @@ option(FEATURE_EDV				"Enable extended demo viewer support (mod)"				ON)
 option(FEATURE_ANTICHEAT		"Enable server side anti-wallhack code (server)"		ON)
 option(FEATURE_AUTOUPDATE		"Enable updater which downloads latest ET:L files"		OFF) #k ON
 option(FEATURE_RENDERER1		"Build and use the vanilla renderer (OpenGL 1/2)"		OFF) #k ON
-option(FEATURE_RENDERER2		"Build and use the borked renderer (OpenGL 3)"			OFF) #k ON
-option(FEATURE_RENDERER_GLES	"Build and use OpenGL ES renderer"						ON)
+option(FEATURE_RENDERER2		"Build and use the extended renderer (OpenGL 3)"		OFF) #k ON
+option(FEATURE_RENDERER_GLES	"Build and use OpenGL ES renderer"						ON)  #k OFF
 option(FEATURE_RENDERER_VULKAN	"Build and use Vulkan renderer"							OFF)
 option(FEATURE_IPV6				"Enable IPv6 networking code"							ON)
 option(FEATURE_IRC_CLIENT		"Enable IRC client client side"							ON)
@@ -109,7 +117,14 @@ cmake_dependent_option(FEATURE_LUA		"Enable Lua support (mod)"						ON "BUILD_SE
 cmake_dependent_option(FEATURE_LUASQL	"Enable LuaSQL sqlite3 backend (mod)"			ON "FEATURE_LUA" OFF)
 cmake_dependent_option(FEATURE_RATING	"Enable skill rating support (mod)"				ON "FEATURE_DBMS" OFF)
 cmake_dependent_option(FEATURE_PRESTIGE	"Enable prestige support (mod)"					ON "FEATURE_DBMS" OFF)
+if(DIII4A) #karin: omni-bot_et support on Android idTech4A++
+option(FEATURE_OMNIBOT	"Enable Omni-bot support (mod)"					ON)
+if(FEATURE_OMNIBOT)
+    add_definitions(-DFEATURE_OMNIBOT)
+endif()
+else()
 cmake_dependent_option(FEATURE_OMNIBOT	"Enable Omni-bot support (mod)"					ON "( NOT MINGW AND WIN32 ) OR FORCE_OMNIBOT OR CMAKE_SYSTEM_NAME MATCHES Linux" OFF)
+endif()
 
 option(INSTALL_EXTRA			"Install extra add-ons (omni-bot, geoip, wolfadmin)."	OFF) #k ON
 
@@ -161,7 +176,7 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ${CMAKE_TARGETS_FOLDER})
 
 # Set language levels
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 99)  # engine is intentionally C99 while mods remain C90
 
 # Find and setup programs the build needs
 include(cmake/ETLPrograms.cmake)
@@ -241,3 +256,5 @@ include(cmake/ETLInstall.cmake)
 include(cmake/ETLCPack.cmake)
 
 set_target_properties(etw_uninstall PROPERTIES FOLDER ${CMAKE_TARGETS_FOLDER})
+
+add_subdirectory(Omnibot)

@@ -4,11 +4,15 @@ import android.graphics.Bitmap;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
 
+import com.n0n3m4.q3e.Q3E;
 import com.n0n3m4.q3e.Q3EControlView;
 import com.n0n3m4.q3e.Q3EUtils;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.opengles.GL10;
 import javax.microedition.khronos.opengles.GL11;
@@ -87,8 +91,8 @@ public final class Q3EGL
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texid);
             GLES20.glUniform1i(gl20tx, 0);
-            GLES20.glUniform4f(gl20sc, 2.0f / Q3EControlView.orig_width, -2.0f / Q3EControlView.orig_height, 0.0f, 1.0f);
-            GLES20.glUniform4f(gl20tr, -Q3EControlView.orig_width / 2.0f + trax, -Q3EControlView.orig_height / 2.0f + tray, 0.0f, 0.0f);
+            GLES20.glUniform4f(gl20sc, 2.0f / Q3E.orig_width, -2.0f / Q3E.orig_height, 0.0f, 1.0f);
+            GLES20.glUniform4f(gl20tr, -Q3E.orig_width / 2.0f + trax, -Q3E.orig_height / 2.0f + tray, 0.0f, 0.0f);
             GLES20.glUniform4f(gl20cl, r, g, b, a);
             GLES20.glDrawElements(GLES20.GL_TRIANGLES, cnt, GLES20.GL_UNSIGNED_BYTE, inds);
             /*if ((!Q3EUtils.q3ei.isQ1) && (!Q3EUtils.q3ei.isD3BFG))*/
@@ -117,6 +121,37 @@ public final class Q3EGL
         gl.glVertexPointer(2, GL10.GL_FLOAT, 0, vertcoord);
         gl.glTranslatef(trax, tray, 0);
         gl.glDrawElements(GL10.GL_TRIANGLES, cnt, GL10.GL_UNSIGNED_BYTE, inds);
+        gl.glTranslatef(-trax, -tray, 0);
+    }
+
+    public static void DrawVerts_GL1(GL11 gl, int texid, int cnt, int vertexBuffer, int indexBuffer, float trax, float tray, float r, float g, float b, float a)
+    {
+        gl.glColor4f(r, g, b, a);
+        gl.glBindTexture(GL10.GL_TEXTURE_2D, texid);
+        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vertexBuffer);
+        gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.glTexCoordPointer(2, GL10.GL_FLOAT, 16, 8);
+        gl.glVertexPointer(2, GL10.GL_FLOAT, 16, 0);
+        gl.glTranslatef(trax, tray, 0);
+        gl.glDrawElements(GL10.GL_TRIANGLES, cnt, GL10.GL_UNSIGNED_BYTE, 0);
+        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0);
+        gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, 0);
+        gl.glTranslatef(-trax, -tray, 0);
+    }
+
+    public static void DrawVerts_GL1(GL11 gl, int texid, int cnt, int vertexBuffer, int indexBuffer, int vertexOffset, int indexOffset, float trax, float tray, float r, float g, float b, float a)
+    {
+        gl.glColor4f(r, g, b, a);
+        gl.glBindTexture(GL10.GL_TEXTURE_2D, texid);
+        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vertexBuffer);
+        gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        int offset = 16 * vertexOffset;
+        gl.glTexCoordPointer(2, GL10.GL_FLOAT, 16, offset + 8);
+        gl.glVertexPointer(2, GL10.GL_FLOAT, 16, offset);
+        gl.glTranslatef(trax, tray, 0);
+        gl.glDrawElements(GL10.GL_TRIANGLES, cnt, GL10.GL_UNSIGNED_BYTE, indexOffset);
+        gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0);
+        gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, 0);
         gl.glTranslatef(-trax, -tray, 0);
     }
 
@@ -201,5 +236,66 @@ public final class Q3EGL
         {
             gl.glDeleteTextures(1, ts, 0);
         }
+    }
+
+    public static void glClearError(GL10 gl)
+    {
+        while(gl.glGetError() != GL10.GL_NO_ERROR);
+    }
+
+    public static void glCheckError(GL10 gl, String name)
+    {
+        int err = gl.glGetError();
+        if(err != GL10.GL_NO_ERROR)
+        {
+            System.err.println("GLError: " + name + " -> " + Integer.toHexString(err));
+        }
+    }
+
+    public static void glDeleteBuffer(GL11 gl, int buffer)
+    {
+        if(buffer > 0)
+        {
+            IntBuffer buffers = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asIntBuffer();
+            buffers.put(buffer);
+            gl.glDeleteBuffers(1, buffers);
+        }
+    }
+
+    public static int glGenBuffer(GL11 gl, int buffer)
+    {
+        if(buffer <= 0)
+        {
+            IntBuffer buffers = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asIntBuffer();
+            gl.glGenBuffers(1, buffers);
+            buffer = buffers.get(0);
+        }
+        return buffer;
+    }
+
+    public static int glBufferData(GL11 gl, int buffer, int type, FloatBuffer verts, int usage)
+    {
+        int lastPos = verts.position();
+
+        buffer = glGenBuffer(gl, buffer);
+        gl.glBindBuffer(type, buffer);
+        gl.glBufferData(type, 4 * (verts.capacity() - lastPos), verts, usage);
+        gl.glBindBuffer(type, 0);
+        verts.position(lastPos);
+
+        return buffer;
+    }
+
+    public static int glBufferData(GL11 gl, int buffer, int type, ByteBuffer indexp, int usage)
+    {
+        int lastPos = indexp.position();
+
+        buffer = glGenBuffer(gl, buffer);
+        gl.glBindBuffer(type, buffer);
+        gl.glBufferData(type, (indexp.capacity() - lastPos), indexp, usage);
+        gl.glBindBuffer(type, 0);
+        indexp.position(lastPos);
+
+        return buffer;
     }
 }

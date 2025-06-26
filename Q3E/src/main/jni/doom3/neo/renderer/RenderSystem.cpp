@@ -168,7 +168,15 @@ static void R_IssueRenderCommands(volatile frameData_t *fd)
 	}
 }
 
-static void RenderCommands(renderCrop_t *pc = 0, byte *pix = 0)
+// only main thread is running and render thread is waiting
+ID_INLINE static void R_OnlyMainThreadRunningAndRenderThreadWaiting(void)
+{
+#ifdef _IMGUI
+    R_ImGui_Render();
+#endif
+}
+
+static void RenderCommands(renderCrop_t *pc = NULL, byte *pix = NULL)
 {
 	renderThread->BackendThreadWait();
 	renderThread->vertListToRender = vertexCache.GetListNum();
@@ -179,10 +187,11 @@ static void RenderCommands(renderCrop_t *pc = 0, byte *pix = 0)
 	renderThread->pixels = pix;
 	R_CheckBackEndCvars(); // check backend cvars state
 
+    R_OnlyMainThreadRunningAndRenderThreadWaiting();
+
 	renderThread->backendFinished = false;
 
-	GLimp_CheckGLInitialized(); // check/wait EGL context
-
+	if(GLimp_CheckGLInitialized()) // check/wait EGL context
 	//if(has_gl_context)
     {
         renderThread->BackendThreadExecute();
@@ -198,7 +207,7 @@ static void RenderCommands(renderCrop_t *pc = 0, byte *pix = 0)
     }
 /*	else
     {
-        backendFinished = true;
+        renderThread->backendFinished = true;
     }*/
 
 	R_ToggleSmpFrame();

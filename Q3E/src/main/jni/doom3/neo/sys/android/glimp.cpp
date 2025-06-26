@@ -66,6 +66,7 @@ idCVar harm_r_openglVersion("harm_r_openglVersion",
 #define HARM_EGL_OPENGL_ES_BIT EGL_OPENGL_ES2_BIT
 #define HARM_EGL_CONTEXT_CLIENT_VERSION 2
 #endif
+#define HARM_EGL_CONTEXT_OPENGL_DEBUG harm_r_debugOpenGL.GetBool() ? EGL_CONTEXT_OPENGL_DEBUG : EGL_NONE
 
 #define GLFORMAT_RGB565 0x0565
 #define GLFORMAT_RGBA4444 0x4444
@@ -76,21 +77,20 @@ idCVar harm_r_openglVersion("harm_r_openglVersion",
 // OpenGL attributes
 // OpenGL color format
 int gl_format = GLFORMAT_RGBA8888;
+// OpenGL depth bits
+int gl_depth_bits = 24;
 // OpenGL multisamples
 int gl_msaa = 0;
 // OpenGL version
 int gl_version = DEFAULT_GLES_VERSION;
 
 bool USING_GLES3 = gl_version != 0x00020000;
+bool USING_GL = false;
 #ifdef _OPENGLES3
 int GLES3_VERSION = USING_GLES3 ? 0 : -1;
-#define USING_GLES30 (GLES3_VERSION > -1)
-#define USING_GLES31 (GLES3_VERSION > 0)
-#define USING_GLES32 (GLES3_VERSION > 1)
 #endif
 
 #define MAX_NUM_CONFIGS 1000
-static bool window_seted = false;
 static volatile ANativeWindow *win;
 //volatile bool has_gl_context = false;
 
@@ -101,47 +101,8 @@ static EGLConfig configs[1];
 static EGLConfig eglConfig = 0;
 static EGLint format = WINDOW_FORMAT_RGBA_8888; // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
 
-#ifdef _OPENGLES3
-#define _GLDBG 0
-#if _GLDBG
-static void GLimp_OutputOpenGLCallback_f(GLenum source,
-                                 GLenum type,
-                                 GLuint id,
-                                 GLenum severity,
-                                 GLsizei length,
-                                 const GLchar* message,
-                                 const void* userParam)
-{
-    fprintf( stdout, "\nGL CALLBACK: %s type = 0x%X, severity = 0X%x, id = %u, message = %s\n",
-             ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
-             type, severity, id, message );
-}
-
-static void GLimp_DebugOpenGL(bool on)
-{
-    // if(!USING_GLES31) return;
-    if(!GL_DEBUG_MESSAGE_AVAILABLE())
-        return;
-    if(on)
-    {
-        qglEnable( GL_DEBUG_OUTPUT );
-        qglEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        qglDebugMessageCallback( GLimp_OutputOpenGLCallback_f, 0 );
-        qglDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE);
-    }
-    else
-    {
-        qglDisable( GL_DEBUG_OUTPUT );
-        qglDisable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        qglDebugMessageCallback( NULL, 0 );
-    }
-}
-#define DEBUG_OPENGL GLimp_DebugOpenGL(true);
-#define NO_DEBUG_OPENGL GLimp_DebugOpenGL(false);
-#else
-#define DEBUG_OPENGL
-#define NO_DEBUG_OPENGL
-#endif
+#ifdef _IMGUI
+#include "imgui.cpp"
 #endif
 
 static void GLimp_HandleError(const char *func, bool exit = true)
@@ -163,7 +124,7 @@ static void GLimp_HandleError(const char *func, bool exit = true)
 			"EGL_BAD_SURFACE",
 			"EGL_CONTEXT_LOST",
 	};
-	GLint err = eglGetError();
+	EGLint err = eglGetError();
 	if(err == EGL_SUCCESS)
 		return;
 
@@ -186,7 +147,7 @@ typedef struct EGLConfigInfo_s
 	EGLint sample_buffers;
 } EGLConfigInfo_t;
 
-static EGLConfigInfo_t GLimp_FormatInfo(int format)
+static EGLConfigInfo_t GLimp_FormatInfo(int gl_format, int gl_depth_bits)
 {
 	int red_bits = 8;
 	int green_bits = 8;
@@ -203,7 +164,7 @@ static EGLConfigInfo_t GLimp_FormatInfo(int format)
 			green_bits = 6;
 			blue_bits = 5;
 			alpha_bits = 0;
-			depth_bits = 16;
+			//depth_bits = 16;
 			buffer_bits = 16;
 			break;
 		case GLFORMAT_RGBA4444:
@@ -211,7 +172,7 @@ static EGLConfigInfo_t GLimp_FormatInfo(int format)
 			green_bits = 4;
 			blue_bits = 4;
 			alpha_bits = 4;
-			depth_bits = 16;
+			//depth_bits = 16;
 			buffer_bits = 16;
 			break;
 		case GLFORMAT_RGBA5551:
@@ -219,7 +180,7 @@ static EGLConfigInfo_t GLimp_FormatInfo(int format)
 			green_bits = 5;
 			blue_bits = 5;
 			alpha_bits = 1;
-			depth_bits = 16;
+			//depth_bits = 16;
 			buffer_bits = 16;
 			break;
 		case GLFORMAT_RGBA1010102:
@@ -227,7 +188,7 @@ static EGLConfigInfo_t GLimp_FormatInfo(int format)
 			green_bits = 10;
 			blue_bits = 10;
 			alpha_bits = 2;
-			depth_bits = 24;
+			//depth_bits = 24;
 			buffer_bits = 32;
 			break;
 		case GLFORMAT_RGBA8888:
@@ -236,10 +197,25 @@ static EGLConfigInfo_t GLimp_FormatInfo(int format)
 			green_bits = 8;
 			blue_bits = 8;
 			alpha_bits = 8;
-			depth_bits = 24;
+			//depth_bits = 24;
 			buffer_bits = 32;
 			break;
 	}
+
+	switch(gl_depth_bits)
+	{
+		case 16:
+			depth_bits = 16;
+			break;
+		case 32:
+			depth_bits = 32;
+			break;
+		case 24:
+		default:
+			depth_bits = 24;
+			break;
+	}
+
 	EGLConfigInfo_t info;
 	info.red = red_bits;
 	info.green = green_bits;
@@ -255,13 +231,13 @@ static int GLimp_EGLConfigCompare(const void *left, const void *right)
 {
 	const EGLConfig lhs = *(EGLConfig *)left;
 	const EGLConfig rhs = *(EGLConfig *)right;
-	EGLConfigInfo_t info = GLimp_FormatInfo(gl_format);
+	EGLConfigInfo_t info = GLimp_FormatInfo(gl_format, gl_depth_bits);
 	int r = info.red;
 	int g = info.green;
 	int b = info.blue;
 	int a = info.alpha;
 	int d = info.depth;
-	int s = info.stencil;
+	int s = info.samples;
 
 	int lr, lg, lb, la, ld, ls;
 	int rr, rg, rb, ra, rd, rs;
@@ -270,16 +246,37 @@ static int GLimp_EGLConfigCompare(const void *left, const void *right)
 	eglGetConfigAttrib(eglDisplay, lhs, EGL_GREEN_SIZE, &lg);
 	eglGetConfigAttrib(eglDisplay, lhs, EGL_BLUE_SIZE, &lb);
 	eglGetConfigAttrib(eglDisplay, lhs, EGL_ALPHA_SIZE, &la);
-	//eglGetConfigAttrib(eglDisplay, lhs, EGL_DEPTH_SIZE, &ld);
-	//eglGetConfigAttrib(eglDisplay, lhs, EGL_STENCIL_SIZE, &ls);
+
 	eglGetConfigAttrib(eglDisplay, rhs, EGL_RED_SIZE, &rr);
 	eglGetConfigAttrib(eglDisplay, rhs, EGL_GREEN_SIZE, &rg);
 	eglGetConfigAttrib(eglDisplay, rhs, EGL_BLUE_SIZE, &rb);
 	eglGetConfigAttrib(eglDisplay, rhs, EGL_ALPHA_SIZE, &ra);
-	//eglGetConfigAttrib(eglDisplay, rhs, EGL_DEPTH_SIZE, &rd);
-	//eglGetConfigAttrib(eglDisplay, rhs, EGL_STENCIL_SIZE, &rs);
+
 	rat1 = (abs(lr - r) + abs(lg - g) + abs(lb - b));//*1000000-(ld*10000+la*100+ls);
 	rat2 = (abs(rr - r) + abs(rg - g) + abs(rb - b));//*1000000-(rd*10000+ra*100+rs);
+
+	if(rat1 == rat2)
+	{
+        eglGetConfigAttrib(eglDisplay, lhs, EGL_DEPTH_SIZE, &ld);
+        //eglGetConfigAttrib(eglDisplay, lhs, EGL_STENCIL_SIZE, &ls);
+
+        eglGetConfigAttrib(eglDisplay, rhs, EGL_DEPTH_SIZE, &rd);
+        //eglGetConfigAttrib(eglDisplay, rhs, EGL_STENCIL_SIZE, &rs);
+
+        rat1 = abs(ld - d);
+        rat2 = abs(rd - d);
+	}
+
+    if(rat1 == rat2)
+    {
+        eglGetConfigAttrib(eglDisplay, lhs, EGL_SAMPLES, &ls);
+
+        eglGetConfigAttrib(eglDisplay, rhs, EGL_SAMPLES, &rs);
+
+        rat1 = /*abs*/(ls - s);
+        rat2 = /*abs*/(rs - s);
+    }
+
 	return rat1 - rat2;
 }
 
@@ -306,17 +303,18 @@ static EGLConfigInfo_t GLimp_GetConfigInfo(const EGLConfig eglConfig)
 	return info;
 }
 
+void GLimp_AndroidOpenWindow(volatile ANativeWindow *w)
+{
+	if(!w)
+		return;
+	win = w;
+	ANativeWindow_acquire((ANativeWindow *)win);
+}
+
 void GLimp_AndroidInit(volatile ANativeWindow *w)
 {
 	if(!w)
 		return;
-	if(!window_seted)
-	{
-		win = w;
-		ANativeWindow_acquire((ANativeWindow *)win);
-		window_seted = true;
-		return;
-	}
 
 	if(eglDisplay == EGL_NO_DISPLAY)
 		return;
@@ -365,7 +363,7 @@ void GLimp_WakeBackEnd(void *a)
 
 void GLimp_EnableLogging(bool log)
 {
-	tr.logFile = log ? f_stdout : NULL;
+	tr.logFile = log ? stdout : NULL;
 	//common->DPrintf("GLimp_EnableLogging stub\n");
 }
 
@@ -506,8 +504,41 @@ void GLimp_Shutdown()
 	Sys_Printf("[Harmattan]: EGL destroyed.\n");
 }
 
+static void GLimp_UpdateSwapInterval( void )
+{
+	EGLint swapIntervalRange[2] = { 0, 0 };
+	eglGetConfigAttrib(eglDisplay, eglConfig, EGL_MIN_SWAP_INTERVAL, &swapIntervalRange[0]);
+	eglGetConfigAttrib(eglDisplay, eglConfig, EGL_MAX_SWAP_INTERVAL, &swapIntervalRange[1]);
+	common->Printf("Swap interval range: %d - %d\n", swapIntervalRange[0], swapIntervalRange[1]);
+	int swapInterval = r_swapInterval.GetInteger();
+	if(swapInterval < swapIntervalRange[0])
+		swapInterval = swapIntervalRange[0];
+	else if(swapInterval > swapIntervalRange[1])
+		swapInterval = swapIntervalRange[1];
+	if(swapInterval >= 0)
+	{
+		if(eglSwapInterval(eglDisplay, swapInterval))
+			common->Printf("Setup swap interval: %d\n", swapInterval);
+		else
+			common->Warning("Setup swap interval to %d fail", swapInterval);
+		// GLimp_HandleError("eglSwapInterval", false);
+	}
+	if(swapInterval != r_swapInterval.GetInteger())
+	{
+		r_swapInterval.SetInteger(swapInterval);
+		r_swapInterval.ClearModified();
+	}
+
+	eglSwapBuffers(eglDisplay, eglSurface);
+}
+
 void GLimp_SwapBuffers()
 {
+	if(r_swapInterval.IsModified())
+	{
+		r_swapInterval.ClearModified();
+		GLimp_UpdateSwapInterval();
+	}
 	eglSwapBuffers(eglDisplay, eglSurface);
 }
 
@@ -536,10 +567,10 @@ bool GLimp_OpenDisplay(void)
 GLES_Init
 ===============
 */
-static bool GLES_Init_special(void)
+static bool GLES_Init_special(const glimpParms_t &ap)
 {
 	EGLint config_count = 0;
-	EGLConfigInfo_t info = GLimp_FormatInfo(gl_format);
+	EGLConfigInfo_t info = GLimp_FormatInfo(gl_format, gl_depth_bits);
 	int stencil_bits = info.stencil;
 	int depth_bits = info.depth;
 	int red_bits = info.red;
@@ -547,6 +578,7 @@ static bool GLES_Init_special(void)
 	int blue_bits = info.blue;
 	int alpha_bits = info.alpha;
 	int buffer_bits = info.buffer;
+	int multisamples = gl_msaa < 0 ? ap.multiSamples : gl_msaa;
 
 	EGLint attrib[] = {
 			EGL_BUFFER_SIZE, buffer_bits,
@@ -556,8 +588,8 @@ static bool GLES_Init_special(void)
 			EGL_GREEN_SIZE, blue_bits,
 			EGL_DEPTH_SIZE, depth_bits,
 			EGL_STENCIL_SIZE, stencil_bits,
-			EGL_SAMPLE_BUFFERS, gl_msaa > 1 ? 1 : 0,
-			EGL_SAMPLES, gl_msaa,
+			EGL_SAMPLE_BUFFERS, multisamples > 1 ? 1 : 0,
+			EGL_SAMPLES, multisamples,
 			EGL_RENDERABLE_TYPE, HARM_EGL_OPENGL_ES_BIT,
 			EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 			EGL_NONE,
@@ -571,7 +603,6 @@ static bool GLES_Init_special(void)
 			, attrib[15], attrib[17]
 	);
 
-	int multisamples = gl_msaa;
 	EGLConfig eglConfigs[MAX_NUM_CONFIGS];
 	while(1)
 	{
@@ -582,8 +613,8 @@ static bool GLES_Init_special(void)
 			if(multisamples > 1) {
 				multisamples = (multisamples <= 2) ? 0 : (multisamples/2);
 
-				attrib[7 + 1] = multisamples > 1 ? 1 : 0;
-				attrib[8 + 1] = multisamples;
+				attrib[7 * 2 + 1] = multisamples > 1 ? 1 : 0;
+				attrib[8 * 2 + 1] = multisamples;
 				continue;
 			}
 			else
@@ -610,10 +641,20 @@ static bool GLES_Init_special(void)
 		break;
 	}
 	configs[0] = GLimp_ChooseConfig(eglConfigs, config_count);
+
+    EGLConfigInfo_t cinfo = GLimp_GetConfigInfo(configs[0]);
+    common->Printf("Choose EGL context: %d/%d/%d Color bits, %d Alpha bits, %d depth, %d stencil display. samples %d sample buffers %d.\n",
+                   cinfo.red, cinfo.green,
+                   cinfo.blue, cinfo.alpha,
+                   cinfo.depth,
+                   cinfo.stencil
+            , cinfo.samples, cinfo.sample_buffers
+    );
+
 	return true;
 }
 
-static bool GLES_Init_prefer(void)
+static bool GLES_Init_prefer(const glimpParms_t &ap)
 {
 	EGLint config_count = 0;
 	int colorbits = 24;
@@ -623,7 +664,7 @@ static bool GLES_Init_prefer(void)
 
 	for (int i = 0; i < 16; i++) {
 
-		int multisamples = gl_msaa;
+		int multisamples = gl_msaa < 0 ? ap.multiSamples : gl_msaa;
 		suc = false;
 
 		// 0 - default
@@ -716,8 +757,8 @@ static bool GLES_Init_prefer(void)
 				if(multisamples > 1) {
 					multisamples = (multisamples <= 2) ? 0 : (multisamples/2);
 
-					attrib[7 + 1] = multisamples > 1 ? 1 : 0;
-					attrib[8 + 1] = multisamples;
+					attrib[7 * 2 + 1] = multisamples > 1 ? 1 : 0;
+					attrib[8 * 2 + 1] = multisamples;
 					continue;
 				}
 				else
@@ -735,7 +776,7 @@ static bool GLES_Init_prefer(void)
 	return suc;
 }
 
-int GLES_Init(glimpParms_t ap)
+int GLES_Init(glimpParms_t &ap)
 {
 	unsigned long mask;
 	int actualWidth, actualHeight;
@@ -762,9 +803,9 @@ int GLES_Init(glimpParms_t ap)
 
 	common->Printf("Initializing OpenGL display\n");
 
-	if(!GLES_Init_special())
+	if(!GLES_Init_special(ap))
 	{
-		if(!GLES_Init_prefer())
+		if(!GLES_Init_prefer(ap))
 		{
 			common->Error("Initializing EGL error");
 			return false;
@@ -774,6 +815,10 @@ int GLES_Init(glimpParms_t ap)
 	actualWidth = glConfig.vidWidth;
 	actualHeight = glConfig.vidHeight;
 	eglConfig = configs[0];
+
+	eglGetConfigAttrib(eglDisplay, eglConfig, EGL_SAMPLES, &glConfig.multiSamples);
+	// ap.multiSamples = glConfig.multiSamples;
+	// r_multiSamples.SetInteger(glConfig.multiSamples);
 
 	eglGetConfigAttrib(eglDisplay, eglConfig, EGL_NATIVE_VISUAL_ID, &format);
 	ANativeWindow_setBuffersGeometry((ANativeWindow *)win, screen_width, screen_height, format);
@@ -793,6 +838,7 @@ int GLES_Init(glimpParms_t ap)
 				// EGL_CONTEXT_CLIENT_VERSION, HARM_EGL_CONTEXT_CLIENT_VERSION,
 				EGL_CONTEXT_MAJOR_VERSION_KHR, 3,
 				EGL_CONTEXT_MINOR_VERSION_KHR, 2,
+                HARM_EGL_CONTEXT_OPENGL_DEBUG, harm_r_debugOpenGL.GetBool() ? 1 : 0,
 				EGL_NONE
 		};
 		gles3_version = 2;
@@ -805,6 +851,7 @@ int GLES_Init(glimpParms_t ap)
 					// EGL_CONTEXT_CLIENT_VERSION, HARM_EGL_CONTEXT_CLIENT_VERSION,
 					EGL_CONTEXT_MAJOR_VERSION_KHR, 3,
 					EGL_CONTEXT_MINOR_VERSION_KHR, 1,
+                    HARM_EGL_CONTEXT_OPENGL_DEBUG, harm_r_debugOpenGL.GetBool() ? 1 : 0,
 					EGL_NONE
 			};
 			gles3_version = 1;
@@ -814,6 +861,7 @@ int GLES_Init(glimpParms_t ap)
 			{
 				EGLint ctxAttrib[] = {
 						EGL_CONTEXT_CLIENT_VERSION, HARM_EGL_CONTEXT_CLIENT_VERSION,
+                        HARM_EGL_CONTEXT_OPENGL_DEBUG, harm_r_debugOpenGL.GetBool() ? 1 : 0,
 						EGL_NONE
 				};
 				gles3_version = 0;
@@ -826,6 +874,7 @@ int GLES_Init(glimpParms_t ap)
 	{
 		EGLint ctxAttrib[] = {
 				EGL_CONTEXT_CLIENT_VERSION, HARM_EGL_CONTEXT_CLIENT_VERSION,
+                HARM_EGL_CONTEXT_OPENGL_DEBUG, harm_r_debugOpenGL.GetBool() ? 1 : 0,
 				EGL_NONE
 		};
 		eglContext = eglCreateContext(eglDisplay, eglConfig, EGL_NO_CONTEXT, ctxAttrib);
@@ -851,6 +900,8 @@ int GLES_Init(glimpParms_t ap)
 		return false;
 	}
 
+	GLimp_UpdateSwapInterval();
+
 	EGLConfigInfo_t info = GLimp_GetConfigInfo(eglConfig);
 	int tcolorbits = info.red + info.green + info.blue;
 	depth_bits = info.depth;
@@ -875,6 +926,26 @@ int GLES_Init(glimpParms_t ap)
 	}
 
 	return true;
+}
+
+bool GLimp_ExtensionSupported(const char *name)
+{
+	if(!qglGetString)
+	{
+		common->Warning("OpenGL not initialized!");
+		return false;
+	}
+
+    const char *exts = (const char *)qglGetString(GL_EXTENSIONS);
+    if(!exts)
+        return false;
+
+	idStr new_exts(exts);
+	new_exts.Append(" ");
+	bool has = new_exts.Find(name) >= 0;
+
+	common->Printf("[Harmattan]: OpenGL extension '%s' -> %s\n", name, has ? "support" : "missing");
+	return has;
 }
 
 /*
@@ -920,9 +991,6 @@ bool GLimp_Init(glimpParms_t a)
 	common->Printf("GL_SHADING_LANGUAGE_VERSION: %s\n", glstring);
 
 	//has_gl_context = true;
-#ifdef _OPENGLES3
-	DEBUG_OPENGL;
-#endif
 	return true;
 }
 

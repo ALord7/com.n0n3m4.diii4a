@@ -42,6 +42,9 @@ extern bool Sys_InRenderThread(void);
 #endif
 #endif
 #define HARM_ONLY_DETECT_SYS_MEMORY 1
+#ifdef __ANDROID__
+idCVar harm_g_normalizeMovementDirection("harm_g_normalizeMovementDirection", "0", CVAR_GAME | CVAR_BOOL, "Re-normalize player/walker movement direction");
+#endif
 
 typedef enum {
 	ERP_NONE,
@@ -236,10 +239,7 @@ class idCommonLocal : public idCommon
 #endif
 #ifdef _HUMANHEAD
 	virtual void				FixupKeyTranslations(const char *src, char *dst, int lengthAllocated) { (void) src; (void)dst; (void)lengthAllocated; }
-	virtual void				MaterialKeyForBinding(const char *binding, char *keyMaterial, char *key, bool &isBound) {
-		(void)binding; (void)keyMaterial; (void)key;
-		isBound = false;
-	}
+	virtual void				MaterialKeyForBinding(const char *binding, char *keyMaterial, char *key, bool &isBound);
 	virtual void				SetGameSensitivityFactor(float factor) { (void) factor; }
 #endif
 };
@@ -491,7 +491,7 @@ void idCommonLocal::VPrintf(const char *fmt, va_list args)
 		// update the console if we are in a long-running command, like dmap
 		if (com_refreshOnPrint) {
 #ifdef _MULTITHREAD
-			if(!multithreadActive/* || !Sys_InRenderThread()*/)
+			if(!multithreadActive || !Sys_InRenderThread())
 #endif
 			session->UpdateScreen();
 		}
@@ -2573,8 +2573,8 @@ void idCommonLocal::InitCommands(void)
 	cmdSystem->AddCommand("dmap", Dmap_f, CMD_FL_TOOL, "compiles a map", idCmdSystem::ArgCompletion_MapName);
 	cmdSystem->AddCommand("renderbump", RenderBump_f, CMD_FL_TOOL, "renders a bump map", idCmdSystem::ArgCompletion_ModelName);
 	cmdSystem->AddCommand("renderbumpFlat", RenderBumpFlat_f, CMD_FL_TOOL, "renders a flat bump map", idCmdSystem::ArgCompletion_ModelName);
-#ifdef _RAVEN //k: for generate AAS file of mp game map and bot.
-	cmdSystem->AddCommand("botRunAAS", RunAAS_f, CMD_FL_GAME, "compiles an AAS file for a map for Quake 4 multiplayer-game", idCmdSystem::ArgCompletion_MapName);
+#if !defined(_HUMANHEAD) //k: for generate AAS file of mp game map and bot on DOOM3 and Quake4.
+	cmdSystem->AddCommand("runSingleAAS", RunSingleAAS_f, CMD_FL_GAME, "compiles an AAS file of single type for a map for multiplayer-game", idCmdSystem::ArgCompletion_MapName);
 #endif
 	cmdSystem->AddCommand("runAAS", RunAAS_f, CMD_FL_TOOL, "compiles an AAS file for a map", idCmdSystem::ArgCompletion_MapName);
 	cmdSystem->AddCommand("runAASDir", RunAASDir_f, CMD_FL_TOOL, "compiles AAS files for all maps in a folder", idCmdSystem::ArgCompletion_MapName);
@@ -2625,6 +2625,11 @@ void idCommonLocal::InitCommands(void)
 
 #ifdef ID_DEDICATED
 	cmdSystem->AddCommand("help", Com_Help_f, CMD_FL_SYSTEM, "shows help");
+#endif
+
+#ifdef _IMGUI
+    extern void R_ImGui_idTech4AmmSettings_f(const idCmdArgs &args);
+    cmdSystem->AddCommand("idTech4AmmSettings", R_ImGui_idTech4AmmSettings_f, CMD_FL_SYSTEM, "Show idTech4A++ new cvars and commands");
 #endif
 }
 
@@ -2739,7 +2744,7 @@ void idCommonLocal::Frame(void)
 
 		// the FPU stack better be empty at this point or some bad code or compiler bug left values on the stack
 		if (!Sys_FPU_StackIsEmpty()) {
-			Printf(Sys_FPU_GetState());
+			Printf("%s", Sys_FPU_GetState());
 			FatalError("idCommon::Frame: the FPU stack is not empty at the end of the frame\n");
 		}
 	}
@@ -2882,11 +2887,6 @@ void idCommonLocal::Async(void)
 	}
 }
 
-/*
-=================
-idCommonLocal::LoadGameDLL
-=================
-*/
 #ifdef _RAVEN // quake4 game dll
 #define _HARM_BASE_GAME_DLL "q4game"
 #elif defined(_HUMANHEAD) // prey game dll
@@ -2921,6 +2921,12 @@ static idCVar	harm_fs_gameLibPath("harm_fs_gameLibPath", "", CVAR_SYSTEM | CVAR_
 		"`<harm_fs_gameLibPath>/lib" _HARM_BASE_GAME_DLL DLL_SUFFIX "`, "
 		"default is empty will load by cvar `fs_game`."); // This cvar priority is higher than `fs_game`.
 static idCVar	harm_fs_gameLibDir("harm_fs_gameLibDir", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "Setup game dynamic library directory path(default is empty, means using `" _DEFAULT_LIBRARY_DIR "`).");
+
+/*
+=================
+idCommonLocal::LoadGameDLL
+=================
+*/
 void idCommonLocal::LoadGameDLL(void)
 {
 #ifdef __DOOM_DLL__
@@ -3263,36 +3269,10 @@ void idCommonLocal::Init(int argc, const char **argv, const char *cmdline)
 
 		// override cvars from command line
 		StartupVariable(NULL, false);
-#ifdef _MULTITHREAD
-#if !defined(__ANDROID__) //karin: enable multithreading-rendering from command cvar
-		multithreadActive = cvarSystem->GetCVarBool("harm_r_multithread");
-		if(multithreadActive)
-			Sys_Printf("[Harmattan]: Enable multi-threading rendering\n");
-		else
-			Sys_Printf("[Harmattan]: Disable multi-threading rendering\n");
-#endif
-#endif
-#ifdef _OPENGLES3
+
 #if !defined(__ANDROID__) //karin: check OpenGL version from command cvar
-		const char *openglVersion = cvarSystem->GetCVarString("harm_r_openglVersion");
-		if(openglVersion && openglVersion[0])
-		{
-			extern int gl_version;
-		    extern bool USING_GLES3;
-			Sys_Printf("[Harmattan]: harm_r_openglVersion = %s\n", openglVersion);
-			if(!idStr::Icmp("GLES2", openglVersion))
-			{
-				gl_version = 0x00020000;
-				Sys_Printf("[Harmattan]: Using OpenGLES2\n");
-			}
-			else
-			{
-				gl_version = 0x00030000;
-				Sys_Printf("[Harmattan]: Using OpenGLES3\n");
-			}
-			USING_GLES3 = gl_version != 0x00020000;
-		}
-#endif
+        extern void GLimp_Startup(void);
+        GLimp_Startup();
 #endif
 
 		if (!idAsyncNetwork::serverDedicated.GetInteger() && Sys_AlreadyRunning()) {
@@ -3342,10 +3322,11 @@ void idCommonLocal::Init(int argc, const char **argv, const char *cmdline)
 			console->LoadHistory();
 #ifdef __ANDROID__ //karin: for in smooth joystick on Android.
 		extern bool smooth_joystick;
-		idCVar *in_smoothJoystick = cvarSystem->Find("harm_in_smoothJoystick");
+		idCVar *in_smoothJoystick = cvarSystem->Find("harm_g_normalizeMovementDirection");
 		if(in_smoothJoystick)
 		{
 			in_smoothJoystick->SetBool(smooth_joystick);
+			CVAR_READONLY(*in_smoothJoystick);
 			in_smoothJoystick->ClearModified();
 		}
 #endif
@@ -3545,6 +3526,9 @@ void idCommonLocal::InitGame(void)
 		cmdSystem->BufferCommandText(CMD_EXEC_NOW, "s_restart\n");
 		cmdSystem->ExecuteCommandBuffer();
 	}
+#ifdef _IMGUI
+    idKeyInput::SetBinding(K_F10, "idTech4AmmSettings");
+#endif
 }
 
 /*
@@ -3606,4 +3590,61 @@ void idCommonLocal::ShutdownGame(bool reloading)
 	// shut down the file system
 	fileSystem->Shutdown(reloading);
 }
+
+#ifdef _HUMANHEAD
+extern const char * IN_FirstKeyFromBinding(const char *binding, int *keycode = NULL);
+void idCommonLocal::MaterialKeyForBinding(const char *binding, char *keyMaterial, char *key, bool &isBound)
+{
+	// 256 length see game/Prey/prey_game.cpp::GetTip
+#define MAX_KEY_MATERIAL_LENGTH 256
+#define MAX_KEY_NAME_LENGTH 256
+	const char *k;
+	int i = -1;
+
+	//karin: only get first binding key
+	k = IN_FirstKeyFromBinding(binding, &i);
+	isBound = false;
+
+	if(k && k[0])
+	{
+		if(i == K_MOUSE1)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/mouse1", MAX_KEY_MATERIAL_LENGTH);
+		else if(i == K_MOUSE2)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/mouse2", MAX_KEY_MATERIAL_LENGTH);
+		else if(i == K_MOUSE3)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/mouse3", MAX_KEY_MATERIAL_LENGTH);
+		else if(i == K_MWHEELDOWN)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/mousedn", MAX_KEY_MATERIAL_LENGTH);
+		else if(i == K_MWHEELUP)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/mouseup", MAX_KEY_MATERIAL_LENGTH);
+		else
+		{
+			isBound = strlen(k) > 1;
+			idStr::Copynz(key, k, MAX_KEY_NAME_LENGTH);
+			idStr::ToLower(key);
+		}
+	}
+
+	if(!keyMaterial[0])
+	{
+		if(isBound)
+			idStr::Copynz(keyMaterial, "textures/interface/tips/keywide", MAX_KEY_MATERIAL_LENGTH);
+		else
+			idStr::Copynz(keyMaterial, "textures/interface/tips/key", MAX_KEY_MATERIAL_LENGTH);
+	}
+#undef MAX_KEY_MATERIAL_LENGTH
+#undef MAX_KEY_NAME_LENGTH
+}
+#endif
+
+//k: temp memory allocate in stack / heap control on Android
+#ifdef _DYNAMIC_ALLOC_STACK_OR_HEAP
+#ifdef __ANDROID__
+#define _DYNAMIC_ALLOC_MAX_STACK "262144" // 256k
+#else
+#define _DYNAMIC_ALLOC_MAX_STACK "524288" // 512k
+#endif
+// #warning "For fix `DOOM3: The lost mission` mod, when load `game/le_hell` map(loading resource `models/mapobjects/hell/hellintro.lwo` model, a larger scene, alloca() stack out of memory)."
+/*static */idCVar harm_r_maxAllocStackMemory("harm_r_maxAllocStackMemory", _DYNAMIC_ALLOC_MAX_STACK, CVAR_INTEGER|CVAR_RENDERER|CVAR_ARCHIVE, "Control allocate temporary memory when load model data, default value is `" _DYNAMIC_ALLOC_MAX_STACK "` bytes(Because stack memory is limited by OS:\n 0 = Always heap;\n Negative = Always stack;\n Positive = Max stack memory limit(If less than this `byte` value, call `alloca` in stack memory, else call `malloc`/`calloc` in heap memory)).");
+#endif
 

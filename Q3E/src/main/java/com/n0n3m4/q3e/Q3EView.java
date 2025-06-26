@@ -32,6 +32,8 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
+import com.n0n3m4.q3e.event.Q3EQuitEvent;
+import com.n0n3m4.q3e.karin.KLog;
 import com.n0n3m4.q3e.karin.KOnceRunnable;
 
 import java.io.File;
@@ -40,7 +42,7 @@ import java.io.FileOutputStream;
 
 class Q3EView extends SurfaceView implements SurfaceHolder.Callback
 {
-    private boolean mInit=false;
+    private boolean mInit = false;
 
 	public Q3EView(Context context)
     {
@@ -59,49 +61,6 @@ class Q3EView extends SurfaceView implements SurfaceHolder.Callback
     {
         post(event);
     }
-    
-    public void Shutdown(final Runnable andThen)
-    {
-        Q3EUtils.q3ei.callbackObj.PushEvent(new Runnable() {
-            public void run()
-            {
-                if(mInit)
-                    Q3EJNI.shutdown();
-                if(null != andThen)
-                    andThen.run();
-            }
-        });
-    }
-
-    public void Shutdown()
-    {
-        if(mInit)
-            Q3EJNI.shutdown();
-    }
-
-    public void Pause()
-    {
-        if(!mInit)
-            return;
-        Runnable runnable = new KOnceRunnable() {
-            @Override public void Run() {
-                Q3EJNI.OnPause();
-            }
-        };
-        Q3EUtils.q3ei.callbackObj.PushEvent(runnable);
-    }
-
-    public void Resume()
-    {
-        if(!mInit)
-            return;
-        Runnable runnable = new KOnceRunnable() {
-            @Override public void Run() {
-                Q3EJNI.OnResume();
-            }
-        };
-        Q3EUtils.q3ei.callbackObj.PushEvent(runnable);
-    }
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -117,6 +76,7 @@ class Q3EView extends SurfaceView implements SurfaceHolder.Callback
     public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
         if(!mInit)
         {
+            KLog.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Game view: %d x %d", w, h);
             mInit = Q3EMain.gameHelper.Start(holder.getSurface(), w, h);
 
             getHolder().setFixedSize(w, h);

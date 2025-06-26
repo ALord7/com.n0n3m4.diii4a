@@ -146,6 +146,13 @@ bool VulkanSwapChain::CreateSwapchain(int width, int height, int imageCount, boo
 		lost = true;
 		return false;
 	}
+#ifdef __ANDROID__ //karin: destroy old swapchain manually
+    if (swapchain)
+    {
+        vkDestroySwapchainKHR(device->device, swapchain, nullptr);
+        swapchain = VK_NULL_HANDLE;
+    }
+#endif
 
 	if (caps.Capabilites.maxImageCount != 0)
 		imageCount = std::min(caps.Capabilites.maxImageCount, (uint32_t)imageCount);
@@ -345,6 +352,9 @@ VulkanSurfaceCapabilities VulkanSwapChain::GetSurfaceCapabilities(bool exclusive
 		if (result != VK_SUCCESS)
 			VulkanError("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed");
 	}
+#ifdef __ANDROID__ //karin: reset surface transform to 0 on swapchain
+	caps.Capabilites.currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+#endif
 
 #ifdef WIN32
 	if (exclusivefullscreen && device->SupportsExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))

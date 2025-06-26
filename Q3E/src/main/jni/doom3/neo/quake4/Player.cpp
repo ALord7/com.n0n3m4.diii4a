@@ -30,13 +30,12 @@
 #ifdef _MOD_VIEW_BODY
 #include "ViewBody.cpp"
 #endif
+#ifdef _QUAKE4 //karin: allow fire when focus NPC
+static idCVar harm_g_allowFireWhenFocusNPC( "harm_g_allowFireWhenFocusNPC", "0", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "allow fire when focus NPC" );
+#endif
 
 idCVar net_predictionErrorDecay( "net_predictionErrorDecay", "112", CVAR_FLOAT | CVAR_GAME | CVAR_NOCHEAT, "time in milliseconds it takes to fade away prediction errors", 0.0f, 200.0f );
 idCVar net_showPredictionError( "net_showPredictionError", "-1", CVAR_INTEGER | CVAR_GAME | CVAR_NOCHEAT, "show prediction errors for the given client", -1, MAX_CLIENTS );
-
-#ifdef MOD_BOTS
-#define IS_BOT() ( spawnArgs.GetInt("spawn_entnum") >= botAi::BOT_START_INDEX )
-#endif
 
 /*
 ===============================================================================
@@ -1345,6 +1344,12 @@ idPlayer::idPlayer() {
 	teamAmmoRegenPending	= false;
 	teamDoubler			= NULL;		
 	teamDoublerPending		= false;
+#ifdef _MOD_VIEW_BODY
+    viewBody				= NULL;
+#endif
+#ifdef MOD_BOTS
+    bot						= NULL;
+#endif
 }
 
 /*
@@ -1420,7 +1425,7 @@ void idPlayer::SetWeapon( int weaponIndex ) {
 	}
 #ifdef _MOD_VIEW_BODY
 	if(viewBody)
-		viewBody->UpdateWeapon();
+		viewBody->UpdateBody();
 #endif
 }
  
@@ -1437,7 +1442,7 @@ void idPlayer::SetupWeaponEntity( void ) {
 	
 	// don't setup weapons for spectators
 #ifdef MOD_BOTS
-    if ( !IS_BOT() && ( gameLocal.isClient || (weaponViewModel && weaponWorldModel) || spectating )  )
+    if ( !IsBot() && ( gameLocal.isClient || (weaponViewModel && weaponWorldModel) || spectating )  )
 #else
 	if ( gameLocal.isClient || (weaponViewModel && weaponWorldModel) || spectating ) 
 #endif
@@ -1781,6 +1786,9 @@ void idPlayer::Init( void ) {
 		teamDoublerPending = false;
 		teamDoubler = PlayEffect( "fx_doubler", renderEntity.origin, renderEntity.axis, true );
 	}
+#ifdef MOD_BOTS
+    SpawnBot();
+#endif
 }
 
 /*
@@ -1935,14 +1943,14 @@ void idPlayer::Spawn( void ) {
 	if(sscanf(harm_pm_fullBodyAwarenessOffset.GetString(), "%f %f %f", &offset.x, &offset.y, &offset.z) == 3)
 		fullBodyAwarenessOffset = offset;
 	else
-		gameLocal.Warning("[Harmattan]: unable read pm_fullBodyAwarenessOffset.\n");
+		gameLocal.Warning("[Harmattan]: unable read harm_pm_fullBodyAwarenessOffset.\n");
 
 	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool())
 #endif
 	renderEntity.suppressSurfaceInViewID = entityNumber+1;
 #ifdef _MOD_FULL_BODY_AWARENESS
 	else
-		showWeaponViewModel = harm_pm_fullBodyAwarenessFirstPerson.GetBool();
+		showWeaponViewModel = false;
 #endif
 
 	// don't project shadow on self or weapon
@@ -1989,8 +1997,7 @@ void idPlayer::Spawn( void ) {
 			assert( spectating );
 		}
 #ifdef MOD_BOTS
-		else if ( IS_BOT() )
-		{
+		else if ( IsBot() ) {
 			// set yourself ready to spawn. idMultiplayerGame will decide when/if appropriate and call SpawnFromSpawnSpot
 			SetupWeaponEntity( );
 #ifdef _MOD_VIEW_BODY
@@ -2129,6 +2136,17 @@ idPlayer::~idPlayer() {
 #endif
 	
 	SetPhysics( NULL );
+#ifdef MOD_BOTS
+    if(IsBot())
+        botAi::ReleaseBotSlot(entityNumber);
+    if(bot)
+    {
+        gameLocal.Printf("Delete player bot: clientID=%d\n", entityNumber);
+        botAi::ReleaseBotSlot(entityNumber);
+        delete bot;
+        bot = NULL;
+    }
+#endif
 }
 
 /*
@@ -2699,7 +2717,7 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	if(sscanf(harm_pm_fullBodyAwarenessOffset.GetString(), "%f %f %f", &offset.x, &offset.y, &offset.z) == 3)
 		fullBodyAwarenessOffset = offset;
 	else
-		gameLocal.Warning("[Harmattan]: unable read pm_fullBodyAwarenessOffset.\n");
+		gameLocal.Warning("[Harmattan]: unable read harm_pm_fullBodyAwarenessOffset.\n");
 #endif
 }
 
@@ -2723,6 +2741,12 @@ void idPlayer::PrepareForRestart( void ) {
 
 	// the sound world is going to be cleared, don't keep references to emitters
 	FreeSoundEmitter( false );
+#ifdef MOD_BOTS
+    if(bot)
+    {
+        bot->PrepareForRestart();
+    }
+#endif
 }
 
 /*
@@ -2745,6 +2769,12 @@ void idPlayer::Restart( void ) {
 
 	lastKiller = NULL;
 	useInitialSpawns = true;
+#ifdef MOD_BOTS
+    if(bot)
+    {
+        bot->Restart();
+    }
+#endif
 }
 
 /*
@@ -3905,6 +3935,11 @@ void idPlayer::EnterCinematic( void ) {
    		weapon->PreSave();
 		weapon->EnterCinematic();
    	}
+#ifdef _MOD_VIEW_BODY
+	if (viewBody) {
+		viewBody->EnterCinematic();
+	}
+#endif
 
 	// Reset state flags   
 	memset ( &pfl, 0, sizeof(pfl) );
@@ -3930,6 +3965,11 @@ void idPlayer::ExitCinematic( void ) {
 		weapon->PostSave();
    		weapon->ExitCinematic();
    	}
+#ifdef _MOD_VIEW_BODY
+	if (viewBody) {
+		viewBody->ExitCinematic();
+	}
+#endif
    
    	SetAnimState( ANIMCHANNEL_TORSO, "Torso_Idle", 0 );
 	SetAnimState( ANIMCHANNEL_LEGS, "Legs_Idle", 0 );
@@ -3976,11 +4016,11 @@ void idPlayer::UpdateConditions( void ) {
 		pfl.strafeRight	= pfl.onGround && ( sidespeed < -20.01f );
  	} else if ( xyspeed > MIN_BOB_SPEED ) {
 #ifdef __ANDROID__ //karin: for in smooth joystick on Android
-		if(harm_in_smoothJoystick.GetBool() && harm_g_normalizeMovementDirection.GetBool())
+		if(harm_g_normalizeMovementDirection.GetBool())
 		{
 			if(pfl.onGround)
 			{
-				GAME_SETUPCMDDIRECTION(usercmd, harm_g_normalizeMovementDirection.GetInteger(), pfl.forward, pfl.backward, pfl.strafeLeft, pfl.strafeRight);
+				GAME_SETUPCMDDIRECTION(usercmd, pfl.forward, pfl.backward, pfl.strafeLeft, pfl.strafeRight);
 			}
 			else
 			{
@@ -6265,6 +6305,9 @@ void idPlayer::Weapon_NPC( void ) {
 	}
 
 	if ( currentWeapon )	{
+#ifdef _QUAKE4 //karin: allow fire when focus NPC
+		if(!harm_g_allowFireWhenFocusNPC.GetBool())
+#endif
 		StopFiring();
 	}
 
@@ -6274,6 +6317,9 @@ void idPlayer::Weapon_NPC( void ) {
 	}
 
 	if ( talkCursor && ( usercmd.buttons & BUTTON_ATTACK ) && !( oldButtons & BUTTON_ATTACK ) ) {
+#ifdef _QUAKE4 //karin: allow fire when focus NPC
+		if(!harm_g_allowFireWhenFocusNPC.GetBool())
+#endif
 		buttonMask |= BUTTON_ATTACK;
 		if ( !talkingNPC ) {
 			idAI *focusAI = static_cast<idAI*>(focusEnt.GetEntity());
@@ -6285,6 +6331,10 @@ void idPlayer::Weapon_NPC( void ) {
 	} else if ( currentWeapon == SlotForWeapon ( "weapon_blaster" ) ) {
 		Weapon_Combat();
 	}
+#ifdef _QUAKE4 //karin: allow fire when focus NPC
+	if(harm_g_allowFireWhenFocusNPC.GetBool())
+		Weapon_Combat();
+#endif
 }
 
 
@@ -6768,78 +6818,6 @@ void idPlayer::UpdateFocus( void ) {
 	oldTalkCursor = talkCursor;
 	talkCursor = 0;
     start = GetEyePosition();
-#ifdef _MOD_FULL_BODY_AWARENESS
-    idAngles viewAngles = this->viewAngles;
-    if(harm_pm_fullBodyAwareness.GetBool() && harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-    {
-        idVec3 start_orig = start;
-        idMat3 viewAxis = this->viewAngles.ToMat3();
-        if( af.IsActive() )
-        {
-            idAFBody* head = af.GetPhysics()->GetBody( "head" );
-            if( head )
-            {
-                start = head->GetWorldOrigin();
-                viewAxis = head->GetWorldAxis();
-            }
-        }
-        else if(head.GetEntity())
-        {
-#define _HARM_Q4_PLAYERMODEL_HEAD_JOINT "head_channel"
-            idMat3 axis;
-            idVec3 origin;
-            const char *headJointName = harm_pm_fullBodyAwarenessHeadJoint.GetString();
-            jointHandle_t head_joint = INVALID_JOINT;
-            if(headJointName && headJointName[0])
-            {
-                head_joint = head->GetAnimator()->GetJointHandle( headJointName );
-            }
-            if(head_joint >= 0 && head->GetJointWorldTransform( head_joint, gameLocal.time, origin, axis ) )
-                start = origin;
-            else
-            {
-                start = head->GetPhysics()->GetOrigin();
-            }
-        }
-        else
-        {
-            // position camera at head
-            idMat3 axis;
-            idVec3 origin;
-            const char *headJointName = harm_pm_fullBodyAwarenessHeadJoint.GetString();
-            jointHandle_t head_joint = INVALID_JOINT;
-            if(headJointName && headJointName[0])
-            {
-                head_joint = animator.GetJointHandle( headJointName );
-#if 0
-                if(head_joint < 0 && idStr::Icmp(_HARM_Q4_PLAYERMODEL_HEAD_JOINT, headJointName))
-                        head_joint = animator.GetJointHandle( _HARM_Q4_PLAYERMODEL_HEAD_JOINT );
-#endif
-            }
-            else
-            {
-                head_joint = animator.GetJointHandle( _HARM_Q4_PLAYERMODEL_HEAD_JOINT ); // quake4 playermodel head joint name, quake4 playermodel head is can attached
-            }
-            if(head_joint >= 0 && animator.GetJointTransform( head_joint, gameLocal.time, origin, axis ) )
-                start = ( origin + modelOffset) * ( viewAxis * physicsObj.GetGravityAxis() ) + physicsObj.GetOrigin();
-#undef _HARM_Q4_PLAYERMODEL_HEAD_JOINT
-        }
-
-        // custom offset: when no focus GUI
-        if(fullBodyAwarenessOffset.x != 0 || fullBodyAwarenessOffset.y != 0 || fullBodyAwarenessOffset.z != 0 )
-            start += fullBodyAwarenessOffset * viewAxis;
-
-        // clip
-        idBounds bounds(idVec3(-4, -4, -4), idVec3(4, 4, 4));
-        trace_t tracei;
-        gameLocal.TraceBounds(this, tracei, start_orig, start, bounds, MASK_SOLID, this);
-
-        if (tracei.fraction != 1.0f) {
-            start = tracei.endpos;
-        }
-        viewAngles = viewAxis.ToAngles();
-    }
-#endif
 	end = start + viewAngles.ToForward() * 768.0f;
 
  	// player identification -> names to the hud
@@ -7844,10 +7822,7 @@ void idPlayer::BobCycle( const idVec3 &pushVelocity ) {
 	viewBob.Zero();
 
 #ifdef _MOD_FULL_BODY_AWARENESS
-	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle()
-        || (zoomed && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-        || (focusUI && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-    )
+	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI)
 #endif
 	if ( physicsObj.HasSteppedUp() ) {
 
@@ -7868,10 +7843,7 @@ void idPlayer::BobCycle( const idVec3 &pushVelocity ) {
 
 	// if the player stepped up recently
 #ifdef _MOD_FULL_BODY_AWARENESS
-	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle()
-        || (zoomed && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-        || (focusUI && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-    ) {
+	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI) {
 #endif
 	deltaTime = gameLocal.time - stepUpTime;
 	if ( deltaTime < STEPUP_TIME ) {
@@ -8290,6 +8262,11 @@ bool idPlayer::EnterVehicle( idEntity* vehicle ) {
 	//HideCrosshair();
 // RAVEN END
   	
+#ifdef _MOD_VIEW_BODY
+	if( viewBody ) {
+		viewBody->Hide();
+	}
+#endif
   	return true;
 }
 
@@ -8314,6 +8291,11 @@ bool idPlayer::ExitVehicle ( bool force ) {
 	ShowCrosshair();
 // RAVEN END
 	
+#ifdef _MOD_VIEW_BODY
+	if( viewBody ) {
+		viewBody->Show();
+	}
+#endif
 	return true;
 }
 
@@ -9476,7 +9458,7 @@ void idPlayer::Think( void ) {
 	else
 	{
 		renderEntity.suppressSurfaceInViewID = 0;
-		showWeaponViewModel = harm_pm_fullBodyAwarenessFirstPerson.GetBool();
+		showWeaponViewModel = false;
 
 		if(harm_pm_fullBodyAwarenessOffset.IsModified())
 		{
@@ -9484,8 +9466,7 @@ void idPlayer::Think( void ) {
 			if(sscanf(harm_pm_fullBodyAwarenessOffset.GetString(), "%f %f %f", &offset.x, &offset.y, &offset.z) == 3)
 				fullBodyAwarenessOffset = offset;
 			else
-				gameLocal.Warning("[Harmattan]: unable read harm_pm_fullBodyAwarenessOffset.\n");
-			harm_pm_fullBodyAwarenessOffset.ClearModified();
+				gameLocal.Warning("[Harmattan]: unable read harm_pm_fullBodyAwarenessOffset.");
 		}
 	}
 #endif
@@ -9764,7 +9745,7 @@ void idPlayer::Think( void ) {
 	} else if ( health > 0 && !gameLocal.inCinematic ) {
 		UpdateWeapon();
 #ifdef _MOD_VIEW_BODY
-        UpdateBody();
+        UpdateViewBody();
 #endif
 	}
 
@@ -10817,10 +10798,7 @@ void idPlayer::CalculateViewWeaponPos( idVec3 &origin, idMat3 &axis ) {
 
 	// CalculateRenderView must have been called first
 #ifdef _MOD_FULL_BODY_AWARENESS
-	idVec3 viewOrigin = !harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle()
-            || (zoomed && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-            || (focusUI && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-            ? firstPersonViewOrigin : firstPersonViewOrigin_viewWeaponOrigin;
+	idVec3 viewOrigin = !harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI ? firstPersonViewOrigin : firstPersonViewOrigin_viewWeaponOrigin;
 #else
 	const idVec3 &viewOrigin = firstPersonViewOrigin;
 #endif
@@ -11095,10 +11073,7 @@ void idPlayer::GetViewPos( idVec3 &origin, idMat3 &axis ) const {
 
 	// if dead, fix the angle and don't add any kick
 #ifdef _MOD_FULL_BODY_AWARENESS
-	if( (!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle()
-        || (zoomed && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-        || (focusUI && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-    ) && health <= 0 )
+	if( (!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI) && health <= 0 )
 #else
 	if ( health <= 0 )
 #endif
@@ -11142,10 +11117,7 @@ idPlayer::CalculateFirstPersonView
 */
 void idPlayer::CalculateFirstPersonView( void ) {
 #ifdef _MOD_FULL_BODY_AWARENESS
-	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle()
-        || (zoomed && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-        || (focusUI && !harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-    ) {
+	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI) {
 #endif
 	if ( ( pm_modelView.GetInteger() == 1 ) || ( ( pm_modelView.GetInteger() == 2 ) && ( health <= 0 ) ) ) {
 		//	Displays the view from the point of view of the "camera" joint in the player model
@@ -11239,7 +11211,7 @@ void idPlayer::CalculateFirstPersonView( void ) {
 		firstPersonViewOrigin_viewWeaponOrigin = firstPersonViewOrigin;
 
 		// custom offset: when no focus GUI
-		if((!focusUI || harm_pm_fullBodyAwarenessFirstPerson.GetBool()) && (fullBodyAwarenessOffset.x != 0 || fullBodyAwarenessOffset.y != 0 || fullBodyAwarenessOffset.z != 0 ))
+		if(!focusUI && (fullBodyAwarenessOffset.x != 0 || fullBodyAwarenessOffset.y != 0 || fullBodyAwarenessOffset.z != 0 ))
 			firstPersonViewOrigin += fullBodyAwarenessOffset * firstPersonViewAxis;
 
 		// clip
@@ -11251,12 +11223,6 @@ void idPlayer::CalculateFirstPersonView( void ) {
 			firstPersonViewOrigin = trace.endpos;
 		}
 
-        if(harm_pm_fullBodyAwarenessFirstPerson.GetBool())
-        {
-            firstPersonViewOrigin_viewWeaponOrigin = firstPersonViewOrigin;
-        }
-        else
-        {
 		// for weapon
 		const idVec3 &forward = firstPersonViewAxis[0];
 		const idPlane p(-forward, -forward * firstPersonViewOrigin_viewWeaponOrigin);
@@ -11265,7 +11231,6 @@ void idPlayer::CalculateFirstPersonView( void ) {
 			firstPersonViewOrigin_viewWeaponOrigin = firstPersonViewOrigin + forward * scale;
 		else
 			firstPersonViewOrigin_viewWeaponOrigin = firstPersonViewOrigin;
-        }
 	}
 #endif
 }
@@ -12233,7 +12198,7 @@ void idPlayer::LocalClientPredictionThink( void ) {
 	}
 #ifdef _MOD_VIEW_BODY
     if ( !gameLocal.inCinematic && viewBody && ( health > 0 ) && !( gameLocal.isMultiplayer && spectating ) ) {
-        UpdateBody();
+        UpdateViewBody();
     }
 #endif
 
@@ -12419,7 +12384,7 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 	}
 #ifdef _MOD_VIEW_BODY
     if ( !gameLocal.inCinematic && viewBody && ( health > 0 ) && !( gameLocal.isMultiplayer && spectating ) ) {
-        UpdateBody();
+        UpdateViewBody();
     }
 #endif
 
@@ -13207,7 +13172,7 @@ idPlayer::CanShowWeaponViewmodel
 */
 bool idPlayer::CanShowWeaponViewmodel( void ) const {
 #ifdef _MOD_FULL_BODY_AWARENESS
-	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI || harm_pm_fullBodyAwarenessFirstPerson.GetBool())
+	if(!harm_pm_fullBodyAwareness.GetBool() || pm_thirdPerson.GetBool() || IsInVehicle() || zoomed || focusUI)
 #endif
  	return showWeaponViewModel;
 #ifdef _MOD_FULL_BODY_AWARENESS
@@ -13775,7 +13740,7 @@ void idPlayer::SetupHead( const char* headModel, idVec3 headOffset ) {
 
 		rvClientAFAttachment* headEnt = clientHead.GetEntity();
 #ifdef MOD_BOTS //karin: fixed setup head
-		if(IS_BOT())
+		if(IsBot())
 			gameLocal.SpawnClientEntityDef( *headDict, (rvClientEntity**)&headEnt, false, "rvClientAFAttachment" );
 		else
 #endif
@@ -14452,14 +14417,12 @@ idPlayer::SetupViewBody
 ==============
 */
 void idPlayer::SetupViewBody( void ) {
-    int						w;
-    const char				*weap;
     const idDeclEntityDef	*decl;
     idEntity				*spawn;
 
     // don't setup weapons for spectators
 #ifdef MOD_BOTS
-    if ( !IS_BOT() && ( gameLocal.isClient || viewBody || spectating )  )
+    if ( !IsBot() && ( gameLocal.isClient || viewBody || spectating )  )
 #else
     if ( gameLocal.isClient || viewBody || spectating )
 #endif
@@ -14473,22 +14436,22 @@ void idPlayer::SetupViewBody( void ) {
     if ( !viewBody ) {
         // setup the view model
         idStr player_viewbody_classname;
-        spawnArgs.GetString("player_viewbody", VIEW_BODY_DEFAULT_CLASSNAME, player_viewbody_classname);
-
+        if(!spawnArgs.GetString("player_viewbody", ""/*VIEW_BODY_DEFAULT_CLASSNAME*/, player_viewbody_classname))
+			return;
         if(!player_viewbody_classname.Length())
-            player_viewbody_classname = VIEW_BODY_DEFAULT_CLASSNAME;
-
+			return;
         decl = static_cast< const idDeclEntityDef * >( declManager->FindType( DECL_ENTITYDEF, player_viewbody_classname, false, false ) );
+		/*
         if ( !decl ) {
-            gameLocal.Warning( "entityDef not found: '%s'", player_viewbody_classname.c_str() );
+            gameLocal.DPrintf( "entityDef not found: '%s'\n", player_viewbody_classname.c_str() );
             if( idStr::Cmp(player_viewbody_classname, VIEW_BODY_DEFAULT_CLASSNAME) )
             {
                 player_viewbody_classname = VIEW_BODY_DEFAULT_CLASSNAME;
                 decl = static_cast< const idDeclEntityDef * >( declManager->FindType( DECL_ENTITYDEF, player_viewbody_classname, false, false ) );
             }
-        }
+		   */
         if ( !decl ) {
-            gameLocal.Warning( "entityDef not found: '%s'", player_viewbody_classname.c_str() );
+            gameLocal.DPrintf( "entityDef not found: '%s'\n", player_viewbody_classname.c_str() );
             return;
         }
 
@@ -14498,14 +14461,14 @@ void idPlayer::SetupViewBody( void ) {
         spawn = NULL;
         gameLocal.SpawnEntityDef( args, &spawn );
         if ( !spawn ) {
-            gameLocal.Warning( "idPlayer::SetupViewBody: failed to spawn viewBody" );
+            gameLocal.DPrintf( "idPlayer::SetupViewBody: failed to spawn viewBody\n" );
             return;
         }
         viewBody = static_cast<idViewBody*>(spawn);
         viewBody->Init( this, true );
         viewBody->SetName( va("%s_viewBody", name.c_str() ) );
         viewBody->SetInstance( instance );
-        gameLocal.Printf( "idPlayer::SetupViewBody: spawn viewBody -> %s\n", viewBody->GetName() );
+        gameLocal.DPrintf( "idPlayer::SetupViewBody: spawn viewBody -> %s\n", viewBody->GetName() );
     }
 
     viewBody->fl.persistAcrossInstances = true;
@@ -14513,10 +14476,10 @@ void idPlayer::SetupViewBody( void ) {
 
 /*
 ===============
-idPlayer::UpdateBody
+idPlayer::UpdateViewBody
 ===============
 */
-void idPlayer::UpdateBody( void ) {
+void idPlayer::UpdateViewBody( void ) {
     if ( !viewBody ) {
         return;
     }
@@ -14544,3 +14507,19 @@ void idPlayer::UpdateBody( void ) {
 			);
 }
 #endif
+
+#ifdef MOD_BOTS
+void idPlayer::SetupBot(botAi *bot)
+{
+    this->bot = bot;
+}
+
+void idPlayer::SpawnBot(void)
+{
+    if(!BOT_ENABLED() || !spawnArgs.GetBool("isBot") || !botAi::PlayerHasBotSlot(entityNumber) || bot)
+        return;
+    //printf("Player bot spawn: %p %p\n", this, bot);
+    bot = botAi::SpawnBot(this);
+}
+#endif
+
