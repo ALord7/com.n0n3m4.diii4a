@@ -41,6 +41,7 @@ import android.view.Display;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
@@ -79,10 +80,6 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     private boolean mInit = false;
     private boolean usesCSAA = false;
     private boolean hideonscr;
-
-    // toolbar function
-    private boolean m_toolbarActive = true;
-    private View m_keyToolbar = null;
 
     // mouse function
     private boolean m_usingMouse = false;
@@ -237,6 +234,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
 
             Q3E.orig_width = w;
             Q3E.orig_height = h;
+            Q3E.activity.SetupGameViewSize(w, h, false);
 
             UiLoader uildr = new UiLoader(this, gl, Q3E.orig_width, Q3E.orig_height, m_portrait);
 
@@ -372,7 +370,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                 qKeyCode = Q3EUtils.q3ei.VOLUME_DOWN_KEY_CODE;
                 break;
             default:
-                qKeyCode = Q3EKeyCodes.convertKeyCode(keyCode, event);
+                qKeyCode = Q3EKeyCodes.convertKeyCode(keyCode, event.getUnicodeChar(0));
                 break;
         }
         int t = getCharacter(keyCode, event);
@@ -403,7 +401,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                 qKeyCode = Q3EUtils.q3ei.VOLUME_DOWN_KEY_CODE;
                 break;
             default:
-                qKeyCode = Q3EKeyCodes.convertKeyCode(keyCode, event);
+                qKeyCode = Q3EKeyCodes.convertKeyCode(keyCode, event.getUnicodeChar(0));
                 break;
         }
         Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, qKeyCode, getCharacter(keyCode, event));
@@ -458,7 +456,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             {
                 case MotionEvent.ACTION_BUTTON_PRESS: {
                     int gameMouseButton = ConvMouseButton(event);
-                    if(gameMouseButton >= 0)
+                    if(gameMouseButton != 0)
                     {
                         Q3EUtils.q3ei.callbackObj.sendKeyEvent(true, gameMouseButton, 0);
                     }
@@ -466,7 +464,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                     break;
                 case MotionEvent.ACTION_BUTTON_RELEASE: {
                     int gameMouseButton = ConvMouseButton(event);
-                    if(gameMouseButton >= 0)
+                    if(gameMouseButton != 0)
                     {
                         Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, gameMouseButton, 0);
                     }
@@ -478,6 +476,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
 //                case MotionEvent.ACTION_HOVER_EXIT: break;
                 case MotionEvent.ACTION_HOVER_MOVE:
                     Q3EUtils.q3ei.callbackObj.sendMotionEvent(deltaX, deltaY);
+                    Q3EUtils.q3ei.callbackObj.sendMouseEvent(Q3E.PhysicsToLogicalX(x), Q3E.PhysicsToLogicalY(y));
                     break;
                 case MotionEvent.ACTION_SCROLL:
                     float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL, actionIndex);
@@ -761,7 +760,6 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     {
         if (m_enableGyro)
             StopGyroscope();
-        ToggleToolbar(false);
     }
 
     public void Resume()
@@ -775,53 +773,8 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     {
         super.onDetachedFromWindow();
 
-        m_keyToolbar = null;
-        m_toolbarActive = true;
-    }
-
-    public View CreateToolbar()
-    {
-        if (Q3EUtils.q3ei.function_key_toolbar)
-        {
-            Context context = getContext();
-            m_keyToolbar = new KKeyToolBar(context);
-            m_keyToolbar.setVisibility(View.GONE);
-            try
-            {
-                String str = PreferenceManager.getDefaultSharedPreferences(context).getString(Q3EPreference.pref_harm_function_key_toolbar_y, "0");
-                if(null == str)
-                    str = "0";
-                int y = Integer.parseInt(str);
-                if (y > 0)
-                    m_keyToolbar.setY(y);
-            } catch (Exception e)
-            {
-                e.printStackTrace();
-            }
-        }
-        return m_keyToolbar;
-    }
-
-    public View Toolbar()
-    {
-        return m_keyToolbar;
-    }
-
-    public void ToggleToolbar()
-    {
-        ToggleToolbar(!m_toolbarActive);
-    }
-
-    public void ToggleToolbar(boolean b)
-    {
-        if (null != m_keyToolbar && Q3EUtils.q3ei.function_key_toolbar)
-        {
-            m_toolbarActive = b;
-            if (m_toolbarActive)
-                m_keyToolbar.setVisibility(View.VISIBLE);
-            else
-                m_keyToolbar.setVisibility(View.GONE);
-        }
+        if(null != Q3E.activity)
+            Q3E.activity.GetKeyboard().onDetachedFromWindow();
     }
 
     private int GetOnScreenType(TouchListener touchListener)
@@ -884,7 +837,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                 case MotionEvent.BUTTON_FORWARD:
                     return Q3EKeyCodes.KeyCodes.K_MOUSE5;
                 default:
-                    return -1;
+                    return 0;
             }
         }
         else
@@ -901,7 +854,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             else if((buttonState & MotionEvent.BUTTON_FORWARD) == MotionEvent.BUTTON_FORWARD)
                 return Q3EKeyCodes.KeyCodes.K_MOUSE5;
             else
-                return -1;
+                return 0;
         }
     }
 
@@ -911,8 +864,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
         {
-            Runnable runnable = new Runnable()
-            {
+            Runnable runnable = new Runnable() {
                 @Override
                 public void run()
                 {
@@ -979,7 +931,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
         {
             case MotionEvent.ACTION_BUTTON_PRESS: {
                 int gameMouseButton = ConvMouseButton(event);
-                if(gameMouseButton >= 0)
+                if(gameMouseButton != 0)
                 {
                     Q3EUtils.q3ei.callbackObj.sendKeyEvent(true, gameMouseButton, 0);
                 }
@@ -989,7 +941,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             break;
             case MotionEvent.ACTION_BUTTON_RELEASE: {
                 int gameMouseButton = ConvMouseButton(event);
-                if(gameMouseButton >= 0)
+                if(gameMouseButton != 0)
                 {
                     Q3EUtils.q3ei.callbackObj.sendKeyEvent(false, gameMouseButton, 0);
                 }
@@ -1023,6 +975,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                     }
                 }
                 Q3EUtils.q3ei.callbackObj.sendMotionEvent(deltaX, deltaY);
+                Q3EUtils.q3ei.callbackObj.sendMouseEvent(deltaX, deltaY);
                 break;
             case MotionEvent.ACTION_SCROLL:
                 // float scrollX = event.getAxisValue(MotionEvent.AXIS_HSCROLL);
@@ -1040,5 +993,23 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
                 break;
         }
         return true;
+    }
+
+    public boolean IsUsingMouse()
+    {
+        return m_usingMouse || m_usingMouseDevice;
+    }
+
+    public void ShowCursor(boolean on)
+    {
+        if(!m_usingMouse)
+            return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+        {
+            if(on)
+                setPointerIcon(null);
+            else
+                setPointerIcon(PointerIcon.getSystemIcon(getContext(), PointerIcon.TYPE_NULL));
+        }
     }
 }

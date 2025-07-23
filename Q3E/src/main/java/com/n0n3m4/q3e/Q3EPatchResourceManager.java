@@ -145,7 +145,7 @@ public class Q3EPatchResourceManager
                 Q3EGameConstants.GAME_XASH3D,
                 null,
                 "pak/xash3d/extras.pk3",
-                null
+                ""
         );
         resourceList.add(rsc);
 
@@ -156,7 +156,18 @@ public class Q3EPatchResourceManager
                 Q3EGameConstants.GAME_XASH3D,
                 null,
                 "pak/xash3d/cs16client-extras.pk3",
-                null
+                ""
+        );
+        resourceList.add(rsc);
+
+        rsc = new Q3EPatchResource_zipToDir(
+                Q3EGameConstants.PatchResource.SOURCE_ENGINE_EXTRAS,
+                Q3ELang.tr(context, R.string.sourceengine_extras),
+                Q3EGameConstants.SOURCE_ENGINE_VERSION,
+                Q3EGameConstants.GAME_SOURCE,
+                null,
+                "pak/source/extras.zip",
+                ""
         );
         resourceList.add(rsc);
     }
@@ -170,6 +181,6 @@ public class Q3EPatchResourceManager
                 return rsc.Fetch(context, overwrite, fsgame);
             }
         }
-        throw new RuntimeException("Unexcept patch resource type: " + type);
+        throw new RuntimeException("Unexpected patch resource type: " + type);
     }
 }

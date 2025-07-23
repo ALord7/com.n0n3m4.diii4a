@@ -1865,99 +1865,9 @@ public class Q3EKeyCodes
 
     ;
 
-    public static void InitRTCWKeycodes()
-    {
-        InitKeycodes(KeyCodesRTCW.class);
-    }
-
-    public static void InitRealRTCWKeycodes()
-    {
-        InitRTCWKeycodes();
-    }
-
-    public static void InitQ3Keycodes()
-    {
-        InitKeycodes(KeyCodesQ3.class);
-    }
-
-    public static void InitQ2Keycodes()
-    {
-        InitQ3Keycodes();
-    }
-
-    public static void InitETWKeycodes()
-    {
-        InitQ3Keycodes();
-    }
-
-    public static void InitFTEQWKeycodes()
-    {
-        InitQ3Keycodes();
-    }
-
     public static void InitD3Keycodes()
     {
         InitKeycodes(KeyCodesD3.class);
-    }
-
-    public static void InitQ4Keycodes()
-    {
-        InitD3Keycodes();
-    }
-
-    public static void InitPreyKeycodes()
-    {
-        InitD3Keycodes();
-    }
-
-    public static void InitTDMKeycodes()
-    {
-        InitD3Keycodes();
-    }
-
-    public static void InitD3BFGKeycodes()
-    {
-        InitKeycodes(KeyCodesD3BFG.class);
-    }
-
-    public static void InitQ1Keycodes()
-    {
-        InitKeycodes(KeyCodesQ1.class);
-    }
-
-    public static void InitSDLKeycodes()
-    {
-        InitKeycodes(KeyCodesSDL.class);
-    }
-
-    public static void InitAndroidKeycodes()
-    {
-        InitKeycodes(KeyCodesAndroid.class);
-    }
-
-    public static void InitGZDOOMKeycodes()
-    {
-        InitSDLKeycodes();
-    }
-
-    public static void InitSamTFEKeycodes()
-    {
-        InitSDLKeycodes();
-    }
-
-    public static void InitSamTSEKeycodes()
-    {
-        InitSDLKeycodes();
-    }
-
-    public static void InitJKKeycodes()
-    {
-        InitKeycodes(KeyCodesJK.class);
-    }
-
-    public static void InitXash3DKeycodes()
-    {
-        InitKeycodes(KeyCodesAndroid.class);
     }
 
     public static void InitKeycodes(Class<?> clazz)
@@ -2020,7 +1930,7 @@ public class Q3EKeyCodes
     }
 
 
-    public static int convertKeyCode(int keyCode, KeyEvent event)
+    public static int convertKeyCode(int keyCode, int uchar)
     {
         switch(keyCode)
         {
@@ -2139,7 +2049,7 @@ public class Q3EKeyCodes
         if(KeyCodes.RAW)
             return keyCode;
 
-        int uchar = event.getUnicodeChar(0);
+        //int uchar = event.getUnicodeChar(0);
         if((uchar < 127) && (uchar != 0))
             return uchar;
         return keyCode % 95 + 32;//Magic

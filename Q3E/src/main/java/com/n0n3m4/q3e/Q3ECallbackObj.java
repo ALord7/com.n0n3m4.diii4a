@@ -22,8 +22,11 @@ package com.n0n3m4.q3e;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.util.Log;
+import android.view.PointerIcon;
 import android.view.View;
+import android.widget.Toast;
 
 import com.n0n3m4.q3e.karin.KBacktraceHandler;
 
@@ -242,6 +245,11 @@ public class Q3ECallbackObj
         eventEngine.SendMotionEvent(deltax, deltay);
     }
 
+    public void sendMouseEvent(final float x, final float y)
+    {
+        eventEngine.SendMouseEvent(x, y);
+    }
+
     public void sendAnalogDelayed(final boolean down, final float x, final float y, View view, final int delay)
     {
         view.postDelayed(new Runnable() {
@@ -316,14 +324,13 @@ public class Q3ECallbackObj
 
     public void ToggleToolbar(boolean on)
     {
-        vw.ToggleToolbar(on);
+        Q3E.activity.GetKeyboard().ToggleToolbar(on);
     }
 
 
     public void OpenURL(String url)
     {
-        vw.post(new Runnable()
-        {
+        vw.post(new Runnable() {
             @Override
             public void run()
             {
@@ -377,6 +384,16 @@ public class Q3ECallbackObj
     public void SetMouseCursorPosition(int x, int y)
     {
         gui.SetMouseCursorPosition(x, y);
+    }
+
+    public void ShowCursor(boolean on)
+    {
+        vw.post(new Runnable() {
+            @Override
+            public void run() {
+                vw.ShowCursor(on);
+            }
+        });
     }
 }
 

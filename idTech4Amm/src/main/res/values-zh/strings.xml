@@ -93,6 +93,8 @@
     <string name="samtse">英雄萨姆TSE</string>
     <string name="xash3d">Xash3D</string>
     <string name="xash3d_base">Xash3D</string>
+    <string name="sourceengine">起源引擎</string>
+    <string name="sourceengine_base">起源引擎</string>
     <string name="tdm">Dark mod</string>
     <string name="doom">毁灭战士</string>
     <string name="prey_2006">掠食(2006)</string>
@@ -494,4 +496,15 @@
     <string name="portrait_orientation_screen">使用竖屏方向运行</string>
     <string name="renderer_ref">渲染器(ref)</string>
     <string name="server_client_sv_cl">服务器/客户端(sv_cl)</string>
+    <string name="halflife_2_base">半衰期2</string>
+    <string name="css_base">反恐精英: 起源</string>
+    <string name="portal_base">传送门</string>
+    <string name="dod_base">胜利之日: 起源</string>
+    <string name="halflife_2_ep1_base">半衰期2: 第1章</string>
+    <string name="halflife_2_ep2_base">半衰期2: 第2章</string>
+    <string name="halflife_2_mp_base">半衰期2: 死亡竞赛</string>
+    <string name="halflife_1_source_base">半衰期1: 起源</string>
+    <string name="halflife_1_mp_source_base">半衰期1-死亡竞赛: 起源</string>
+    <string name="use_builtin_virtual_keyboard">使用内置软键盘</string>
+    <string name="use_builtin_virtual_keyboard_instead_of_system_virtual_keyboard">使用内置软键盘代替系统输入法键盘</string>
 </resources>
