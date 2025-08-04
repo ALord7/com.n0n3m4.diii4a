@@ -502,6 +502,11 @@ public class Q3EInterface
 		return isDOOM;
 	}
 
+	public boolean IsUsingSDL()
+	{
+		return isXash3D || isSource;
+	}
+
 	public String GetGameCommandParm()
 	{
 		return Q3EGame.Find(game_id).MOD_PARM;
@@ -639,6 +644,11 @@ public class Q3EInterface
 	public static boolean IsStandaloneGame(String game)
 	{
 		return Q3EGame.Find(game).STANDALONE;
+	}
+
+	public boolean IsSupportExternalDLL()
+	{
+		return IsIdTech4() || isXash3D;
 	}
 
 	public static boolean IsSupportSecondaryDirGame(String game)

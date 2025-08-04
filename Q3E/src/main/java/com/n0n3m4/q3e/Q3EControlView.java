@@ -101,6 +101,13 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     private int m_pressBackCount = 0;
     private boolean m_portrait = false;
 
+    // controller
+    private final boolean[] directionPressed = { false, false, false, false }; // up down left right
+    private boolean dpadAsArrowKey = false;
+    private float leftJoystickDeadRange = 0.01f;
+    private float rightJoystickDeadRange = 0.0f;
+    private float rightJoystickSensitivity = 1.0f;
+
 
     //RTCW4A-specific
     /*
@@ -111,7 +118,6 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
 
     //MOUSE
     private long oldtime = 0;
-    private long delta = 0;
 
 
     // other controls function
@@ -150,7 +156,25 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
         setFocusable(true);
         setFocusableInTouchMode(true);
 
-        boolean usingMouse = PreferenceManager.getDefaultSharedPreferences(context).getBoolean(Q3EPreference.pref_harm_using_mouse, false);
+        SharedPreferences mPrefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
+
+        hideonscr = mPrefs.getBoolean(Q3EPreference.pref_hideonscr, false);
+        mapvol = mPrefs.getBoolean(Q3EPreference.pref_mapvol, false);
+        m_mapBack = mPrefs.getInt(Q3EPreference.pref_harm_mapBack, Q3EGlobals.ENUM_BACK_ALL); //k
+        m_portrait = mPrefs.getBoolean(Q3EPreference.pref_harm_portrait, false); //k
+        // controller
+        dpadAsArrowKey = mPrefs.getBoolean(Q3EPreference.pref_harm_dpad_as_arrow_key, false);
+        leftJoystickDeadRange = Q3EPreference.GetFloatFromString(mPrefs, Q3EPreference.pref_harm_left_joystick_deadzone, 0.01f);
+        rightJoystickDeadRange = Q3EPreference.GetFloatFromString(mPrefs, Q3EPreference.pref_harm_right_joystick_deadzone, 0.0f);
+        rightJoystickSensitivity = Q3EPreference.GetFloatFromString(mPrefs, Q3EPreference.pref_harm_right_joystick_sensitivity, 1.0f);
+
+        boolean usingMouse = mPrefs.getBoolean(Q3EPreference.pref_harm_using_mouse, false);
+
+        KLog.I("Controller DPad as arrow keys: " + dpadAsArrowKey);
+        KLog.I("Controller left joystick dead zone: " + leftJoystickDeadRange);
+        KLog.I("Controller right joystick dead zone: " + rightJoystickDeadRange);
+        KLog.I("Controller right joystick sensitivity: " + rightJoystickSensitivity);
+
         if(usingMouse)
         {
             int mouse = Q3EUtils.SupportMouse();
@@ -164,11 +188,12 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     public void onDrawFrame(GL10 gl)
     {
         long t = System.currentTimeMillis();
-        delta = t - oldtime;
+        float delta = t - oldtime;
         oldtime = t;
         if (delta > 1000)
             delta = 1000;
 
+        delta *= rightJoystickSensitivity;
         if ((last_joystick_x != 0) || (last_joystick_y != 0))
             Q3EUtils.q3ei.callbackObj.sendMotionEvent(delta * last_joystick_x, delta * last_joystick_y);
 
@@ -222,12 +247,6 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
         if (!mInit)
         {
             KLog.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Control view: %d x %d", w, h);
-            SharedPreferences mPrefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
-
-            hideonscr = mPrefs.getBoolean(Q3EPreference.pref_hideonscr, false);
-            mapvol = mPrefs.getBoolean(Q3EPreference.pref_mapvol, false);
-            m_mapBack = mPrefs.getInt(Q3EPreference.pref_harm_mapBack, Q3EGlobals.ENUM_BACK_ALL); //k
-            m_portrait = mPrefs.getBoolean(Q3EPreference.pref_harm_portrait, false); //k
 
             if(m_usingMouseDevice)
                 m_mouseDevice = new Q3EMouseDevice(this);
@@ -256,6 +275,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             //must be last
             //touch_elements.add(new MouseControl(this, false));
             touch_elements.add(new MouseControl(this));
+            SharedPreferences mPrefs = PreferenceManager.getDefaultSharedPreferences(this.getContext());
             if(mPrefs.getBoolean(Q3EPreference.pref_2fingerlmb, false))
                 touch_elements.add(new MouseButton(this));
             //touch_elements.add(new MouseControl(this, false));
@@ -408,19 +428,98 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
         return true;
     }
 
-    private static float getCenteredAxis(MotionEvent event, int axis)
+    private static float getCenteredAxis(MotionEvent event, InputDevice device, int axis)
     {
-        final InputDevice.MotionRange range = event.getDevice().getMotionRange(axis, event.getSource());
-        if (range != null)
-        {
+        final InputDevice.MotionRange range = device.getMotionRange(axis, event.getSource());
+
+        // A joystick at rest does not always report an absolute position of
+        // (0,0). Use the getFlat() method to determine the range of values
+        // bounding the joystick axis center.
+        if (range != null) {
             final float flat = range.getFlat();
             final float value = event.getAxisValue(axis);
-            if (Math.abs(value) > flat)
-            {
+
+            // Ignore axis values that are within the 'flat' region of the
+            // joystick axis center.
+            if (Math.abs(value) > flat) {
                 return value;
             }
         }
         return 0;
+    }
+
+    private static float getCenteredAxis(MotionEvent event, InputDevice device, int axis, int historyPos) {
+        final InputDevice.MotionRange range = device.getMotionRange(axis, event.getSource());
+
+        // A joystick at rest does not always report an absolute position of
+        // (0,0). Use the getFlat() method to determine the range of values
+        // bounding the joystick axis center.
+        if (range != null) {
+            final float flat = range.getFlat();
+            final float value = historyPos < 0 ? event.getAxisValue(axis): event.getHistoricalAxisValue(axis, historyPos);
+
+            // Ignore axis values that are within the 'flat' region of the
+            // joystick axis center.
+            if (Math.abs(value) > flat) {
+                return value;
+            }
+        }
+        return 0;
+    }
+
+    private void HandleDPadMotionEvent(MotionEvent event)
+    {
+        float xaxis = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+        float yaxis = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+
+        // Check if the AXIS_HAT_X value is -1 or 1, and set the D-pad
+        // LEFT and RIGHT direction accordingly.
+        boolean leftPressed = Float.compare(xaxis, -1.0f) == 0;
+        boolean rightPressed = Float.compare(xaxis, 1.0f) == 0;
+        // Check if the AXIS_HAT_Y value is -1 or 1, and set the D-pad
+        // UP and DOWN direction accordingly.
+        boolean upPressed = Float.compare(yaxis, -1.0f) == 0;
+        boolean downPressed = Float.compare(yaxis, 1.0f) == 0;
+
+        if(leftPressed != directionPressed[2])
+        {
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(leftPressed, Q3EKeyCodes.KeyCodes.K_LEFTARROW, 0);
+            directionPressed[2] = leftPressed;
+        }
+        if(rightPressed != directionPressed[3])
+        {
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(rightPressed, Q3EKeyCodes.KeyCodes.K_RIGHTARROW, 0);
+            directionPressed[3] = rightPressed;
+        }
+        if(upPressed != directionPressed[0])
+        {
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(upPressed, Q3EKeyCodes.KeyCodes.K_UPARROW, 0);
+            directionPressed[0] = upPressed;
+        }
+        if(downPressed != directionPressed[1])
+        {
+            Q3EUtils.q3ei.callbackObj.sendKeyEvent(downPressed, Q3EKeyCodes.KeyCodes.K_DOWNARROW, 0);
+            directionPressed[1] = downPressed;
+        }
+    }
+
+    private void HandleJoyStickMotionEvent(MotionEvent event, InputDevice inputDevice/*, int historyPos*/) {
+        float x = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_X/*, historyPos*/);
+        float y = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_Y/*, historyPos*/);
+
+        if(dpadAsArrowKey || !Q3EUtils.q3ei.callbackObj.notinmenu)
+        {
+            HandleDPadMotionEvent(event);
+        }
+        else
+        {
+            if(x == 0.0f)
+                x = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_HAT_X/*, historyPos*/);
+            if(y == 0.0f)
+                y = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_HAT_Y/*, historyPos*/);
+        }
+
+        Q3EUtils.q3ei.callbackObj.sendAnalog((Math.abs(x) > leftJoystickDeadRange) || (Math.abs(y) > leftJoystickDeadRange), x, -y);
     }
 
     @Override
@@ -428,17 +527,51 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
     {
         int action = event.getAction();
         int source = event.getSource();
-        if (((source == InputDevice.SOURCE_JOYSTICK) || (source == InputDevice.SOURCE_GAMEPAD)) && (action == MotionEvent.ACTION_MOVE))
+
+        if (action == MotionEvent.ACTION_MOVE)
         {
-            float x = getCenteredAxis(event, MotionEvent.AXIS_X);
-            float y = -getCenteredAxis(event, MotionEvent.AXIS_Y);
-            Q3EUtils.q3ei.callbackObj.sendAnalog(((Math.abs(x) > 0.01) || (Math.abs(y) > 0.01)), x, y);
-            x = getCenteredAxis(event, MotionEvent.AXIS_Z);
-            y = getCenteredAxis(event, MotionEvent.AXIS_RZ);
-            last_joystick_x = x;
-            last_joystick_y = y;
-            return true;
+            InputDevice inputDevice = event.getDevice();
+            if (((source == InputDevice.SOURCE_JOYSTICK) || (source == InputDevice.SOURCE_GAMEPAD)) && (action == MotionEvent.ACTION_MOVE));
+            if ((source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK)
+            {
+                // left as movement event
+                // Process all historical movement samples in the batch
+//                final int historySize = event.getHistorySize();
+
+                // Process the movements starting from the
+                // earliest historical position in the batch
+//                for (int i = 0; i < historySize; i++) {
+//                    // Process the event at historical position i
+//                    HandleJoyStickMotionEvent(event, inputDevice, i);
+//                }
+
+                // Process the current movement sample in the batch (position -1)
+                HandleJoyStickMotionEvent(event, inputDevice/*, -1*/);
+
+                // right as view event
+                float x = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_Z);
+                float y = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_RZ);
+
+                if((Math.abs(x) < rightJoystickDeadRange))
+                    x = 0.0f;
+                if((Math.abs(y) < rightJoystickDeadRange))
+                    y = 0.0f;
+                
+                last_joystick_x = x;
+                last_joystick_y = y;
+
+                return true;
+            }
+            else if ((source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
+            {
+                if(dpadAsArrowKey || !Q3EUtils.q3ei.callbackObj.notinmenu)
+                {
+                    HandleDPadMotionEvent(event);
+                    return true;
+                }
+            }
         }
+
         if(m_usingMouse && source == InputDevice.SOURCE_MOUSE)
         {
             int actionIndex = event.getActionIndex();
@@ -819,7 +952,7 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
 
     private int ConvMouseButton(MotionEvent event)
     {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
         {
             int actionButton = event.getActionButton();
             switch (actionButton)
@@ -1011,5 +1144,18 @@ public class Q3EControlView extends GLSurfaceView implements GLSurfaceView.Rende
             else
                 setPointerIcon(PointerIcon.getSystemIcon(getContext(), PointerIcon.TYPE_NULL));
         }
+    }
+
+    private boolean IsGamePadDevice(int deviceId) {
+        InputDevice device = InputDevice.getDevice(deviceId);
+        if ((device == null) || (deviceId < 0)) {
+            return false;
+        }
+        int sources = device.getSources();
+
+        return ((sources & InputDevice.SOURCE_CLASS_JOYSTICK) != 0 ||
+                ((sources & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD) ||
+                ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
+        );
     }
 }

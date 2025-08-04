@@ -20,16 +20,17 @@
 package com.n0n3m4.q3e;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.util.Log;
-import android.view.PointerIcon;
 import android.view.View;
-import android.widget.Toast;
 
 import com.n0n3m4.q3e.karin.KBacktraceHandler;
+import com.n0n3m4.q3e.karin.KStr;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
@@ -394,6 +395,33 @@ public class Q3ECallbackObj
                 vw.ShowCursor(on);
             }
         });
+    }
+
+    public String CopyDLLToCache(String dllPath, String name)
+    {
+        return Q3E.CopyDLLToCache(dllPath, Q3EUtils.q3ei.game, name);
+    }
+
+    public boolean RequestPermission(String permission, int requestCode)
+    {
+        synchronized(Q3E.activity.permissionRequest) {
+            try
+            {
+                Q3E.activity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        Q3E.activity.RequestPermission(permission, requestCode);
+                    }
+                });
+                Q3E.activity.permissionRequest.wait();
+            }
+            catch(Exception e)
+            {
+                e.printStackTrace();
+            }
+        }
+        return Q3E.activity.permissionRequest.IsGranted();
     }
 }
 

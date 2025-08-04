@@ -64,6 +64,7 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.karin.idTech4Amm.ControllerConfigActivity;
 import com.karin.idTech4Amm.OnScreenButtonConfigActivity;
 import com.karin.idTech4Amm.R;
 import com.karin.idTech4Amm.lib.ContextUtility;
@@ -793,6 +794,17 @@ public class GameLauncher extends Activity
 						RemoveParam("sv_cl");
 				}
 			}
+
+			// SDL
+			else if (rgId == R.id.sdl_audio_driver)
+			{
+				index = GetRadioGroupSelectIndex(radioGroup, id);
+				if(index < 0 || index >= Q3EGameConstants.SDL_AUDIO_DRIVER.length)
+					index = 0;
+				PreferenceManager.getDefaultSharedPreferences(GameLauncher.this).edit()
+						.putString(Q3EPreference.pref_harm_sdl_audio_driver, Q3EGameConstants.SDL_AUDIO_DRIVER[index])
+						.commit();
+			}
         }
     };
     private final View.OnClickListener m_buttonClickListener = new View.OnClickListener() {
@@ -859,6 +871,10 @@ public class GameLauncher extends Activity
 			else if (id == R.id.launcher_tab1_open_menu)
 			{
 				OpenMenu();
+			}
+			else if (id == R.id.setup_controller)
+			{
+				OpenControllerSetting();
 			}
         }
     };
@@ -1972,6 +1988,10 @@ public class GameLauncher extends Activity
 		V.launcher_tab1_game_data_chooser_button.setOnClickListener(m_buttonClickListener);
 		V.onscreen_button_setting.setOnClickListener(m_buttonClickListener);
 		V.setup_onscreen_button_theme.setOnClickListener(m_buttonClickListener);
+		V.setup_controller.setOnClickListener(m_buttonClickListener);
+
+		// SDL
+		SetupUI_SDL();
 
 		// Quake2
 		SetupUI_Quake2();
@@ -2147,6 +2167,20 @@ public class GameLauncher extends Activity
 
 			public void afterTextChanged(Editable s) { }
 		});
+	}
+
+	private void SetupUI_SDL()
+	{
+		String str = PreferenceManager.getDefaultSharedPreferences(this).getString(Q3EPreference.pref_harm_sdl_audio_driver, Q3EGameConstants.SDL_AUDIO_DRIVER[0]);
+		int index = 0;
+		if(null != str)
+		{
+			index = Utility.ArrayIndexOf(Q3EGameConstants.SDL_AUDIO_DRIVER, str);
+			if(index < 0)
+				index = 0;
+		}
+		SelectRadioGroup(V.sdl_audio_driver, index);
+		V.sdl_audio_driver.setOnCheckedChangeListener(m_groupCheckChangeListener);
 	}
 
 	private void SetupUI_Quake2()
@@ -3831,10 +3865,18 @@ public class GameLauncher extends Activity
 		V.fteqw_section.setVisibility(Q3EUtils.q3ei.isFTEQW ? View.VISIBLE : View.GONE);
 		V.xash3d_section.setVisibility(Q3EUtils.q3ei.isXash3D ? View.VISIBLE : View.GONE);
 		V.source_section.setVisibility(Q3EUtils.q3ei.isSource ? View.VISIBLE : View.GONE);
+		V.sdl_section.setVisibility(Q3EUtils.q3ei.IsUsingSDL() ? View.VISIBLE : View.GONE);
 
 		V.opengl_section.setVisibility(openglVisible ? View.VISIBLE : View.GONE);
 		V.auto_quick_load.setVisibility(quickloadVisible ? View.VISIBLE : View.GONE);
 		V.skip_intro.setVisibility(skipintroVisible ? View.VISIBLE : View.GONE);
+		V.dll_section.setVisibility(Q3EUtils.q3ei.IsSupportExternalDLL() ? View.VISIBLE : View.GONE);
+		if(Q3EUtils.q3ei.IsIdTech4())
+			V.find_dll_desc.setText(R.string.using_external_game_library);
+		else if(Q3EUtils.q3ei.isXash3D)
+			V.find_dll_desc.setText(R.string.using_external_game_library_xash3d);
+		else
+			V.find_dll_desc.setText("");
 
 		String subdir = Q3EUtils.q3ei.subdatadir;
 		if(null == subdir)
@@ -4191,6 +4233,12 @@ public class GameLauncher extends Activity
     {
         new SetupControlsThemeFunc(this).Start(new Bundle());
     }
+
+	private void OpenControllerSetting()
+	{
+		Intent intent = new Intent(this, ControllerConfigActivity.class);
+		startActivity(intent);
+	}
 
     private String GetExternalGameLibraryPath()
     {
@@ -4723,10 +4771,12 @@ public class GameLauncher extends Activity
         public RadioGroup rg_s_driver;
         public CheckBox launcher_tab2_joystick_unfixed;
         public Button setup_onscreen_button_theme;
+		public Button setup_controller;
         public CheckBox using_mouse;
         public TextView tv_mprefs;
         public LinearLayout layout_mouse_device;
         public CheckBox find_dll;
+		public TextView find_dll_desc;
 		public EditText edt_harm_r_maxFps;
 		public Button launcher_tab1_edit_cvar;
 		public Button launcher_tab1_patch_resource;
@@ -4838,6 +4888,8 @@ public class GameLauncher extends Activity
 		public RadioGroup xash3d_sv_cl;
 		public LinearLayout source_section;
 		public RadioGroup source_sv_cl;
+		public LinearLayout sdl_section;
+		public RadioGroup sdl_audio_driver;
 
 		private RadioGroup CreateGameRadioGroup()
 		{
@@ -4936,10 +4988,12 @@ public class GameLauncher extends Activity
             rg_s_driver = findViewById(R.id.rg_s_driver);
             launcher_tab2_joystick_unfixed = findViewById(R.id.launcher_tab2_joystick_unfixed);
             setup_onscreen_button_theme = findViewById(R.id.setup_onscreen_button_theme);
+			setup_controller = findViewById(R.id.setup_controller);
             using_mouse = findViewById(R.id.using_mouse);
             tv_mprefs = findViewById(R.id.tv_mprefs);
             layout_mouse_device = findViewById(R.id.layout_mouse_device);
             find_dll = findViewById(R.id.find_dll);
+			find_dll_desc = findViewById(R.id.find_dll_desc);
 			edt_harm_r_maxFps = findViewById(R.id.edt_harm_r_maxFps);
 			launcher_tab1_edit_cvar = findViewById(R.id.launcher_tab1_edit_cvar);
 			launcher_tab1_patch_resource = findViewById(R.id.launcher_tab1_patch_resource);
@@ -5035,6 +5089,8 @@ public class GameLauncher extends Activity
 			xash3d_sv_cl = findViewById(R.id.xash3d_sv_cl);
 			source_section = findViewById(R.id.source_section);
 			source_sv_cl = findViewById(R.id.source_sv_cl);
+			sdl_section = findViewById(R.id.sdl_section);
+			sdl_audio_driver = findViewById(R.id.sdl_audio_driver);
         }
     }
 }

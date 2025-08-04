@@ -35,12 +35,18 @@ import android.widget.Toast;
 import com.n0n3m4.q3e.karin.KLog;
 import com.n0n3m4.q3e.karin.KStr;
 import com.n0n3m4.q3e.karin.KidTech4Command;
+import com.n0n3m4.q3e.karin.KidTechCommand;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -72,6 +78,24 @@ public class Q3EGameHelper
         Toast.makeText(m_context, resId, Toast.LENGTH_LONG).show();
     }
 
+    private void LoadControllerKeymap()
+    {
+        Integer code;
+        String fieldName;
+
+        Map<String, Integer> codeMap = Q3EKeyCodes.LoadGamePadButtonCodeMap(m_context);
+        for (String button : Q3EKeyCodes.CONTROLLER_BUTTONS) {
+            code = codeMap.get(button); // code = generic
+            fieldName = Q3EKeyCodes.GetDefaultGamePadButtonFieldName(button);
+            if(null == code)
+            {
+                code = Q3EKeyCodes.GetDefaultGamePadButtonCode(button); // code = generic
+            }
+            code = Q3EKeyCodes.GetRealKeyCode(code); // code = game
+            Q3EKeyCodes.SetKeycodeByName(fieldName, code);
+        }
+    }
+
     public boolean checkGameFiles()
     {
         String dataDir = Q3EUtils.q3ei.GetGameDataDirectoryPath(null);
@@ -82,6 +106,25 @@ public class Q3EGameHelper
         }
 
         return true;
+    }
+
+    private int GetSDLAudioDriverID(String sdlAudioDriverName)
+    {
+        if(KStr.IsEmpty(sdlAudioDriverName))
+            return 0;
+        int res = Q3EUtils.ArrayIndexOf(Q3EGameConstants.SDL_AUDIO_DRIVER, sdlAudioDriverName, false);
+        if(res < 0)
+            return 0;
+        boolean supportAAudio = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+        switch (res)
+        {
+            case 1:
+                return 1;
+            case 2:
+                return supportAAudio ? 2 : 0;
+            default:
+                return supportAAudio ? 2 : 1;
+        }
     }
 
     public void InitGlobalEnv(String gameTypeName, String gameCommand)
@@ -166,67 +209,135 @@ public class Q3EGameHelper
 
         if(!useUserCommand)
         {
-            if(preferences.getBoolean(Q3EPreference.pref_harm_find_dll, false)
-                    && Q3EUtils.q3ei.IsIdTech4()
-            )
+            if(preferences.getBoolean(Q3EPreference.pref_harm_find_dll, false))
             {
-                KidTech4Command command = new KidTech4Command(cmd);
-                String fs_game = command.Prop(Q3EUtils.q3ei.GetGameCommandParm());
-                if(null == fs_game || fs_game.isEmpty())
+                if(Q3EUtils.q3ei.IsIdTech4())
                 {
-                    switch (Q3EUtils.q3ei.game)
+                    KidTechCommand command = Q3EUtils.q3ei.GetGameCommandEngine(cmd);
+                    String fs_game = command.Prop(Q3EUtils.q3ei.GetGameCommandParm());
+                    if(null == fs_game || fs_game.isEmpty())
                     {
-                        case Q3EGameConstants.GAME_PREY:
-                            fs_game = Q3EGameConstants.GAME_BASE_PREY;
-                            break;
-                        case Q3EGameConstants.GAME_QUAKE4:
-                            fs_game = Q3EGameConstants.GAME_BASE_QUAKE4;
-                            break;
-                        case Q3EGameConstants.GAME_DOOM3:
-                        default:
-                            fs_game = Q3EGameConstants.GAME_BASE_DOOM3;
-                            break;
+                        switch (Q3EUtils.q3ei.game)
+                        {
+                            case Q3EGameConstants.GAME_PREY:
+                                fs_game = Q3EGameConstants.GAME_BASE_PREY;
+                                break;
+                            case Q3EGameConstants.GAME_QUAKE4:
+                                fs_game = Q3EGameConstants.GAME_BASE_QUAKE4;
+                                break;
+                            case Q3EGameConstants.GAME_DOOM3:
+                            default:
+                                fs_game = Q3EGameConstants.GAME_BASE_DOOM3;
+                                break;
+                        }
                     }
+                    CleanDLLCachePath(Q3EUtils.q3ei.game);
+                    String dll = FindDLL_idTech4(fs_game);
+                    if(null != dll)
+                        command.SetProp("harm_fs_gameLibPath", dll);
+                    cmd = command.toString();
                 }
-                String dll = FindDLL(fs_game);
-                if(null != dll)
-                    command.SetProp("harm_fs_gameLibPath", dll);
-                cmd = command.toString();
+                else if(Q3EUtils.q3ei.isXash3D)
+                {
+                    KidTechCommand command = Q3EUtils.q3ei.GetGameCommandEngine(cmd);
+                    String fs_game = command.Param(Q3EUtils.q3ei.GetGameCommandParm());
+                    if(null == fs_game || fs_game.isEmpty())
+                    {
+                        fs_game = Q3EGameConstants.GAME_BASE_XASH3D;
+                    }
+                    String dll;
+                    Set<String> dlls = new HashSet<>();
+                    boolean loaded = false;
+
+                    CleanDLLCachePath(Q3EUtils.q3ei.game);
+
+                    dll = FindDLL_Xash3D(fs_game, "client", command.Param("clientlib"), dlls);
+                    if(null != dll)
+                    {
+                        loaded = true;
+                        command.SetParam("clientlib", dll);
+                    }
+
+                    dll = FindDLL_Xash3D(fs_game, "menu", command.Param("menulib"), dlls);
+                    if(null != dll)
+                    {
+                        loaded = true;
+                        command.SetParam("menulib", dll);
+                    }
+
+                    dll = FindDLL_Xash3D(fs_game, "server", command.Param("dll"), dlls);
+                    if(null != dll)
+                    {
+                        loaded = true;
+                        command.SetParam("dll", dll);
+                    }
+
+                    dll = FindDLL_Xash3D(fs_game, "OTHER", null, dlls);
+
+                    if(loaded)
+                        command.SetParam("gamelibdir", dll);
+
+                    cmd = command.toString();
+                }
             }
+
             cmd += " " + Q3EUtils.q3ei.start_temporary_extra_command/* + " +set harm_fs_gameLibDir " + lib_dir*/;
         }
 
         String binDir = Q3EUtils.q3ei.GetGameDataDirectoryPath(null);
         cmd = binDir + "/" + cmd;
         Q3EUtils.q3ei.cmd = cmd;
+
+        // load controller button keymap
+        LoadControllerKeymap();
     }
 
-    private String FindDLL(String fs_game)
+    private String FindDLL_idTech4(String fs_game)
     {
         String DLLPath = Q3EUtils.q3ei.GetGameDataDirectoryPath(fs_game); // /sdcard/diii4a/<fs_game>
+        KLog.I("Find idTech4 dll in " + DLLPath + "......");
         String Suffix = "game" + Q3EGlobals.ARCH + ".so"; // gameaarch64.so(64) / gamearm.so(32)
-        String[] guess = {
-                Suffix,
-                "lib" + Suffix,
-        };
-        String res = null;
-        String targetDir = m_context.getCacheDir() + File.separator; // /data/user/<package_name>/cache/
-        for (String f : guess)
+        String p = KStr.AppendPath(DLLPath, Suffix);
+        return Q3E.CopyDLLToCache(p, Q3EUtils.q3ei.game, Suffix);
+    }
+
+    public void CleanDLLCachePath(String dir)
+    {
+        String path = Q3E.GetDLLCachePath(dir);
+        KLog.I("Clean external library cache directory: " + path);
+        Q3EUtils.rmdir_r(path);
+    }
+
+    private String FindDLL_Xash3D(String fs_game, String type, String name, Collection<String> dlls)
+    {
+        String DLLPath = Q3EUtils.q3ei.GetGameDataDirectoryPath(fs_game);
+        DLLPath = KStr.AppendPath(DLLPath, "lib", Q3EGlobals.ARCH_DIR); // /sdcard/diii4a/<fs_game>/lib/<arm64/arm>/
+        KLog.I("Find Xash3D dll " + type + " in " + DLLPath + "......");
+        String libname;
+        String res;
+        switch(type)
         {
-            String p = KStr.AppendPath(DLLPath, f);
-            File file = new File(p);
-            if(!file.isFile() || !file.canRead())
-                continue;
-            Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Found user game library file: " + p);
-            String cacheFile = targetDir + Suffix;
-            long r = Q3EUtils.cp(p, cacheFile);
-            if(r > 0)
-            {
-                Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Load user game library: " + cacheFile);
-                res = cacheFile;
-            }
-            else
-                Log.e(Q3EGlobals.CONST_Q3E_LOG_TAG, "Upload user game library fail: " + cacheFile);
+            case "client":
+                libname = KStr.NotEmpty(name) ? name : "client.so";
+                res = Q3E.CopyDLLToCache(DLLPath, libname, Q3EUtils.q3ei.game, null);
+                if(null != res)
+                    dlls.add(KStr.Filename(res));
+                break;
+            case "server":
+                libname = KStr.NotEmpty(name) ? name : "server.so";
+                res = Q3E.CopyDLLToCache(DLLPath, libname, Q3EUtils.q3ei.game, null);
+                if(null != res)
+                    dlls.add(KStr.Filename(res));
+                break;
+            case "menu":
+                libname = KStr.NotEmpty(name) ? name : "menu.so";
+                res = Q3E.CopyDLLToCache(DLLPath, libname, Q3EUtils.q3ei.game, null);
+                if(null != res)
+                    dlls.add(KStr.Filename(res));
+                break;
+            default:
+                res = Q3E.CopyDLLsToCache(DLLPath, Q3EUtils.q3ei.game, dlls.toArray(new String[0]));
+                break;
         }
         return res;
     }
@@ -906,20 +1017,7 @@ public class Q3EGameHelper
         // clean old libraries
         Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Clean external libraries: " + targetPath);
         File dir = new File(targetPath);
-        if(dir.isDirectory())
-        {
-            File[] files = dir.listFiles();
-            if(null != files && files.length > 0)
-            {
-                for(File f : files)
-                {
-                    if(!f.isFile() || !f.canRead())
-                        continue;
-                    Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Delete external library: " + f.getAbsolutePath());
-                    f.delete();
-                }
-            }
-        }
+        Q3EUtils.rmdir_r(dir);
 
         String arch = GetArchName();
         String localPath = Q3EUtils.GetDataPath(File.separator + "lib" + File.separator + arch);
@@ -990,25 +1088,16 @@ public class Q3EGameHelper
         if(preferences.getBoolean(Q3EPreference.LOAD_LOCAL_ENGINE_LIB, false))
         {
             String localLibPath = Q3EUtils.q3ei.GetGameDataDirectoryPath(libname);
-            File file = new File(localLibPath);
-            if(!file.isFile() || !file.canRead())
+            KLog.I("Find local engine library at " + localLibPath + "......");
+            String cacheFile = Q3E.CopyDLLToCache(localLibPath, "lib", null);
+            if(null != cacheFile)
             {
-                Log.w(Q3EGlobals.CONST_Q3E_LOG_TAG, "Local engine library not file or unreadable: " + localLibPath);
+                libPath = cacheFile;
+                Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Load local engine library: " + cacheFile);
             }
             else
             {
-                String cacheFile = m_context.getCacheDir() + File.separator + /*Q3EUtils.q3ei.*/libname;
-                Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Found local engine library file: " + localLibPath);
-                long r = Q3EUtils.cp(localLibPath, cacheFile);
-                if(r > 0)
-                {
-                    libPath = cacheFile;
-                    Log.i(Q3EGlobals.CONST_Q3E_LOG_TAG, "Load local engine library: " + cacheFile);
-                }
-                else
-                {
-                    Log.e(Q3EGlobals.CONST_Q3E_LOG_TAG, "Upload local engine library fail: " + cacheFile);
-                }
+                Log.e(Q3EGlobals.CONST_Q3E_LOG_TAG, "Upload local engine library fail: " + cacheFile);
             }
         }
         else if(preferences.getBoolean(Q3EPreference.USE_EXTERNAL_LIB_PATH, false))
@@ -1047,6 +1136,7 @@ public class Q3EGameHelper
         boolean usingMouse = preferences.getBoolean(Q3EPreference.pref_harm_using_mouse, false) && Q3EUtils.SupportMouse() == Q3EGlobals.MOUSE_EVENT;
         boolean useExternalLibPath = preferences.getBoolean(Q3EPreference.USE_EXTERNAL_LIB_PATH, false);
         int consoleMaxHeightFrac = preferences.getInt(Q3EPreference.pref_harm_max_console_height_frac, 0);
+        int sdlAudioDriver = GetSDLAudioDriverID(preferences.getString(Q3EPreference.pref_harm_sdl_audio_driver, Q3EGameConstants.SDL_AUDIO_DRIVER[0]));
 
         String subdatadir = Q3EUtils.q3ei.subdatadir;
 
@@ -1110,6 +1200,7 @@ public class Q3EGameHelper
                 Q3EUtils.q3ei.joystick_smooth,
                 consoleMaxHeightFrac,
                 useExternalLibPath,
+                sdlAudioDriver,
                 runBackground > 0
         );
         if(res)

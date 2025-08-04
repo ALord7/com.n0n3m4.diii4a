@@ -86,6 +86,7 @@ static void open_url(const char *url);
 static int open_dialog(const char *title, const char *message, int num, const char *buttons[]);
 static void finish(void);
 static void show_cursor(int on);
+static char * copy_dll_to_cache(const char *dll_path, const char *file_name);
 
 // data
 static char *game_data_dir = NULL;
@@ -116,6 +117,7 @@ static jmethodID android_GrabMouse_method;
 static jmethodID android_SetupSmoothJoystick_method;
 static jmethodID android_CopyToClipboard_method;
 static jmethodID android_GetClipboardText_method;
+static jmethodID android_CopyDLLToCache_method;
 
 static jmethodID android_initAudio;
 static jmethodID android_writeAudio;
@@ -134,6 +136,7 @@ static jmethodID android_ShowCursor_method;
 #ifdef _Q3E_SDL
 static jmethodID android_SetCursorVisible_method;
 static jmethodID android_SetCursorPosition_method;
+static jmethodID android_RequestPermission_method;
 #endif
 
 #define ATTACH_JNI(env) \
@@ -280,7 +283,7 @@ void initAudio(void *buffer, int size)
 
 	ATTACH_JNI(env)
 
-	LOGI("Q3E AudioTrack init");
+	LOGI("Q3E AudioTrack initialization");
 #ifdef AUDIOTRACK_BYTEBUFFER
     tmp = (*env)->NewDirectByteBuffer(env, buffer, size);
 #else
@@ -444,10 +447,12 @@ JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_setCallbackObject(JNIEnv *env,
 	android_Finish_method = (*env)->GetMethodID(env, q3eCallbackClass, "Finish", "()V");
 	android_Backtrace_method = (*env)->GetMethodID(env, q3eCallbackClass, "Backtrace", "(IIII[Ljava/lang/String;)Z");
 	android_ShowCursor_method = (*env)->GetMethodID(env, q3eCallbackClass, "ShowCursor", "(Z)V");
+	android_CopyDLLToCache_method = (*env)->GetMethodID(env, q3eCallbackClass, "CopyDLLToCache", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
 
 #ifdef _Q3E_SDL
 	android_SetCursorVisible_method = (*env)->GetMethodID(env, q3eCallbackClass, "SetMouseCursorVisible", "(Z)V");
 	android_SetCursorPosition_method = (*env)->GetMethodID(env, q3eCallbackClass, "SetMouseCursorPosition", "(II)V");
+	android_RequestPermission_method = (*env)->GetMethodID(env, q3eCallbackClass, "RequestPermission", "(Ljava/lang/String;I)Z");
 #endif
 }
 
@@ -475,6 +480,7 @@ static void setup_Q3E_callback(void)
 	callback.Sys_openURL = &open_url;
 	callback.Sys_exitFinish = &finish;
 	callback.Sys_showCursor = &show_cursor;
+	//callback.Sys_cacheDLL = &copy_dll_to_cache;
 
 	callback.Gui_ShowToast = &show_toast;
 	callback.Gui_openDialog = &open_dialog;
@@ -484,7 +490,7 @@ static void setup_Q3E_callback(void)
 	setCallbacks(&callback);
 }
 
-JNIEXPORT jboolean JNICALL Java_com_n0n3m4_q3e_Q3EJNI_init(JNIEnv *env, jclass c, jstring LibPath, jstring nativeLibPath, jint width, jint height, jstring GameDir, jstring gameSubDir, jstring Cmdline, jobject view, jint format, jint depthBits, jint msaa, jint glVersion, jboolean redirectOutputToFile, jint signalsHandler, jboolean bMultithread, jboolean mouseAvailable, jint refreshRate, jstring appHome, jboolean smoothJoystick, jint consoleMaxHeightFrac, jboolean usingExternalLibs, jboolean bContinueNoGLContext)
+JNIEXPORT jboolean JNICALL Java_com_n0n3m4_q3e_Q3EJNI_init(JNIEnv *env, jclass c, jstring LibPath, jstring nativeLibPath, jint width, jint height, jstring GameDir, jstring gameSubDir, jstring Cmdline, jobject view, jint format, jint depthBits, jint msaa, jint glVersion, jboolean redirectOutputToFile, jint signalsHandler, jboolean bMultithread, jboolean mouseAvailable, jint refreshRate, jstring appHome, jboolean smoothJoystick, jint consoleMaxHeightFrac, jboolean usingExternalLibs, jint sdlAudioDriver, jboolean bContinueNoGLContext)
 {
     char **argv;
     int argc;
@@ -505,6 +511,7 @@ JNIEXPORT jboolean JNICALL Java_com_n0n3m4_q3e_Q3EJNI_init(JNIEnv *env, jclass c
 	}
 
     INIT_SDL();
+	EXEC_SDL(Q3E_SDL_SetAudioDriver, sdlAudioDriver);
 	EXEC_SDL(Q3E_SDL_SetWindowSize, width, height);
 
 	const char *dir = (*env)->GetStringUTFChars(env, GameDir, &iscopy);
@@ -924,6 +931,53 @@ void show_cursor(int on)
 	(*env)->CallVoidMethod(env, q3eCallbackObj, android_ShowCursor_method, on ? JNI_TRUE : JNI_FALSE);
 }
 
+char * copy_dll_to_cache(const char *dll_path, const char *file_name)
+{
+	ATTACH_JNI(env)
+
+	LOGI("Copy DLL: %s -> %s", dll_path, file_name);
+
+	const char *dll_path_str;
+	char cwd[1024] = { 0 };
+
+	if(dll_path[0] != '/')
+		dll_path_str = dll_path;
+	else
+	{
+		if(getcwd(cwd, sizeof(cwd)))
+		{
+			strcat(cwd, "/");
+			strcat(cwd, dll_path);
+			dll_path_str = cwd;
+		}
+		else
+			dll_path_str = dll_path;
+	}
+	jstring dllPath = (*env)->NewStringUTF(env, dll_path_str);
+	jstring dllPathRef = (*env)->NewWeakGlobalRef(env, dllPath);
+	(*env)->DeleteLocalRef(env, dllPath);
+
+	jstring fileNameRef = NULL;
+	if(file_name)
+	{
+		jstring fileName = (*env)->NewStringUTF(env, file_name);
+		fileNameRef = (*env)->NewWeakGlobalRef(env, fileName);
+		(*env)->DeleteLocalRef(env, fileName);
+	}
+
+	jstring str = (*env)->CallObjectMethod(env, q3eCallbackObj, android_CopyDLLToCache_method, dllPathRef, fileNameRef);
+
+	if(!str)
+		return NULL;
+
+	const char *nstr = (*env)->GetStringUTFChars(env, str, NULL);
+	char *res = NULL;
+	if(nstr)
+		res = strdup(nstr);
+	(*env)->ReleaseStringUTFChars(env, str, nstr);
+	return res;
+}
+
 #define TMPFILE_NAME "idtech4amm_harmattan_tmpfile_XXXXXX"
 FILE * android_tmpfile(void)
 {
@@ -1002,6 +1056,21 @@ static void set_mouse_cursor_position(int x, int y)
 
     //LOGI("Mouse cursor position: %d, %d", x, y);
     (*env)->CallVoidMethod(env, q3eCallbackObj, android_SetCursorPosition_method, x, y);
+}
+
+static int request_permission(const char *perm, int code)
+{
+	ATTACH_JNI(env)
+
+	if(!perm)
+		return Q3E_FALSE;
+
+	LOGI("Request permission: %s(%d)", perm, code);
+	jstring str = (*env)->NewStringUTF(env, perm);
+	jstring nstr = (*env)->NewWeakGlobalRef(env, str);
+	(*env)->DeleteLocalRef(env, str);
+	jboolean res = (*env)->CallBooleanMethod(env, q3eCallbackObj, android_RequestPermission_method, nstr, code);
+	return res ? Q3E_TRUE : Q3E_FALSE;
 }
 
 #include "q3esdl2.c"
