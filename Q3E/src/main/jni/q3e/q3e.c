@@ -643,6 +643,21 @@ JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_sendMouseEvent(JNIEnv *env, jc
     }
 }
 
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_sendTextEvent(JNIEnv *env, jclass c, jstring text)
+{
+	EXEC_SDL(Q3E_SDL_TextEvent, env, text);
+}
+
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_sendCharEvent(JNIEnv *env, jclass clazz, jint ch)
+{
+	EXEC_SDL(Q3E_SDL_CharEvent, ch);
+}
+
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_sendWheelEvent(JNIEnv *env, jclass clazz, jfloat x, jfloat y)
+{
+	EXEC_SDL(Q3E_SDL_WheelEvent, x, y);
+}
+
 JNIEXPORT jboolean JNICALL Java_com_n0n3m4_q3e_Q3EJNI_Is64(JNIEnv *env, jclass c)
 {    
     return sizeof(void *) == 8 ? JNI_TRUE : JNI_FALSE;
@@ -1030,6 +1045,21 @@ JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PushMouseEvent(JNIEnv *env, jc
     }
 }
 
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PushTextEvent(JNIEnv *env, jclass clazz, jstring text)
+{
+	EXEC_SDL(Q3E_SDL_TextEvent, env, text);
+}
+
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PushCharEvent(JNIEnv *env, jclass clazz, jint ch)
+{
+	EXEC_SDL(Q3E_SDL_CharEvent, ch);
+}
+
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PushWheelEvent(JNIEnv *env, jclass clazz, jfloat x, jfloat y)
+{
+	EXEC_SDL(Q3E_SDL_WheelEvent, x, y);
+}
+
 JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PushAnalogEvent(JNIEnv *env, jclass c, jint enable, jfloat x, jfloat y)
 {
     Q3E_PushAnalogEvent(enable, x, y);
@@ -1039,6 +1069,20 @@ JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_PreInit(JNIEnv *env, jclass cl
 {
 	usingNativeEventQueue = eventQueueType != EVENT_QUEUE_TYPE_JAVA;
 	usingNativeThread = gameThreadType != GAME_THREAD_TYPE_JAVA;
+}
+
+JNIEXPORT void JNICALL Java_com_n0n3m4_q3e_Q3EJNI_Setenv(
+		JNIEnv *env, jclass cls,
+		jstring name, jstring value)
+{
+	const char *utfname = (*env)->GetStringUTFChars(env, name, NULL);
+	const char *utfvalue = (*env)->GetStringUTFChars(env, value, NULL);
+
+	LOGI("setenv(%s, %s, 1)", utfname, utfvalue);
+	setenv(utfname, utfvalue, 1);
+
+	(*env)->ReleaseStringUTFChars(env, name, utfname);
+	(*env)->ReleaseStringUTFChars(env, value, utfvalue);
 }
 
 #ifdef _Q3E_SDL

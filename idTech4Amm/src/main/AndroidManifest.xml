@@ -1,8 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.karin.idTech4Amm"
-    android:versionCode="11067"
-    android:versionName="1.1.0harmattan67"
+    android:versionCode="11068"
+    android:versionName="1.1.0harmattan68"
     android:installLocation="auto"
     > <!--android:installLocation="preferExternal"-->
 
@@ -19,6 +19,8 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <!-- Touchscreen -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.landscape" android:required="false"/>
+    <uses-feature android:name="android.software.leanback" android:required="false" />
     <!-- Mouse -->
     <uses-feature android:name="android.hardware.type.pc" android:required="false" />
     <!-- Audio -->
@@ -69,6 +71,7 @@
         android:preserveLegacyExternalStorage="true"
         android:hasFragileUserData="true"
         android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
         tools:ignore="HardcodedDebugMode,UnusedAttribute">
         <activity            
             android:name="com.n0n3m4.DIII4A.GameLauncher"

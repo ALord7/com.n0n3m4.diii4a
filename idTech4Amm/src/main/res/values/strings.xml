@@ -40,8 +40,6 @@
     <string name="specular_exponent_in_interaction_light_model_default_is_4_0">Phong specular exponent</string>
     <string name="sound">Sound(s_driver)</string>
     <string name="load_quicksave_when_start_game">Load QuickSave when start game</string>
-    <string name="edit_autoexec_cfg">Edit autoexec.cfg</string>
-    <string name="edit_doomconfig_cfg">Edit DoomConfig.cfg</string>
     <string name="note_gamepads_keyboards_must_be_configured_in_game_like_on_pc_not_here">Note: Gamepads/Keyboards must be configured in-game (like on PC), not here</string>
     <string name="configure_on_screen_controls">Configure on-screen controls</string>
     <string name="on_screen_button_setting">On-screen button setting</string>
@@ -152,6 +150,7 @@
     <string name="graphics">Graphics</string>
     <string name="controls">Controls</string>
     <string name="do_you_want_to_support_the_developer">Do you want to support the developer?</string>
+    <string name="do_you_want_to_support_the_developer_text">idTech4A++ is a completely open and free project, so you can obtain this application for free without paying any fees, and also no need to make any donations to this application, all donation links have been removed.\nThank you for your support.</string>
     <string name="donate_to">Donate to </string>
     <string name="more_apps_in">More apps in</string>
     <string name="dont_ask">Don\'t ask</string>
@@ -528,5 +527,22 @@
     <string name="reset_all_controller_configure">Reset all controller configure</string>
     <string name="automatic">Automatic</string>
     <string name="sdl_audio_driver">SDL audio driver</string>
+    <string name="install_shortcut_tips_if_creating_failed">Maybe require grant install shortcut permission manually in system on some brand devices if creating failed.</string>
+    <string name="name_">Name: </string>
+    <string name="path_">Path: </string>
+    <string name="author_">Author: </string>
+    <string name="description_">Description: </string>
+    <string name="expand_all">Expand all</string>
+    <string name="collapse_all">Collapse all</string>
+    <string name="openal_driver">OpenAL driver</string>
+    <string name="edit_env">Edit env</string>
+    <string name="value_">Value:</string>
+    <string name="input_value">Input value</string>
+    <string name="input_name">Input name</string>
+    <string name="env">Env</string>
+    <string name="must_choose_a_env">Must choose a env</string>
+    <string name="name_must_not_empty">Name must not empty!</string>
+    <string name="urbanterror">Q3-UT4</string>
+    <string name="urbanterror_base">Urban Terror</string>
 
 </resources>

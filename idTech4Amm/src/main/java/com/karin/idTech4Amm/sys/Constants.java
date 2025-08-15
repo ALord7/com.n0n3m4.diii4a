@@ -9,8 +9,8 @@ import com.karin.idTech4Amm.misc.TextHelper;
  */
 public final class Constants
 {
-    public static final int    CONST_UPDATE_RELEASE = 67;
-    public static final String CONST_RELEASE = "2025-05-08"; // 02-12
+    public static final int    CONST_UPDATE_RELEASE = 68;
+    public static final String CONST_RELEASE = "2025-08-09"; // 02-12; 05-08
     public static final String CONST_EMAIL = "beyondk2000@gmail.com";
     public static final String CONST_DEV = "Karin";
     public static final String CONST_CODE = "Harmattan";
@@ -20,6 +20,7 @@ public final class Constants
     public static final String CONST_TIEBA = "https://tieba.baidu.com/p/6825594793";
 	public static final String CONST_DEVELOPER = "https://github.com/glKarin";
     public static final String CONST_DEVELOPER_XDA = "https://forum.xda-developers.com/member.php?u=10584229";
+    public static final String CONST_DISCORD = "https://discord.gg/KFshBra4kh";
     public static final String CONST_PACKAGE = "com.karin.idTech4Amm";
     public static final String CONST_FDROID = "https://f-droid.org/packages/com.karin.idTech4Amm/";
 	public static final String CONST_CHECK_FOR_UPDATE_URL = "https://raw.githubusercontent.com/glKarin/com.n0n3m4.diii4a/master/CHECK_FOR_UPDATE.json";
@@ -28,8 +29,9 @@ public final class Constants
 	public static String[] CONST_CHANGES()
     {
         return new String[] {
-            "Update Wolfenstein: Enemy Territory(ET: Legacy) version to 2.83.2, fix Omni-bot initialization.",
-            "Fix game controller. Add game controller configure on launcher `CONTROL` tab.",
+            "Add `Urban Terror`(ver 4.3.4) support, game standalone directory named `urt`, game data directory named `q3ut4`. More view in `" + TextHelper.GenLinkText("https://www.urbanterror.info", "Urban Terror") + "`.",
+            "Update Quake 2(yquake2) version to 8.51, update vulkan renderer.",
+            "Update GZDOOM version to 4.14.2.",
         };
 	};
 

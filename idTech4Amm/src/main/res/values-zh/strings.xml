@@ -37,8 +37,6 @@
     <string name="specular_exponent_in_interaction_light_model_default_is_4_0">Phong光照下镜面反射指数</string>
     <string name="sound">音频实现(s_driver)</string>
     <string name="load_quicksave_when_start_game">启动游戏时自动加载快速存档</string>
-    <string name="edit_autoexec_cfg">编辑 autoexec.cfg</string>
-    <string name="edit_doomconfig_cfg">编辑 DoomConfig.cfg</string>
     <string name="note_gamepads_keyboards_must_be_configured_in_game_like_on_pc_not_here">说明: 游戏手柄/键盘按键映射都在游戏中设置(就像在PC端一样), 而不在启动器中设置</string>
     <string name="configure_on_screen_controls">配置虚拟按键</string>
     <string name="on_screen_button_setting">虚拟按键功能</string>
@@ -157,6 +155,7 @@
     <string name="graphics">图形</string>
     <string name="controls">控制</string>
     <string name="do_you_want_to_support_the_developer">支持开发者?</string>
+    <string name="do_you_want_to_support_the_developer_text">idTech4A++是一个完全开放和免费的项目, 您可以免费获取此应用程序而无需支付任何费用, 并且也不必对此应用程序进行任何捐赠, 所有的捐赠链接都被删除.\n最后感谢支持.</string>
     <string name="donate_to">捐贈</string>
     <string name="more_apps_in">更多App在</string>
     <string name="dont_ask">不询问</string>
@@ -524,4 +523,21 @@
     <string name="reset_all_controller_configure">重置所有手柄配置</string>
     <string name="automatic">自动</string>
     <string name="sdl_audio_driver">SDL音频驱动</string>
+    <string name="install_shortcut_tips_if_creating_failed">如果快捷方式创建失败, 某些品牌的设备可能需要先在系统应用设置中手动授权安装快捷方式权限.</string>
+    <string name="name_">名称: </string>
+    <string name="path_">路径: </string>
+    <string name="author_">作者: </string>
+    <string name="description_">详情: </string>
+    <string name="expand_all">全部展开</string>
+    <string name="collapse_all">全部折叠</string>
+    <string name="openal_driver">OpenAL驱动</string>
+    <string name="edit_env">编辑环境变量</string>
+    <string name="value_">值: </string>
+    <string name="input_value">输入值</string>
+    <string name="input_name">输入名称</string>
+    <string name="env">环境变量</string>
+    <string name="must_choose_a_env">必须只选择一个环境变量</string>
+    <string name="name_must_not_empty">名称不能为空!</string>
+    <string name="urbanterror">UrT</string>
+    <string name="urbanterror_base">Urban Terror</string>
 </resources>

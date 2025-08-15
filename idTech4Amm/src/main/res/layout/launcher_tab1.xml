@@ -258,6 +258,7 @@
             android:orientation="vertical">
 
             <com.karin.idTech4Amm.widget.Divider
+                android:id="@+id/gameversion_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 myapp:label="@string/version"
@@ -983,6 +984,11 @@
             android:visibility="gone"></include>
 
         <include
+            android:id="@+id/openal_section"
+            layout="@layout/launcher_openal"
+            android:visibility="gone"></include>
+
+        <include
             android:id="@+id/sdl_section"
             layout="@layout/launcher_sdl"
             android:visibility="gone"></include>
@@ -1120,19 +1126,19 @@
                     android:orientation="horizontal">
 
                     <Button
-                        android:id="@+id/launcher_tab1_edit_autoexec"
+                        android:id="@+id/launcher_tab1_edit_config"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="0.5"
-                        android:text="@string/edit_autoexec_cfg"
+                        android:text="@string/edit_config_file"
                         android:textAllCaps="false" />
 
                     <Button
-                        android:id="@+id/launcher_tab1_edit_doomconfig"
+                        android:id="@+id/launcher_tab1_edit_env"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="0.5"
-                        android:text="@string/edit_doomconfig_cfg"
+                        android:text="@string/env"
                         android:textAllCaps="false" />
                 </LinearLayout>
 
